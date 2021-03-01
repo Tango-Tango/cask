@@ -7,7 +7,7 @@ echo "=====> Regnerating Build Environments"
 
 if [ "$BUILD_TARGET" = "host" ] || [ "$BUILD_TARGET" = "all" ]; then
     rm -rf build_host
-    meson setup build_host -Db_sanitize=address,undefined
+    meson setup build_host -Db_sanitize=address,undefined -Db_coverage=true
 fi
 
 if [ "$BUILD_TARGET" = "benchmark" ] || [ "$BUILD_TARGET" = "all" ]; then
