@@ -1,0 +1,10 @@
+build*
+!build.sh
+.toolchains
+toolchains.ini
+subprojects/*
+!subprojects/*.wrap
+!subprojects/packagefiles
+*.tar.gz
+.vscode
+docs

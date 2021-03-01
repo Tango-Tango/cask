@@ -1,0 +1,6 @@
+[wrap-git]
+directory = concurrentqueue-1.0.2
+patch_directory = concurrentqueue-1.0.2-patch
+url = https://github.com/cameron314/concurrentqueue.git
+revision = v1.0.2
+depth = 1
