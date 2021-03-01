@@ -26,6 +26,8 @@ jobs:
         run: sudo apt-get install -y ninja-build build-essential python3-pip gcovr cppcheck
       - name: Install Python Development Dependencies
         run: sudo python3 -m pip install meson==0.56.0
+      - name: Generate the Build Environment
+        run: ./regenerate_env.sh ${{ matrix.target }}
       - name: Build and Test
         working-directory: build_${{ matrix.target }}
         run: meson test --verbose
