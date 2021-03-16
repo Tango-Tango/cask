@@ -27,14 +27,6 @@ TEST(MVar, Create) {
     EXPECT_EQ(take->await(), 123);
 }
 
-TEST(MVar, Read) {
-    auto mvar = MVar<int, std::string>::create(123);
-    auto firstRead = mvar->read().run(Scheduler::global());
-    auto secondRead = mvar->read().run(Scheduler::global());
-    EXPECT_EQ(firstRead->await(), 123);
-    EXPECT_EQ(secondRead->await(), 123);
-}
-
 TEST(MVar, PutsAndTakes) {
     auto mvar = MVar<int>::empty();
 
@@ -44,6 +36,8 @@ TEST(MVar, PutsAndTakes) {
     EXPECT_EQ(take->await(), 123);
     put->await();
 }
+
+
 
 
 TEST(MVar, ResolvesPendingTakesInOrder) {
@@ -158,4 +152,12 @@ TEST(MVar, CleanupCanceledTake) {
     firstPut->await();
     secondPut->await();
     thirdPut->await();
+}
+
+TEST(MVar, Read) {
+    auto mvar = MVar<int, std::string>::create(123);
+    auto firstRead = mvar->read().run(Scheduler::global());
+    auto secondRead = mvar->read().run(Scheduler::global());
+    EXPECT_EQ(firstRead->await(), 123);
+    EXPECT_EQ(secondRead->await(), 123);
 }

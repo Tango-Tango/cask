@@ -83,10 +83,16 @@ private:
     MVar();
     MVar(const T& initialValue);
 
-    std::mutex mutex;
+    std::recursive_mutex mutex;
     std::optional<T> valueOpt;
     std::deque<std::pair<PromiseRef<None,E>,T>> pendingPuts;
     std::deque<PromiseRef<T,E>> pendingTakes;
+
+    static DeferredRef<None,E> pushPutOntoQueue(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched, const T& newValue);
+    static DeferredRef<None,E> resolveTakeOrStore(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched, const T& newValue);
+
+    static DeferredRef<T,E> pushTakeOntoQueue(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched);
+    static DeferredRef<T,E> resolvePutOrClear(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched);
 
     void cleanupTake(PromiseRef<T,E>);
     void cleanupPut(PromiseRef<None,E>);
@@ -125,26 +131,9 @@ Task<None,E> MVar<T,E>::put(const T& newValue) {
     return Task<None,E>::deferAction([self, newValue](auto sched) {
         std::lock_guard(self->mutex);
         if(self->valueOpt.has_value()) {
-            auto promise = Promise<None,E>::create(sched);
-            self->pendingPuts.emplace_back(promise, newValue);
-            promise->onCancel([promiseWeak = std::weak_ptr(promise), selfWeak = std::weak_ptr(self)](auto) {
-                if(auto self = selfWeak.lock()) {
-                    if(auto promise = promiseWeak.lock()) {
-                        self->cleanupPut(promise);
-                    }
-                }
-            });
-            return Deferred<None,E>::forPromise(promise);
+            return pushPutOntoQueue(self, sched, newValue);
         } else {
-            if(!self->pendingTakes.empty()) {
-                auto nextTake = self->pendingTakes.front();
-                nextTake->success(newValue);
-                self->pendingTakes.pop_front();
-            } else {
-                self->valueOpt = newValue;
-            }
-
-            return Deferred<None,E>::pure(None());
+            return resolveTakeOrStore(self, sched, newValue);
         }
     });
 }
@@ -156,29 +145,9 @@ Task<T,E> MVar<T,E>::take() {
     return Task<T,E>::deferAction([self](auto sched) {
         std::lock_guard(self->mutex);
         if(self->valueOpt.has_value()) {
-            auto value = *(self->valueOpt);
-
-            if(!self->pendingPuts.empty()) {
-                auto nextPut = self->pendingPuts.front();
-                self->valueOpt = nextPut.second;
-                nextPut.first->success(None());
-                self->pendingPuts.pop_front();
-            } else {
-                self->valueOpt.reset();
-            }
-
-            return Deferred<T,E>::pure(value);
+            return resolvePutOrClear(self, sched);
         } else {
-            auto promise = Promise<T,E>::create(sched);
-            self->pendingTakes.emplace_back(promise);
-            promise->onCancel([promiseWeak = std::weak_ptr(promise), selfWeak = std::weak_ptr(self)](auto) {
-                if(auto self = selfWeak.lock()) {
-                    if(auto promise = promiseWeak.lock()) {
-                        self->cleanupTake(promise);
-                    }
-                }
-            });
-            return Deferred<T,E>::forPromise(promise);
+            return pushTakeOntoQueue(self, sched);
         }
     });
 }
@@ -191,6 +160,63 @@ Task<T,E> MVar<T,E>::read() {
             return value;
         });
     });
+}
+
+template <class T, class E>
+DeferredRef<None,E> MVar<T,E>::pushPutOntoQueue(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched, const T& newValue) {
+    auto promise = Promise<None,E>::create(sched);
+    self->pendingPuts.emplace_back(promise, newValue);
+    promise->onCancel([promiseWeak = std::weak_ptr(promise), selfWeak = std::weak_ptr(self)](auto) {
+        if(auto self = selfWeak.lock()) {
+            if(auto promise = promiseWeak.lock()) {
+                self->cleanupPut(promise);
+            }
+        }
+    });
+    return Deferred<None,E>::forPromise(promise);
+}
+
+template <class T, class E>
+DeferredRef<None,E> MVar<T,E>::resolveTakeOrStore(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched, const T& newValue) {
+    if(!self->pendingTakes.empty()) {
+        auto nextTake = self->pendingTakes.front();
+        nextTake->success(newValue);
+        self->pendingTakes.pop_front();
+    } else {
+        self->valueOpt = newValue;
+    }
+
+    return Deferred<None,E>::pure(None());
+}
+
+template <class T, class E>
+DeferredRef<T,E> MVar<T,E>::pushTakeOntoQueue(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched) {
+    auto promise = Promise<T,E>::create(sched);
+    self->pendingTakes.emplace_back(promise);
+    promise->onCancel([promiseWeak = std::weak_ptr(promise), selfWeak = std::weak_ptr(self)](auto) {
+        if(auto self = selfWeak.lock()) {
+            if(auto promise = promiseWeak.lock()) {
+                self->cleanupTake(promise);
+            }
+        }
+    });
+    return Deferred<T,E>::forPromise(promise);
+}
+
+template <class T, class E>
+DeferredRef<T,E> MVar<T,E>::resolvePutOrClear(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched) {
+    auto value = *(self->valueOpt);
+
+    if(!self->pendingPuts.empty()) {
+        auto nextPut = self->pendingPuts.front();
+        self->valueOpt = nextPut.second;
+        nextPut.first->success(None());
+        self->pendingPuts.pop_front();
+    } else {
+        self->valueOpt.reset();
+    }
+
+    return Deferred<T,E>::pure(value);
 }
 
 template <class T, class E>
