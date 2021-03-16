@@ -74,7 +74,7 @@ void Scheduler::run() {
     std::function<void()> task;
     while(running) {
         readyQueueLock.lock();
-        if(dataInQueue.wait_for(readyQueueLock, max_wait_time) == std::cv_status::no_timeout) {
+        if(dataInQueue.wait_for(readyQueueLock, max_wait_time, [this](){return !readyQueue.empty(); })) {
             task = readyQueue.front();
             readyQueue.pop();
             readyQueueLock.unlock();
