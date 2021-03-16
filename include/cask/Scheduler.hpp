@@ -7,13 +7,14 @@
 #define _CASK_SCHEDULER_H_
 
 #include <atomic>
+#include <condition_variable>
 #include <functional>
 #include <map>
 #include <mutex>
 #include <optional>
 #include <thread>
 #include <vector>
-#include "blockingconcurrentqueue.h"
+#include <queue>
 
 namespace cask {
 
@@ -65,11 +66,13 @@ public:
     void submitAfter(int milliseconds, std::function<void()> task);
 private:
     bool running;
-    moodycamel::BlockingConcurrentQueue<std::function<void()>> readyQueue;
+
+    std::mutex readyQueueMutex;
+    std::condition_variable dataInQueue;
+    std::queue<std::function<void()>> readyQueue;
     std::mutex timerMutex;
     std::map<long,std::vector<std::function<void()>>> timers;
     std::vector<std::thread> runThreads;
-    std::map<std::thread::id,moodycamel::ProducerToken> producerTokens;
     std::thread timerThread;
     std::atomic_long ticks;
 

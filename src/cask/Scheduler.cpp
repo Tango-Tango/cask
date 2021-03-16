@@ -16,16 +16,16 @@ std::shared_ptr<Scheduler> Scheduler::global() {
 
 Scheduler::Scheduler(int poolSize)
     : running(true)
+    , readyQueueMutex()
+    , dataInQueue()
     , readyQueue()
     , timerMutex()
     , timers()
     , runThreads()
-    , producerTokens()
     , timerThread()
 {
     for(int i =0; i < poolSize; i++) {
         std::thread poolThread(std::bind(&Scheduler::run, this));
-        producerTokens.emplace(poolThread.get_id(), moodycamel::ProducerToken(readyQueue));
         runThreads.push_back(std::move(poolThread));
     }
 
@@ -47,13 +47,11 @@ Scheduler::~Scheduler() {
 }
 
 void Scheduler::submit(std::function<void()> task) {
-    auto tokenIter = producerTokens.find(std::this_thread::get_id());
-
-    if(tokenIter != producerTokens.end()) {
-        readyQueue.enqueue(tokenIter->second, task);
-    } else {
-        readyQueue.enqueue(task);
+    {
+        std::lock_guard guard(readyQueueMutex);
+        readyQueue.emplace(task);
     }
+    dataInQueue.notify_one();
 }
 
 void Scheduler::submitAfter(int milliseconds, std::function<void()> task) {
@@ -71,11 +69,18 @@ void Scheduler::submitAfter(int milliseconds, std::function<void()> task) {
 }
 
 void Scheduler::run() {
-    moodycamel::ConsumerToken token(readyQueue);
+    std::unique_lock<std::mutex> readyQueueLock(readyQueueMutex, std::defer_lock);
+    std::chrono::milliseconds max_wait_time(10);
     std::function<void()> task;
     while(running) {
-        if(readyQueue.wait_dequeue_timed(token, task, std::chrono::milliseconds(1))) {
+        readyQueueLock.lock();
+        if(dataInQueue.wait_for(readyQueueLock, max_wait_time) == std::cv_status::no_timeout) {
+            task = readyQueue.front();
+            readyQueue.pop();
+            readyQueueLock.unlock();
             task();
+        } else {
+            readyQueueLock.unlock();
         }
     }
 }
