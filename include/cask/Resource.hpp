@@ -146,7 +146,8 @@ constexpr Resource<T2,E> Resource<T,E>::flatMap(std::function<Resource<T2,E>(T)>
 
     std::function<TargetResourceTask(SourceResource)> composeResources =
         [predicate](SourceResource result) {
-            auto [outerValue, outerRelease] = result;
+            T outerValue = std::get<0>(result);
+            ReleaseTask outerRelease = std::get<1>(result);
             Resource<T2,E> innerResource = predicate(outerValue);
 
             std::function<TargetResource(TargetResource)> innerCompose =

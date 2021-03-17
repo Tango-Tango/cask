@@ -22,7 +22,7 @@ public:
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;
     void cancel(const E& override) override;
-    T await();
+    T await() override;
 private:
 };
 
