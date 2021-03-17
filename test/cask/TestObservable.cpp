@@ -10,6 +10,7 @@
 using cask::Scheduler;
 using cask::Observable;
 using cask::Task;
+using cask::None;
 
 TEST(Observable, PureLast) {
     auto sched = Scheduler::global();
@@ -224,4 +225,69 @@ TEST(Observable, TakeWhile) {
 
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(*result, 10);
+}
+
+TEST(Observable, FromVector) {
+    std::vector<int> things = {1,2,3};
+
+    auto result = Observable<int>::fromVector(things)
+        ->take(3)
+        .run(Scheduler::global())
+        ->await();
+
+    ASSERT_EQ(result.size(), 3);
+    EXPECT_EQ(result[0], 1);
+    EXPECT_EQ(result[1], 2);
+    EXPECT_EQ(result[2], 3);
+}
+
+TEST(Observable, FromVectorEnds) {
+    std::vector<int> things = {1,2,3};
+
+    auto result = Observable<int>::fromVector(things)
+        ->take(10)
+        .run(Scheduler::global())
+        ->await();
+
+    ASSERT_EQ(result.size(), 3);
+    EXPECT_EQ(result[0], 1);
+    EXPECT_EQ(result[1], 2);
+    EXPECT_EQ(result[2], 3);
+}
+
+TEST(Observable, FromVectorEmpty) {
+    std::vector<int> things;
+
+    auto result = Observable<int>::fromVector(things)
+        ->take(10)
+        .run(Scheduler::global())
+        ->await();
+
+    ASSERT_EQ(result.size(), 0);
+}
+
+TEST(Observable, CompletedEmpty) {
+    auto result = Observable<int>::empty()
+        ->completed()
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_EQ(result, None());
+}
+
+TEST(Observable, CompletedNonEmpty) {
+    int counter = 0;
+    auto result = Observable<int>::repeatTask(
+            Task<int>::eval([&counter]() {
+                counter++;
+                return counter;
+            })
+        )
+        ->takeWhile([](auto i) { return i < 3; })
+        ->completed()
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_EQ(result, None());
+    EXPECT_EQ(counter, 3);
 }

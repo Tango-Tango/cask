@@ -103,6 +103,16 @@ public:
     static ObservableRef<T,E> repeatTask(Task<T,E> task);
 
     /**
+     * Create an observable who emits each element of the given vector
+     * to downstream observers.
+     * @param vector The vector to iterator through and whose values to
+     *               emit downstream.
+     * @return A new observable which will emit the values of the given
+     *         vector on subscription
+     */
+    static ObservableRef<T,E> fromVector(const std::vector<T>& vector);
+
+    /**
      * Subscribe to the observer - beginning computation of the stream. Ongoing
      * computation may be cancled by using the returned cancelation handle.
      * 
@@ -157,6 +167,17 @@ public:
     Task<std::optional<T>,E> last() const;
 
     /**
+     * When this observable has processed all available values return
+     * an empty task denoting that completion. Useful for cases where
+     * a user would like to ensure processing of an observable completes
+     * but otherwise does not care what the results were.
+     * 
+     * @return A task which, upon evaluation, will evaluate the complete
+     *         observable and provide a None result on completion.
+     */
+    Task<None,E> completed() const;
+
+    /**
      * Accumulate the given number of elements from the stream and return
      * them to the caller. If the stream finishes before the given number
      * elements could be accumulated then whatever elements were found
@@ -197,6 +218,7 @@ public:
 #include "observable/RepeatTaskObservable.hpp"
 #include "observable/TakeObserver.hpp"
 #include "observable/TakeWhileObservable.hpp"
+#include "observable/VectorObservable.hpp"
 
 namespace cask {
 
@@ -240,6 +262,11 @@ std::shared_ptr<Observable<T,E>> Observable<T,E>::repeatTask(Task<T,E> task) {
 }
 
 template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::fromVector(const std::vector<T>& vector) {
+    return std::make_shared<observable::VectorObservable<T,E>>(vector);
+}
+
+template <class T, class E>
 template <class T2>
 std::shared_ptr<Observable<T2,E>> Observable<T,E>::map(std::function<T2(T)> predicate) const {
     auto self = this->shared_from_this();
@@ -274,6 +301,11 @@ Task<std::optional<T>,E> Observable<T,E>::last() const {
 
         return Deferred<std::optional<T>,E>::forPromise(promise);
     });
+}
+
+template <class T, class E>
+Task<None,E> Observable<T,E>::completed() const {
+    return last().template map<None>([](auto) { return None(); });
 }
 
 template <class T, class E>
