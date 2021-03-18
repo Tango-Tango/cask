@@ -3,6 +3,10 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 1.3
+
+- Add the `takeWhileInclusive` method to `Observable`.
+
 ## 1.2
 
 - Add the `mapError` method to `Observable`.
