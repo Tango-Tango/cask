@@ -133,6 +133,16 @@ public:
     ObservableRef<T2,E> map(std::function<T2(T)> predicate) const;
 
     /**
+     * Transform each error of the stream using the provided transforming predicate
+     * function.
+     *
+     * @param predicate The function to apply to each error of the stream.
+     * @return A new observable which transforms each error of the stream.
+     */
+    template <class E2>
+    ObservableRef<T,E2> mapError(std::function<E2(E)> predicate) const;
+
+    /**
      * Transform each element of the stream using the providing transforming predicat
      * function which may execute synchronously or asynchronously in the context of the
      * returned task.
@@ -214,6 +224,7 @@ public:
 #include "observable/FlatMapObservable.hpp"
 #include "observable/LastObserver.hpp"
 #include "observable/MapObservable.hpp"
+#include "observable/MapErrorObservable.hpp"
 #include "observable/MapTaskObservable.hpp"
 #include "observable/RepeatTaskObservable.hpp"
 #include "observable/TakeObserver.hpp"
@@ -271,6 +282,13 @@ template <class T2>
 std::shared_ptr<Observable<T2,E>> Observable<T,E>::map(std::function<T2(T)> predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::MapObservable<T,T2,E>>(self, predicate);
+}
+
+template <class T, class E>
+template <class E2>
+std::shared_ptr<Observable<T,E2>> Observable<T,E>::mapError(std::function<E2(E)> predicate) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::MapErrorObservable<T,E,E2>>(self, predicate);
 }
 
 template <class T, class E>

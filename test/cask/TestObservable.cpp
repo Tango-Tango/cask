@@ -35,6 +35,22 @@ TEST(Observable, PureMap) {
     EXPECT_EQ(*result, 184.5);
 }
 
+TEST(Observable, RaiseErrorMapError) {
+    auto sched = Scheduler::global();
+    auto result = Observable<int, std::string>::raiseError("broke")
+        ->mapError<std::string>([](auto error) {
+            std::string copy(error);
+            std::reverse(copy.begin(), copy.end());
+            return copy;
+        })
+        ->last()
+        .failed()
+        .run(sched)
+        ->await();
+
+    EXPECT_EQ(result, "ekorb");
+}
+
 TEST(Observable, PureMapTask) {
     auto sched = Scheduler::global();
     auto result = Observable<int>::pure(123)
