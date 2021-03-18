@@ -12,17 +12,6 @@ using cask::Observable;
 using cask::Task;
 using cask::None;
 
-TEST(Observable, PureLast) {
-    auto sched = Scheduler::global();
-    auto result = Observable<int>::pure(123)
-        ->last()
-        .run(sched)
-        ->await();
-
-    EXPECT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 123);
-}
-
 TEST(Observable, PureMap) {
     auto sched = Scheduler::global();
     auto result = Observable<int>::pure(123)
@@ -77,26 +66,6 @@ TEST(Observable, PureFlatMap) {
 
     EXPECT_TRUE(result.has_value());
     EXPECT_EQ(*result, 184.5);
-}
-
-TEST(Observable, PureTake) {
-    auto sched = Scheduler::global();
-    auto result = Observable<int>::pure(123)
-        ->take(10)
-        .run(sched)
-        ->await();
-
-    EXPECT_EQ(result.size(), 1);
-}
-
-TEST(Observable, RepeatTaskTake) {
-    auto sched = Scheduler::global();
-    auto result = Observable<int>::repeatTask(cask::Task<int>::pure(123))
-        ->take(10)
-        .run(sched)
-        ->await();
-
-    EXPECT_EQ(result.size(), 10);
 }
 
 TEST(Observable, Empty) {
@@ -224,23 +193,6 @@ TEST(Observable, DeferTaskRaisesError) {
         ->await();
 
     EXPECT_EQ(result, "broke");
-}
-
-TEST(Observable, TakeWhile) {
-    int counter = 0;
-    auto result = Observable<int>::repeatTask(Task<int>::eval([&counter] {
-            counter++;
-            return counter;
-        }))
-        ->takeWhile([](auto value) {
-            return value <= 10;
-        })
-        ->last()
-        .run(Scheduler::global())
-        ->await();
-
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 10);
 }
 
 TEST(Observable, FromVector) {
