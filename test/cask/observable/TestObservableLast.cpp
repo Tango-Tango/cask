@@ -20,6 +20,16 @@ TEST(ObservableLast, Pure) {
     EXPECT_EQ(*result, 123);
 }
 
+TEST(ObservableLast, Error) {
+    auto result = Observable<int,float>::raiseError(1.23)
+        ->last()
+        .failed()
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_EQ(result, 1.23f);
+}
+
 TEST(ObservableLast, Empty) {
     auto result = Observable<int>::empty()
         ->last()

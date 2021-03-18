@@ -195,23 +195,6 @@ TEST(Observable, DeferTaskRaisesError) {
     EXPECT_EQ(result, "broke");
 }
 
-TEST(Observable, TakeWhile) {
-    int counter = 0;
-    auto result = Observable<int>::repeatTask(Task<int>::eval([&counter] {
-            counter++;
-            return counter;
-        }))
-        ->takeWhile([](auto value) {
-            return value <= 10;
-        })
-        ->last()
-        .run(Scheduler::global())
-        ->await();
-
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 10);
-}
-
 TEST(Observable, FromVector) {
     std::vector<int> things = {1,2,3};
 

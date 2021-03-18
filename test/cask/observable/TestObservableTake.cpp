@@ -10,6 +10,26 @@
 using cask::Observable;
 using cask::Scheduler;
 
+
+TEST(ObservableTake, ErrorTakeNothing) {
+    auto result = Observable<int,float>::raiseError(1.23)
+        ->take(0)
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_TRUE(result.empty());
+}
+
+TEST(ObservableTake, ErrorTakeOne) {
+    auto result = Observable<int,float>::raiseError(1.23)
+        ->take(1)
+        .failed()
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_EQ(result, 1.23f);
+}
+
 TEST(ObservableTake, PureTakeNothing) {
     auto result = Observable<int>::pure(123)
         ->take(0)
