@@ -38,9 +38,10 @@ TakeObserver<T,E>::TakeObserver(unsigned int amount, std::weak_ptr<Promise<std::
 
 template <class T, class E>
 DeferredRef<Ack,E> TakeObserver<T,E>::onNext(T value) {
-    remaining--;
     entries.push_back(value);
-    if(remaining == 0) {
+    remaining -= 1;
+
+    if(remaining <= 0) {
         if(auto promiseLock = promise.lock()) {
             promiseLock->success(entries);
         }

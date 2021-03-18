@@ -52,7 +52,7 @@ DeferredRef<Ack,E> FlatMapObserver<TI,TO,E>::onNext(TI value) {
             return downstream->onNext(resultValue);
         });
     })
-    ->takeWhile([](auto ack){
+    ->takeWhileInclusive([](auto ack){
         return ack == Continue;
     })
     ->last()

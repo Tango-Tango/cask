@@ -18,22 +18,24 @@ namespace cask::observable {
 template <class T, class E>
 class TakeWhileObservable final : public Observable<T,E> {
 public:
-    TakeWhileObservable(std::shared_ptr<const Observable<T,E>> upstream, std::function<bool(T)> predicate);
+    TakeWhileObservable(std::shared_ptr<const Observable<T,E>> upstream, std::function<bool(T)> predicate, bool inclusive);
     CancelableRef<E> subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
 private:
     std::shared_ptr<const Observable<T,E>> upstream;
     std::function<bool(T)> predicate;
+    bool inclusive;
 };
 
 template <class T, class E>
-TakeWhileObservable<T,E>::TakeWhileObservable(std::shared_ptr<const Observable<T,E>> upstream, std::function<bool(T)> predicate)
+TakeWhileObservable<T,E>::TakeWhileObservable(std::shared_ptr<const Observable<T,E>> upstream, std::function<bool(T)> predicate, bool inclusive)
     : upstream(upstream)
     , predicate(predicate)
+    , inclusive(inclusive)
 {}
 
 template <class T, class E>
 CancelableRef<E> TakeWhileObservable<T,E>::subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const {
-    auto takeWhileObserver = std::make_shared<TakeWhileObserver<T,E>>(observer, predicate);
+    auto takeWhileObserver = std::make_shared<TakeWhileObserver<T,E>>(sched, observer, predicate, inclusive);
     return upstream->subscribe(sched, takeWhileObserver);
 }
 

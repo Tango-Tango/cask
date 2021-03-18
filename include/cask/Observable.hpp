@@ -203,7 +203,9 @@ public:
      * Consume from the upstream observable and emit downstream while the
      * given predicate function returns true. Once the predicate returns false
      * send the stop signal upstream and complete the downstream observers - thus
-     * shutting down the stream.
+     * shutting down the stream. Values emitted downstream only include those for
+     * which the predicate returned true - it is not inclusive of the final value
+     * evaluated by the predicate.
      *
      * @param predicate The method to apply to each element of the stream - continuing
      *                  streaming while it returns true.
@@ -211,6 +213,20 @@ public:
      *         predicate function.
      */
     ObservableRef<T,E> takeWhile(std::function<bool(T)> predicate) const;
+
+    /**
+     * Consume from the upstream observable and emit downstream while the
+     * given predicate function returns true. Once the predicate returns false
+     * send the stop signal upstream and complete the downstream observers - thus
+     * shutting down the stream.V alues emitted downstream are inclusive of the final
+     * value evaluated by the predicate (where it returned false).
+     *
+     * @param predicate The method to apply to each element of the stream - continuing
+     *                  streaming while it returns true.
+     * @return An observable that emits only the first elements matching the given
+     *         predicate function.
+     */
+    ObservableRef<T,E> takeWhileInclusive(std::function<bool(T)> predicate) const;
 
     virtual ~Observable();
 };
@@ -328,24 +344,34 @@ Task<None,E> Observable<T,E>::completed() const {
 
 template <class T, class E>
 Task<std::vector<T>,E> Observable<T,E>::take(unsigned int amount) const {
-    auto self = this->shared_from_this();
-    return Task<std::vector<T>,E>::deferAction([self = self, amount](auto sched) {
-        auto promise = Promise<std::vector<T>,E>::create(sched);
-        auto observer = std::shared_ptr<Observer<T,E>>(new observable::TakeObserver<T,E>(amount, promise));
-        auto subscription = self->subscribe(sched, observer);
+    if(amount == 0) {
+        return Task<std::vector<T>,E>::pure(std::vector<T>());
+    } else {
+        auto self = this->shared_from_this();
+        return Task<std::vector<T>,E>::deferAction([self = self, amount](auto sched) {
+            auto promise = Promise<std::vector<T>,E>::create(sched);
+            auto observer = std::shared_ptr<Observer<T,E>>(new observable::TakeObserver<T,E>(amount, promise));
+            auto subscription = self->subscribe(sched, observer);
 
-        promise->onCancel([subscription](auto cancelError) {
-            subscription->cancel(cancelError);
+            promise->onCancel([subscription](auto cancelError) {
+                subscription->cancel(cancelError);
+            });
+
+            return Deferred<std::vector<T>,E>::forPromise(promise);
         });
-
-        return Deferred<std::vector<T>,E>::forPromise(promise);
-    });
+    }
 }
 
 template <class T, class E>
 ObservableRef<T,E> Observable<T,E>::takeWhile(std::function<bool(T)> predicate) const {
     auto self = this->shared_from_this();
-    return std::make_shared<observable::TakeWhileObservable<T,E>>(self, predicate);
+    return std::make_shared<observable::TakeWhileObservable<T,E>>(self, predicate, false);
+}
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::takeWhileInclusive(std::function<bool(T)> predicate) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::TakeWhileObservable<T,E>>(self, predicate, true);
 }
 
 template <class T, class E>

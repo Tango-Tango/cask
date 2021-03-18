@@ -19,19 +19,35 @@ namespace cask::observable {
 template <class T, class E>
 class TakeWhileObserver final : public Observer<T,E> {
 public:
-    TakeWhileObserver(ObserverRef<T,E> downstream, std::function<bool(T)> predicate);
+    TakeWhileObserver(
+        std::shared_ptr<Scheduler> sched,
+        ObserverRef<T,E> downstream,
+        std::function<bool(T)> predicate,
+        bool inclusive
+    );
     DeferredRef<Ack,E> onNext(T value);
     void onError(E error);
     void onComplete();
 private:
+    std::shared_ptr<Scheduler> sched;
     ObserverRef<T,E> downstream;
     std::function<bool(T)> predicate;
+    bool inclusive;
+    bool completed;
 };
 
 template <class T, class E>
-TakeWhileObserver<T,E>::TakeWhileObserver(ObserverRef<T,E> downstream, std::function<bool(T)> predicate)
-    : downstream(downstream)
+TakeWhileObserver<T,E>::TakeWhileObserver(
+    std::shared_ptr<Scheduler> sched,
+    ObserverRef<T,E> downstream,
+    std::function<bool(T)> predicate,
+    bool inclusive
+)
+    : sched(sched)
+    , downstream(downstream)
     , predicate(predicate)
+    , inclusive(inclusive)
+    , completed(false)
 {}
 
 template <class T, class E>
@@ -39,8 +55,19 @@ DeferredRef<Ack,E> TakeWhileObserver<T,E>::onNext(T value) {
     if(predicate(value)) {
         return downstream->onNext(value);
     } else {
-        downstream->onComplete();
-        return Deferred<Ack,E>::pure(Stop);
+        if(inclusive) {
+            return Task<Ack,E>::deferAction([downstream = this->downstream, value](auto) {
+                    return downstream->onNext(value);
+                })
+                .template map<Ack>([this](auto) {
+                    onComplete();
+                    return Stop;
+                })
+                .run(sched);
+        } else {
+            downstream->onComplete();
+            return Deferred<Ack,E>::pure(Stop);
+        }
     }
 }
 
@@ -51,7 +78,10 @@ void TakeWhileObserver<T,E>::onError(E error) {
 
 template <class T, class E>
 void TakeWhileObserver<T,E>::onComplete() {
-    downstream->onComplete();
+    if(!completed) {
+        completed = true;
+        downstream->onComplete();
+    }
 }
 
 }
