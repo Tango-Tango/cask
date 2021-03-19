@@ -3,6 +3,10 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 1.4
+
+- Add `flatten` and `fromTask` to `Observable`.
+
 ## 1.3
 
 - Add the `takeWhileInclusive` method to `Observable`.
