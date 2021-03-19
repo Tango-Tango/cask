@@ -56,9 +56,6 @@ DeferredRef<Ack,E> FlatMapObserver<TI,TO,E>::onNext(TI value) {
         return ack == Continue;
     })
     ->last()
-    .onError([downstream = downstream](auto error) {
-        downstream->onError(error);
-    })
     .template map<Ack>([downstream = downstream](auto lastAckOpt) {
         if(lastAckOpt.has_value()) {
             return *lastAckOpt;

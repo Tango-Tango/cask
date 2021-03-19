@@ -103,6 +103,14 @@ public:
     static ObservableRef<T,E> repeatTask(Task<T,E> task);
 
     /**
+     * Create an observable which evalutes the given task a single time and
+     * emites its result.
+     * @param task The task to execute.
+     * @return A new observable which will execute the give task a single time.
+     */
+    static ObservableRef<T,E> fromTask(Task<T,E> task);
+
+    /**
      * Create an observable who emits each element of the given vector
      * to downstream observers.
      * @param vector The vector to iterator through and whose values to
@@ -166,6 +174,21 @@ public:
      */
     template <class T2>
     ObservableRef<T2,E> flatMap(std::function<ObservableRef<T2,E>(T)> predicate) const;
+
+    /**
+     * Given a nested observable (an observable who emits other observables)
+     * flatten them by evaluating each inner observable in-order and
+     * emmitting those values downstream.
+     * 
+     * NOTE: This method implements the same behavior as `concatMap` from rx.
+     * 
+     * @return An observable which evaluates each inner observable in-order and
+     *         emits its values downstream.
+     */
+    template <class T2, typename std::enable_if<
+        std::is_assignable<ObservableRef<T2,E>,T>::value
+    >::type* = nullptr>
+    ObservableRef<T2,E> flatten() const;
 
     /**
      * Emit the last value of this stream seen. Note that if the stream of
@@ -289,6 +312,11 @@ std::shared_ptr<Observable<T,E>> Observable<T,E>::repeatTask(Task<T,E> task) {
 }
 
 template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::fromTask(Task<T,E> task) {
+    return deferTask([task](){ return task; });
+}
+
+template <class T, class E>
 ObservableRef<T,E> Observable<T,E>::fromVector(const std::vector<T>& vector) {
     return std::make_shared<observable::VectorObservable<T,E>>(vector);
 }
@@ -319,6 +347,14 @@ template <class T2>
 ObservableRef<T2,E> Observable<T,E>::flatMap(std::function<ObservableRef<T2,E>(T)> predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::FlatMapObservable<T,T2,E>>(self, predicate);
+}
+
+template <class T, class E>
+template <class T2, typename std::enable_if<
+    std::is_assignable<ObservableRef<T2,E>,T>::value
+>::type*>
+ObservableRef<T2,E> Observable<T,E>::flatten() const {
+    return this->template flatMap<T2>([](auto inner){ return inner; });
 }
 
 template <class T, class E>
