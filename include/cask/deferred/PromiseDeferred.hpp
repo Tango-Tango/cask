@@ -25,7 +25,7 @@ class PromiseDeferred;
 template <class T, class E = std::any>
 class PromiseDeferred final : public Deferred<T,E> {
 public:
-    PromiseDeferred(std::shared_ptr<Promise<T,E>> promise);
+    explicit PromiseDeferred(std::shared_ptr<Promise<T,E>> promise);
     void onComplete(std::function<void(Either<T,E>)> callback) override;
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;

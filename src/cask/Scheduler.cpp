@@ -46,7 +46,7 @@ Scheduler::~Scheduler() {
     } catch(const std::system_error& error) {}
 }
 
-void Scheduler::submit(std::function<void()> task) {
+void Scheduler::submit(const std::function<void()>& task) {
     {
         std::lock_guard guard(readyQueueMutex);
         readyQueue.emplace(task);
@@ -54,8 +54,8 @@ void Scheduler::submit(std::function<void()> task) {
     dataInQueue.notify_one();
 }
 
-void Scheduler::submitAfter(int milliseconds, std::function<void()> task) {
-    long executionTick = ticks.load() + milliseconds;
+void Scheduler::submitAfter(int milliseconds, const std::function<void()>& task) {
+    int64_t executionTick = ticks.load() + milliseconds;
     {
         std::lock_guard guard(timerMutex);
         auto tasks = timers.find(executionTick);
@@ -88,7 +88,7 @@ void Scheduler::run() {
 void Scheduler::timer() {
     while(running) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        long currentTick = ticks.fetch_add(1);
+        int64_t currentTick = ticks.fetch_add(1);
 
         {
             std::lock_guard guard(timerMutex);
@@ -103,4 +103,4 @@ void Scheduler::timer() {
     }
 }
 
-}
+} // namespace cask

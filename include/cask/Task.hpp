@@ -256,8 +256,8 @@ public:
      * should not be called directly and, instead, users should use provided
      * operators to build these operations automatically.
      */
-    constexpr Task(const std::shared_ptr<trampoline::TrampolineOp>& op) noexcept;
-    constexpr Task(std::shared_ptr<trampoline::TrampolineOp>&& op) noexcept;
+    constexpr explicit Task(const std::shared_ptr<trampoline::TrampolineOp>& op) noexcept;
+    constexpr explicit Task(std::shared_ptr<trampoline::TrampolineOp>&& op) noexcept;
 
     const std::shared_ptr<trampoline::TrampolineOp> op;
 };

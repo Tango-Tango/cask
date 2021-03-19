@@ -13,7 +13,7 @@ namespace cask::observable {
 template <class T, class E>
 class EvalObservable final : public Observable<T,E> {
 public:
-    EvalObservable(std::function<T()> predicate);
+    explicit EvalObservable(std::function<T()> predicate);
     CancelableRef<E> subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
 
 private:
@@ -27,7 +27,7 @@ EvalObservable<T,E>::EvalObservable(std::function<T()> predicate)
 
 template <class T, class E>
 CancelableRef<E> EvalObservable<T,E>::subscribe(
-    std::shared_ptr<Scheduler> sched,
+    std::shared_ptr<Scheduler>,
     std::shared_ptr<Observer<T,E>> observer) const
 {
     try {

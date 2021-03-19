@@ -50,7 +50,7 @@ public:
      * Construct a promise. Provided purely for compatibility with `std::make_shared`
      * and can cause issues if used directly. Please use `Promise<T,E>::create` instead.
      */
-    Promise(std::shared_ptr<Scheduler> sched);
+    explicit Promise(std::shared_ptr<Scheduler> sched);
 
     /**
      * Complete this promise with the given value.

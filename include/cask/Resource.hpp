@@ -37,7 +37,7 @@ public:
     /**
      * Create a resource wrapping the given allocation task.
      */
-    constexpr Resource(const AllocatedResourceTask& allocated) noexcept;
+    constexpr explicit Resource(const AllocatedResourceTask& allocated) noexcept;
 
     /**
      * Acquire and use this resource. The acquired resource will be supplied to

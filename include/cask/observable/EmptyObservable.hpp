@@ -21,7 +21,7 @@ private:
 
 template <class T, class E>
 CancelableRef<E> EmptyObservable<T,E>::subscribe(
-    std::shared_ptr<Scheduler> sched,
+    std::shared_ptr<Scheduler>,
     std::shared_ptr<Observer<T,E>> observer) const
 {
     observer->onComplete();

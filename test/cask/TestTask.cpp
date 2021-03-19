@@ -65,7 +65,7 @@ TEST(Task, EvalWithoutErrorType) {
 
 TEST(Task, DeferAsync) {
     auto sched = Scheduler::global();
-    auto task = Task<int,None>::deferAction([](auto sched){
+    auto task = Task<int,None>::deferAction([](auto){
         return Deferred<int,None>::pure(123);
     });
     auto result = task.run(sched);
@@ -74,7 +74,7 @@ TEST(Task, DeferAsync) {
 
 TEST(Task, DeferWithoutErrorType) {
     auto sched = Scheduler::global();
-    auto task = Task<int>::deferAction([](auto sched){
+    auto task = Task<int>::deferAction([](auto){
         return Deferred<int>::pure(123);
     });
     auto result = task.run(sched);
@@ -83,7 +83,7 @@ TEST(Task, DeferWithoutErrorType) {
 
 TEST(Task, DeferError) {
     auto sched = Scheduler::global();
-    auto task = Task<None,int>::deferAction([](auto sched){
+    auto task = Task<None,int>::deferAction([](auto){
         return Deferred<None,int>::raiseError(123);
     });
     auto result = task.failed().run(sched);
@@ -129,7 +129,7 @@ TEST(Task, EvalMapAsync) {
 
 TEST(Task, DeferMapAsync) {
     auto sched = Scheduler::global();
-    auto task = Task<int,None>::deferAction([](auto sched){
+    auto task = Task<int,None>::deferAction([](auto){
             return Deferred<int,None>::pure(123);
         })
         .map<float>([](auto value){

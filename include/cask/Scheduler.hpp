@@ -53,7 +53,7 @@ public:
      * 
      * @param task The task to submit for execution.
      */
-    void submit(std::function<void()> task);
+    void submit(const std::function<void()>& task);
 
     /**
      * Submit a task to the pool after _at least_ the given amount
@@ -63,7 +63,7 @@ public:
      *                     submitting to the pool
      * @param task The task the submit after the wait time has elapsed.
      */
-    void submitAfter(int milliseconds, std::function<void()> task);
+    void submitAfter(int milliseconds, const std::function<void()>& task);
 private:
     bool running;
 

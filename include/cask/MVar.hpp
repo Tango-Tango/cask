@@ -81,7 +81,7 @@ public:
     Task<T,E> read();
 private:
     MVar();
-    MVar(const T& initialValue);
+    explicit MVar(const T& initialValue);
 
     std::recursive_mutex mutex;
     std::optional<T> valueOpt;
@@ -89,10 +89,10 @@ private:
     std::deque<PromiseRef<T,E>> pendingTakes;
 
     static DeferredRef<None,E> pushPutOntoQueue(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched, const T& newValue);
-    static DeferredRef<None,E> resolveTakeOrStore(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched, const T& newValue);
+    static DeferredRef<None,E> resolveTakeOrStore(const MVarRef<T,E>& self, const T& newValue);
 
     static DeferredRef<T,E> pushTakeOntoQueue(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched);
-    static DeferredRef<T,E> resolvePutOrClear(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched);
+    static DeferredRef<T,E> resolvePutOrClear(const MVarRef<T,E>& self);
 
     void cleanupTake(PromiseRef<T,E>);
     void cleanupPut(PromiseRef<None,E>);
@@ -133,7 +133,7 @@ Task<None,E> MVar<T,E>::put(const T& newValue) {
         if(self->valueOpt.has_value()) {
             return pushPutOntoQueue(self, sched, newValue);
         } else {
-            return resolveTakeOrStore(self, sched, newValue);
+            return resolveTakeOrStore(self, newValue);
         }
     });
 }
@@ -145,7 +145,7 @@ Task<T,E> MVar<T,E>::take() {
     return Task<T,E>::deferAction([self](auto sched) {
         std::lock_guard(self->mutex);
         if(self->valueOpt.has_value()) {
-            return resolvePutOrClear(self, sched);
+            return resolvePutOrClear(self);
         } else {
             return pushTakeOntoQueue(self, sched);
         }
@@ -177,7 +177,7 @@ DeferredRef<None,E> MVar<T,E>::pushPutOntoQueue(const MVarRef<T,E>& self, const 
 }
 
 template <class T, class E>
-DeferredRef<None,E> MVar<T,E>::resolveTakeOrStore(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched, const T& newValue) {
+DeferredRef<None,E> MVar<T,E>::resolveTakeOrStore(const MVarRef<T,E>& self, const T& newValue) {
     if(!self->pendingTakes.empty()) {
         auto nextTake = self->pendingTakes.front();
         nextTake->success(newValue);
@@ -204,7 +204,7 @@ DeferredRef<T,E> MVar<T,E>::pushTakeOntoQueue(const MVarRef<T,E>& self, const st
 }
 
 template <class T, class E>
-DeferredRef<T,E> MVar<T,E>::resolvePutOrClear(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched) {
+DeferredRef<T,E> MVar<T,E>::resolvePutOrClear(const MVarRef<T,E>& self) {
     auto value = *(self->valueOpt);
 
     if(!self->pendingPuts.empty()) {

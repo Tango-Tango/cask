@@ -6,10 +6,11 @@
 #include "cask/trampoline/TrampolineOp.hpp"
 #include <utility>
 
-using namespace cask::trampoline;
+namespace cask::trampoline {
 
 TrampolineOp::TrampolineOp(const TrampolineOp& other) noexcept
-    : opType(other.opType)
+    : std::enable_shared_from_this<TrampolineOp>(other)
+    , opType(other.opType)
 {
     switch(opType) {
         case VALUE:
@@ -29,24 +30,24 @@ TrampolineOp::TrampolineOp(const TrampolineOp& other) noexcept
 }
 
 TrampolineOp::TrampolineOp(TrampolineOp&& other) noexcept
-    : opType(std::move(other.opType))
+    : opType(other.opType)
 {
     switch(opType) {
         case VALUE:
         case ERROR:
-            data.constantData = std::move(other.data.constantData);
+            data.constantData = other.data.constantData;
             other.data.constantData = nullptr;
         break;
         case THUNK:
-            data.thunkData = std::move(other.data.thunkData);
+            data.thunkData = other.data.thunkData;
             other.data.thunkData = nullptr;
         break;
         case ASYNC:
-            data.asyncData = std::move(other.data.asyncData);
+            data.asyncData = other.data.asyncData;
             other.data.asyncData = nullptr;
         break;
         case FLATMAP:
-            data.flatMapData = std::move(other.data.flatMapData);
+            data.flatMapData = other.data.flatMapData;
             other.data.flatMapData = nullptr;
         break;
     }
@@ -106,7 +107,7 @@ std::shared_ptr<TrampolineOp> TrampolineOp::value(const std::any& v) noexcept {
 }
 
 std::shared_ptr<TrampolineOp> TrampolineOp::value(std::any&& v) noexcept {
-    auto constant = new ConstantData(Either<std::any,std::any>::left(std::move(v)));
+    auto constant = new ConstantData(Either<std::any,std::any>::left(v));
     return std::make_shared<TrampolineOp>(VALUE, constant);
 }
 
@@ -146,3 +147,5 @@ std::shared_ptr<TrampolineOp> TrampolineOp::flatMap(const FlatMapPredicate& pred
     }
     __builtin_unreachable();
 }
+
+} // namespace cask::trampoline

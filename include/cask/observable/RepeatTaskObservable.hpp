@@ -18,7 +18,7 @@ namespace cask::observable {
 template <class T, class E>
 class RepeatTaskObservable final : public Observable<T,E> {
 public: 
-    RepeatTaskObservable(Task<T,E> task);
+    explicit RepeatTaskObservable(Task<T,E> task);
     CancelableRef<E> subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
 private:
     Task<T,E> task;
