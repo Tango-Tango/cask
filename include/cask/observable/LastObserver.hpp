@@ -20,7 +20,7 @@ namespace cask::observable {
 template <class T, class E>
 class LastObserver final : public Observer<T,E> {
 public:
-    LastObserver(std::weak_ptr<Promise<std::optional<T>,E>> promise);
+    explicit LastObserver(std::weak_ptr<Promise<std::optional<T>,E>> promise);
 
     DeferredRef<Ack,E> onNext(T value);
     void onError(E error);

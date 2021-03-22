@@ -8,7 +8,8 @@
 #include <exception>
 
 using cask::DeferredRef;
-using namespace cask::trampoline;
+
+namespace cask::trampoline {
 
 TrampolineResult TrampolineRunLoop::execute(
     const std::shared_ptr<const TrampolineOp>& initialOp,
@@ -100,9 +101,9 @@ TrampolineResult TrampolineRunLoop::execute(
 
         if(!nextOp) {
             if(error.has_value()) {
-                return Either<std::any,std::any>::right(std::move(error));
+                return Either<std::any,std::any>::right(error);
             } else {
-                return Either<std::any,std::any>::left(std::move(value));
+                return Either<std::any,std::any>::left(value);
             }
         } else if(op == nullptr) {
             if(error.has_value()) {
@@ -115,3 +116,5 @@ TrampolineResult TrampolineRunLoop::execute(
         }
     }
 }
+
+} // namespace cask::trampoline

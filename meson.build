@@ -20,9 +20,10 @@ run_target('docs', command : ['doxygen', meson.source_root() + '/Doxyfile'])
 run_target('cppcheck', command : [
     'cppcheck',
     '-q',
+    '-j', '4',
     '--enable=all',
     '--project=' + join_paths(meson.build_root(), 'compile_commands.json'),
-    '--suppressions-list=' + join_paths(meson.source_root(), '.cppcheck_suppressions')
+    '--error-exitcode=1'
 ]) 
 
 # Setup the 'cask' project structure

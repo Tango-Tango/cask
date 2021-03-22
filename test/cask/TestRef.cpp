@@ -12,58 +12,43 @@ using cask::Ref;
 using cask::Scheduler;
 using cask::None;
 
-#include "immer/vector.hpp"
-#include "immer/map.hpp"
-
 TEST(Ref,Creates) {
-    auto ref = Ref<immer::vector<int>>::create(immer::vector<int>());
+    auto ref = Ref<int>::create(0);
     auto result = ref->get().run(Scheduler::global());
-    auto vector = result->await();
-    EXPECT_TRUE(vector.empty());
+    auto value = result->await();
+    EXPECT_EQ(value, 0);
 }
 
 TEST(Ref,Updates) {
-    auto ref = Ref<immer::vector<int>>::create(immer::vector<int>());
-    auto result = ref->update([](auto vector) {
-        return vector.push_back(0).push_back(1);
+    auto ref = Ref<int>::create(0);
+    auto result = ref->update([](auto value) {
+        return value + 1;
     })
-    .flatMap<immer::vector<int>>([ref](auto) {
+    .template flatMap<int>([ref](auto) {
         return ref->get();
     })
     .run(Scheduler::global());
 
-    auto vector = result->await();
-
-    EXPECT_FALSE(vector.empty());
-    EXPECT_EQ(vector.size(), 2);
-    EXPECT_EQ(vector[0], 0);
-    EXPECT_EQ(vector[1], 1);
+    auto value = result->await();
+    EXPECT_EQ(value, 1);
 }
 
 TEST(Ref,ContendedUpdates) {
-    auto ref = Ref<immer::map<std::string, int>>::create(immer::map<std::string, int>());
+    auto ref = Ref<std::tuple<int,int>>::create(std::make_tuple(0,0));
 
     std::vector<DeferredRef<None,std::any>> deferreds;
 
     for(int i = 0; i < 1000; i++) {
-        auto first = ref->update([](auto map) {
-            if(map.count("hello")) {
-                auto counter = map["hello"];
-                return map.set("hello", counter + 1);
-            } else {
-                return map.set("hello", 1);
-            }
+        auto first = ref->update([](auto value) {
+            auto [left, right] = value;
+            return std::make_tuple(left + 1, right);
         })
         .asyncBoundary()
         .run(Scheduler::global());
 
-        auto second = ref->update([](auto map) {
-            if(map.count("world")) {
-                auto counter = map["world"];
-                return map.set("world", counter + 1);
-            } else {
-                return map.set("world", 1);
-            }
+        auto second = ref->update([](auto value) {
+            auto [left, right] = value;
+            return std::make_tuple(left, right + 1);
         })
         .asyncBoundary()
         .run(Scheduler::global());
@@ -76,13 +61,11 @@ TEST(Ref,ContendedUpdates) {
         deferred->await();
     }
 
-    auto map = ref->get()
-    .asyncBoundary()
-    .run(Scheduler::global())
-    ->await();
+    auto [left, right] = ref->get()
+        .asyncBoundary()
+        .run(Scheduler::global())
+        ->await();
 
-    EXPECT_FALSE(map.empty());
-    EXPECT_EQ(map.size(), 2);
-    EXPECT_EQ(map["hello"], 1000);
-    EXPECT_EQ(map["world"], 1000);
+    EXPECT_EQ(left, 1000);
+    EXPECT_EQ(right, 1000);
 }

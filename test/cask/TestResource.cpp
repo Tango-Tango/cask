@@ -71,7 +71,7 @@ TEST(Resource,CallsReleaseOnError) {
     );
 
     auto sched = std::make_shared<cask::Scheduler>();
-    auto result = resource.template use<float>([](int value) {
+    auto result = resource.template use<float>([](int) {
         return Task<float, std::string>::raiseError("something went wrong");
     });
 

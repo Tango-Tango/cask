@@ -98,7 +98,7 @@ TEST(Deferred, ErrorAwait) {
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string value) {
+    } catch(std::string& value) {
         EXPECT_EQ(value, "broke");
     }
 }
@@ -109,7 +109,7 @@ TEST(Deferred, ErrorIgnoresCancel) {
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string value) {
+    } catch(std::string& value) {
         EXPECT_EQ(value, "broke");
     }
 }
@@ -212,7 +212,7 @@ TEST(Deferred, PromiseAwaitSyncError) {
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string value) {
+    } catch(std::string& value) {
         EXPECT_EQ(value, "broke");
     }
 }
@@ -257,7 +257,7 @@ TEST(Deferred, PromiseCancel) {
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string value) {
+    } catch(std::string& value) {
         EXPECT_EQ(value, "canceled");
     }
 }
@@ -282,7 +282,7 @@ TEST(Deferred, PromiseErrorIgnoresCancel) {
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string value) {
+    } catch(std::string& value) {
         EXPECT_EQ(value, "broke");
     }
 }
@@ -297,7 +297,7 @@ TEST(Deferred, PromiseCancelIgnoresSuccess) {
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string value) {
+    } catch(std::string& value) {
         EXPECT_EQ(value, "canceled");
     }
 }
@@ -312,7 +312,7 @@ TEST(Deferred, PromiseCancelIgnoresError) {
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string value) {
+    } catch(std::string& value) {
         EXPECT_EQ(value, "canceled");
     }
 }
@@ -327,7 +327,7 @@ TEST(Deferred, PromiseCancelIgnoresSubsequentCancel) {
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string value) {
+    } catch(std::string& value) {
         EXPECT_EQ(value, "canceled");
     }
 }
@@ -342,7 +342,7 @@ TEST(Deferred, PromiseCancelAffectsPeers) {
     try {
         sibling->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string value) {
+    } catch(std::string& value) {
         EXPECT_EQ(value, "canceled");
     }
 }
@@ -354,7 +354,7 @@ TEST(Deferred, DoesntAllowMultipleSuccesses) {
     try {
         promise->success(456);
         FAIL() << "Excpeted method to throw";
-    } catch (std::runtime_error& error) {
+    } catch(std::runtime_error& error) {
         std::string message = error.what();
         EXPECT_EQ(message, "Promise already successfully completed.");
     }
@@ -367,7 +367,7 @@ TEST(Deferred, DoesntAllowMultipleErrors) {
     try {
         promise->error("fail2");
         FAIL() << "Excpeted method to throw";
-    } catch (std::runtime_error& error) {
+    } catch(std::runtime_error& error) {
         std::string message = error.what();
         EXPECT_EQ(message, "Promise already completed with an error.");
     }

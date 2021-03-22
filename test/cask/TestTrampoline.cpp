@@ -102,7 +102,7 @@ TEST(Trampoline,ThunkMove) {
 }
 
 TEST(Trampoline,AsyncValue) {
-    auto op = TrampolineOp::async([](auto sched) {
+    auto op = TrampolineOp::async([](auto) {
         return Deferred<std::any,std::any>::pure(123);
     });
 
@@ -114,7 +114,7 @@ TEST(Trampoline,AsyncValue) {
 }
 
 TEST(Trampoline,AsyncError) {
-    auto op = TrampolineOp::async([](auto sched) {
+    auto op = TrampolineOp::async([](auto) {
         return Deferred<std::any,std::any>::raiseError(123);
     });
 
@@ -131,7 +131,7 @@ TEST(Trampoline,AsyncError) {
 
 
 TEST(Trampoline,AsyncAssignment) {
-    auto op = TrampolineOp::async([](auto sched) {
+    auto op = TrampolineOp::async([](auto) {
         return Deferred<std::any,std::any>::pure(123);
     });
     TrampolineOp op2 = *op;
@@ -143,7 +143,7 @@ TEST(Trampoline,AsyncAssignment) {
 }
 
 TEST(Trampoline,AsyncMove) {
-    auto op = TrampolineOp::async([](auto sched) {
+    auto op = TrampolineOp::async([](auto) {
         return Deferred<std::any,std::any>::pure(123);
     });
     TrampolineOp op2 = *op;
@@ -188,7 +188,7 @@ TEST(Trampoline,FlatMapError) {
 }
 
 TEST(Trampoline,FlatMapAsyncValue) {
-    auto op = TrampolineOp::async([](auto sched) {
+    auto op = TrampolineOp::async([](auto) {
         return Deferred<std::any,std::any>::pure(123);
     })
     ->flatMap([](auto erased_value, auto isError) {
@@ -208,7 +208,7 @@ TEST(Trampoline,FlatMapAsyncValue) {
 }
 
 TEST(Trampoline,FlatMapAsyncError) {
-    auto op = TrampolineOp::async([](auto sched) {
+    auto op = TrampolineOp::async([](auto) {
         return Deferred<std::any,std::any>::raiseError(123);
     })
     ->flatMap([](auto erased_value, auto isError) {
@@ -233,10 +233,10 @@ TEST(Trampoline,FlatMapAsyncError) {
 }
 
 TEST(Trampoline,FlatMapAsyncNestedAsync) {
-    auto op = TrampolineOp::async([](auto sched) {
+    auto op = TrampolineOp::async([](auto) {
         return Deferred<std::any,std::any>::pure(123);
     })
-    ->flatMap([](auto erased_value, auto isError) {
+    ->flatMap([](auto erased_value, auto) {
         auto value = std::any_cast<int>(erased_value);
         return TrampolineOp::async([value](auto) {
             return Deferred<std::any,std::any>::pure(value * 1.5f);
@@ -250,7 +250,7 @@ TEST(Trampoline,FlatMapAsyncNestedAsync) {
 }
 
 TEST(Trampoline,FlatMapAssignment) {
-    auto op = TrampolineOp::value(123)->flatMap([](auto erased_value, auto isError) {
+    auto op = TrampolineOp::value(123)->flatMap([](auto erased_value, auto) {
         return TrampolineOp::value(erased_value);
     });
     TrampolineOp op2 = *op;
@@ -262,7 +262,7 @@ TEST(Trampoline,FlatMapAssignment) {
 }
 
 TEST(Trampoline,FlatMapMove) {
-    auto op = TrampolineOp::value(123)->flatMap([](auto erased_value, auto isError) {
+    auto op = TrampolineOp::value(123)->flatMap([](auto erased_value, auto) {
         return TrampolineOp::value(erased_value);
     });
     TrampolineOp op2 = *op;

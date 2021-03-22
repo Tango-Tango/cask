@@ -13,8 +13,8 @@ namespace cask::deferred {
 template <class T, class E>
 class PureDeferred final : public Deferred<T,E> {
 public:
-    constexpr PureDeferred(const T& value);
-    constexpr PureDeferred(T&& value);
+    constexpr explicit PureDeferred(const T& value);
+    constexpr explicit PureDeferred(T&& value);
 
     const T value;
 
@@ -47,12 +47,12 @@ void PureDeferred<T,E>::onSuccess(std::function<void(T)> callback) {
 }
 
 template <class T, class E>
-void PureDeferred<T,E>::onError(std::function<void(E)> callback) {
+void PureDeferred<T,E>::onError(std::function<void(E)>) {
     return;
 }
 
 template <class T, class E>
-void PureDeferred<T,E>::cancel(const E& error) {
+void PureDeferred<T,E>::cancel(const E&) {
     return;
 }
 

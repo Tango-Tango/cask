@@ -16,7 +16,7 @@ namespace cask::observable {
 template <class T, class E>
 class VectorObservable final : public Observable<T,E> {
 public:
-    VectorObservable(const std::vector<T>& source);
+    explicit VectorObservable(const std::vector<T>& source);
     CancelableRef<E> subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
 private:
     std::vector<T> source;

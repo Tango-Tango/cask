@@ -1,6 +1,0 @@
-[wrap-git]
-directory = immer-latest
-patch_directory = immer-latest-patch
-url = https://github.com/arximboldi/immer.git
-revision = 800ddb04e528a3e83e69e8021d7e872e7c34cbcd
-depth = 1

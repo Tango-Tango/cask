@@ -14,7 +14,7 @@ namespace cask::observable {
 template <class T, class E>
 class DeferObservable final : public Observable<T,E> {
 public:
-    DeferObservable(std::function<ObservableRef<T,E>()> predicate);
+    explicit DeferObservable(std::function<ObservableRef<T,E>()> predicate);
     CancelableRef<E> subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
 private:
     std::function<ObservableRef<T,E>()> predicate;

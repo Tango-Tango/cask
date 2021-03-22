@@ -27,7 +27,7 @@ jobs:
     - name: Update Apt Cache
       run: sudo apt-get update
     - name: Install Apt Development Dependencies
-      run: sudo apt-get install -y ninja-build build-essential python3-pip gcovr cppcheck clang
+      run: sudo apt-get install -y ninja-build build-essential python3-pip gcovr clang
     - name: Install Python Development Dependencies
       run: sudo python3 -m pip install meson==0.57.0
     - name: Run the Pre-Build Release Stage
@@ -49,14 +49,41 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: true
+  
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-20.04
+    if: github.actor != 'engineering-at-tangotango'
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 2
+        token: ${{ secrets.AUTOMATION_USER_TOKEN }}
+      env:
+        AUTOMATION_USER_TOKEN: secrets.AUTOMATION_USER_TOKEN
+    - name: Update Apt Cache
+      run: sudo apt-get update
+    - name: Install Apt Development Dependencies
+      run: sudo apt-get install -y ninja-build python3-pip gcovr cppcheck clang clang-tidy
+    - name: Install Python Development Dependencies
+      run: sudo python3 -m pip install meson==0.57.0
+    - name: Run the Pre-Build Release Stage
+      run: |
+        git config user.name engineering-at-tangotango
+        git config user.email engineering@tangotango.net
+        ./automatic_release.py -u engineering-at-tangotango -o Tango-Tango -r cask -s pre-build
+    - name: Generate the Build Environment
+      run: ./regenerate_env.sh clang
     - name: Run cppcheck
-      if: ${{ matrix.target == 'debug' }}
-      run: ninja cppcheck -C build_${{ matrix.target }}
+      run: ninja cppcheck -C build_clang
+    - name: Run clang-tidy
+      run: ninja clang-tidy -C build_clang
   
   release:
     name: Release
     runs-on: ubuntu-20.04
-    needs: [build]
+    needs: [build, analyze]
     if: contains(github.ref, 'master') && github.actor != 'engineering-at-tangotango'
 
     steps:

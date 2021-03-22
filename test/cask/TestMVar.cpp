@@ -9,6 +9,7 @@
 using cask::Task;
 using cask::MVar;
 using cask::Scheduler;
+using cask::None;
 
 TEST(MVar, Empty) {
     auto mvar = MVar<int, std::string>::empty();
@@ -36,9 +37,6 @@ TEST(MVar, PutsAndTakes) {
     EXPECT_EQ(take->await(), 123);
     put->await();
 }
-
-
-
 
 TEST(MVar, ResolvesPendingTakesInOrder) {
     auto mvar = MVar<int>::empty();
@@ -70,6 +68,10 @@ TEST(MVar, ResolvesPendingPutsInOrder) {
     EXPECT_EQ(firstTake->await(), 1);
     EXPECT_EQ(secondTake->await(), 2);
     EXPECT_EQ(thirdTake->await(), 3);
+
+    EXPECT_EQ(firstPut->await(), None());
+    EXPECT_EQ(secondPut->await(), None());
+    EXPECT_EQ(thirdPut->await(), None());
 }
 
 TEST(MVar, InterleavePutsAndTakes) {
@@ -88,9 +90,9 @@ TEST(MVar, InterleavePutsAndTakes) {
     EXPECT_EQ(secondTake->await(), 2);
     EXPECT_EQ(thirdTake->await(), 3);
 
-    firstPut->await();
-    secondPut->await();
-    thirdPut->await();
+    EXPECT_EQ(firstPut->await(), None());
+    EXPECT_EQ(secondPut->await(), None());
+    EXPECT_EQ(thirdPut->await(), None());
 }
 
 TEST(MVar, InterleavesTakesAndPuts) {
@@ -109,9 +111,9 @@ TEST(MVar, InterleavesTakesAndPuts) {
     EXPECT_EQ(secondTake->await(), 2);
     EXPECT_EQ(thirdTake->await(), 3);
 
-    firstPut->await();
-    secondPut->await();
-    thirdPut->await();
+    EXPECT_EQ(firstPut->await(), None());
+    EXPECT_EQ(secondPut->await(), None());
+    EXPECT_EQ(thirdPut->await(), None());
 }
 
 TEST(MVar, CleanupCanceledPut) {
@@ -129,8 +131,8 @@ TEST(MVar, CleanupCanceledPut) {
     EXPECT_EQ(firstTake->await(), 1);
     EXPECT_EQ(secondTake->await(), 3);
 
-    firstPut->await();
-    thirdPut->await();
+    EXPECT_EQ(firstPut->await(), None());
+    EXPECT_EQ(thirdPut->await(), None());
 }
 
 TEST(MVar, CleanupCanceledTake) {
@@ -149,9 +151,9 @@ TEST(MVar, CleanupCanceledTake) {
     EXPECT_EQ(firstTake->await(), 1);
     EXPECT_EQ(thirdTake->await(), 2);
 
-    firstPut->await();
-    secondPut->await();
-    thirdPut->await();
+    EXPECT_EQ(firstPut->await(), None());
+    EXPECT_EQ(secondPut->await(), None());
+    EXPECT_EQ(thirdPut->await(), None());
 }
 
 TEST(MVar, Read) {
