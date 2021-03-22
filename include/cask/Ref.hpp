@@ -70,7 +70,7 @@ public:
     template <typename U>
     Task<U,E> modify(std::function<std::tuple<T,U>(T&)> predicate);
 private:
-    Ref(const T& initialValue);
+    explicit Ref(const T& initialValue);
     std::shared_ptr<T> data;
 };
 
