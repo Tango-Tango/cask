@@ -613,7 +613,7 @@ constexpr Task<T,E> Task<T,E>::sideEffect(const Task<T2, E>& task) const noexcep
             return result;
         });
     });
-};
+}
 
 template <class T, class E>
 template <class T2>
