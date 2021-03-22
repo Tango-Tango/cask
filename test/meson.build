@@ -1,7 +1,6 @@
 if not meson.is_subproject()
     test_dependencies = [
-        subproject('gtest').get_variable('gtest_dep'),
-        subproject('immer').get_variable('immer_dep')
+        subproject('gtest').get_variable('gtest_dep')
     ]
 
     test_sources = [
