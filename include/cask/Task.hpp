@@ -387,12 +387,12 @@ Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
     if(auto either = std::get_if<Either<std::any,std::any>>(&result)) {
         if(either->is_left()) {
             auto success = std::any_cast<T>(either->get_left());
-            auto result = Either<T,E>::left(success);
-            return Either<Either<T,E>,Task<T,E>>::left(result);
+            auto syncResult = Either<T,E>::left(success);
+            return Either<Either<T,E>,Task<T,E>>::left(syncResult);
         } else {
             auto error = std::any_cast<E>(either->get_right());
-            auto result = Either<T,E>::right(error);
-            return Either<Either<T,E>,Task<T,E>>::left(result);
+            auto syncResult = Either<T,E>::right(error);
+            return Either<Either<T,E>,Task<T,E>>::left(syncResult);
         }
     } else {
         auto boundary = std::get<trampoline::AsyncBoundary>(result);
