@@ -1,0 +1,27 @@
+//          Copyright Tango Tango, Inc. 2020 - 2021.
+// Distributed under the Boost Software License, Version 1.0.
+//    (See accompanying file LICENSE_1_0.txt or copy at
+//          https://www.boost.org/LICENSE_1_0.txt)
+
+#include "gtest/gtest.h"
+#include "cask/Task.hpp"
+
+using cask::Task;
+
+TEST(TaskAssignment,CopyAssignment) {
+    Task<int> original = Task<int>::pure(123);
+    Task<int> other = original;
+    EXPECT_EQ(original.op, other.op);
+}
+
+TEST(TaskAssignment,MoveAssignment) {
+    Task<int> outer = Task<int>::pure(123);
+
+    {
+        Task<int> inner = Task<int>::pure(456);
+        outer = inner;
+    }
+
+    auto result = outer.runSync();
+    EXPECT_EQ(result.get_left().get_left(), 456);
+}
