@@ -17,11 +17,14 @@ TEST(TaskAssignment,CopyAssignment) {
 TEST(TaskAssignment,MoveAssignment) {
     Task<int> outer = Task<int>::pure(123);
 
+    auto beforeResult = outer.runSync();
+    EXPECT_EQ(beforeResult.get_left().get_left(), 123);
+
     {
         Task<int> inner = Task<int>::pure(456);
         outer = inner;
     }
 
-    auto result = outer.runSync();
-    EXPECT_EQ(result.get_left().get_left(), 456);
+    auto afterResult = outer.runSync();
+    EXPECT_EQ(afterResult.get_left().get_left(), 456);
 }

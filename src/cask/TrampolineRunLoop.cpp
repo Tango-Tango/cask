@@ -94,8 +94,8 @@ DeferredRef<std::any,std::any> TrampolineRunLoop::executeAsyncBoundary(
     const AsyncBoundary& boundary,
     const std::shared_ptr<Scheduler>& sched
 ) {
-    std::shared_ptr<const TrampolineOp> op = std::get<0>(boundary);
-    TrampolineOp::FlatMapPredicate nextOp = std::get<1>(boundary);
+    const std::shared_ptr<const TrampolineOp>& op = std::get<0>(boundary);
+    const TrampolineOp::FlatMapPredicate& nextOp = std::get<1>(boundary);
 
     const TrampolineOp::AsyncData* async = op->data.asyncData;
     auto promise = Promise<std::any,std::any>::create(sched);

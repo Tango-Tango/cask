@@ -1,7 +1,5 @@
----
 Checks:          'clang-diagnostic-*,clang-analyzer-*,google-*,bugprone-*,performance-*,portability-*'
 WarningsAsErrors: 'clang-diagnostic-*,clang-analyzer-*,google-*,bugprone-*,performance-*,portability-*'
-HeaderFilterRegex: '';
+HeaderFilterRegex: ''
 AnalyzeTemporaryDtors: false
 FormatStyle:     google
----
