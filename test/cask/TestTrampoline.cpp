@@ -421,6 +421,32 @@ TEST(Trampoline,FlatMapAsyncNestedAsyncSync) {
     EXPECT_EQ(std::any_cast<float>(awaitResult), 184.5);
 }
 
+TEST(Trampoline,FlatMapAsyncCancel) {
+    auto op = TrampolineOp::async([](auto sched) {
+        auto promise = Promise<std::any,std::any>::create(sched);
+        return Deferred<std::any,std::any>::forPromise(promise);
+    })
+    ->flatMap([](auto erased_value, auto isError) {
+        if(isError) {
+            return TrampolineOp::error(erased_value);
+        } else {
+            return TrampolineOp::value(erased_value);
+        }
+    });
+
+    auto result = TrampolineRunLoop::execute(op, Scheduler::global());
+    auto asyncResult = std::get<DeferredRef<std::any,std::any>>(result);
+
+    asyncResult->cancel(123);
+
+    try {
+        asyncResult->await();
+        FAIL() << "Expected test to throw an error";
+    } catch(const std::any& error) {
+        EXPECT_EQ(std::any_cast<int>(error), 123);
+    }
+}
+
 TEST(Trampoline,FlatMapAssignment) {
     auto op = TrampolineOp::value(123)->flatMap([](auto erased_value, auto) {
         return TrampolineOp::value(erased_value);
