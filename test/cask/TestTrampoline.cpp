@@ -10,6 +10,7 @@
 using cask::Deferred;
 using cask::DeferredRef;
 using cask::Either;
+using cask::Promise;
 using cask::Scheduler;
 using cask::trampoline::AsyncBoundary;
 using cask::trampoline::TrampolineOp;
@@ -208,6 +209,47 @@ TEST(Trampoline,AsyncMove) {
     auto left = op->data.thunkData->target<DeferredRef<std::any,std::any>(*)(std::shared_ptr<Scheduler>)>();
     auto right = op3.data.thunkData->target<DeferredRef<std::any,std::any>(*)(std::shared_ptr<Scheduler>)>();
     EXPECT_EQ(left, right);
+}
+
+TEST(Trampoline,AsyncCancel) {
+    auto op = TrampolineOp::async([](auto sched) {
+        auto promise = Promise<std::any,std::any>::create(sched);
+        return Deferred<std::any,std::any>::forPromise(promise);
+    });
+
+    auto result = TrampolineRunLoop::execute(op, Scheduler::global());
+    auto asyncResult = std::get<DeferredRef<std::any,std::any>>(result);
+
+    asyncResult->cancel(123);
+
+    try {
+        asyncResult->await();
+        FAIL() << "Expected operation to throw";
+    } catch(const std::any& error) {
+        auto value = std::any_cast<int>(error);
+        EXPECT_EQ(value, 123);
+    }
+}
+
+TEST(Trampoline,AsyncCancelSync) {
+    auto op = TrampolineOp::async([](auto sched) {
+        auto promise = Promise<std::any,std::any>::create(sched);
+        return Deferred<std::any,std::any>::forPromise(promise);
+    });
+
+    auto result = TrampolineRunLoop::executeSync(op);
+    auto boundary = std::get<AsyncBoundary>(result);
+    auto asyncResult = TrampolineRunLoop::executeAsyncBoundary(boundary, Scheduler::global());
+
+    asyncResult->cancel(123);
+
+    try {
+        asyncResult->await();
+        FAIL() << "Expected operation to throw";
+    } catch(const std::any& error) {
+        auto value = std::any_cast<int>(error);
+        EXPECT_EQ(value, 123);
+    }
 }
 
 TEST(Trampoline,FlatMapValue) {
