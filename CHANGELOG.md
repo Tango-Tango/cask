@@ -3,6 +3,14 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 1.5
+
+- Add the `runSync` method to `Task` which attempts to run a task synchronously
+  but stops when an async boundary is encountered. Add the `executeSync` and
+  `executeAsyncBoundary` methods to `TrampolineRunLoop` to support this. Add
+  the `AsyncBoundary` type to represent when the trampoline has encountered
+  such a boundary during synchronous execution.
+
 ## 1.4
 
 - Add `flatten` and `fromTask` to `Observable`.
