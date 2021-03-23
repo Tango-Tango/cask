@@ -166,7 +166,7 @@ template <class T, class E>
 DeferredRef<None,E> MVar<T,E>::pushPutOntoQueue(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched, const T& newValue) {
     auto promise = Promise<None,E>::create(sched);
     self->pendingPuts.emplace_back(promise, newValue);
-    promise->onCancel([promiseWeak = std::weak_ptr(promise), selfWeak = std::weak_ptr(self)](auto) {
+    promise->onCancel([promiseWeak = std::weak_ptr<Promise<None,E>>(promise), selfWeak = std::weak_ptr<MVar<T,E>>(self)](auto) {
         if(auto self = selfWeak.lock()) {
             if(auto promise = promiseWeak.lock()) {
                 self->cleanupPut(promise);
@@ -193,7 +193,7 @@ template <class T, class E>
 DeferredRef<T,E> MVar<T,E>::pushTakeOntoQueue(const MVarRef<T,E>& self, const std::shared_ptr<Scheduler>& sched) {
     auto promise = Promise<T,E>::create(sched);
     self->pendingTakes.emplace_back(promise);
-    promise->onCancel([promiseWeak = std::weak_ptr(promise), selfWeak = std::weak_ptr(self)](auto) {
+    promise->onCancel([promiseWeak = std::weak_ptr<Promise<T,E>>(promise), selfWeak = std::weak_ptr<MVar<T,E>>(self)](auto) {
         if(auto self = selfWeak.lock()) {
             if(auto promise = promiseWeak.lock()) {
                 self->cleanupTake(promise);

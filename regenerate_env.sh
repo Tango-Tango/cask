@@ -25,8 +25,8 @@ fi
 if [ "$BUILD_TARGET" = "clang" ] || [ "$BUILD_TARGET" = "all" ]; then
     rm -rf build_clang
     CC=clang CXX=clang++ meson setup build_clang \
-        -Dbuildtype=release \
-        -Dwarning_level=3 \
-        -Dwerror=true
+        -Dbuildtype=release
+        #-Dwarning_level=3 \
+        #-Dwerror=true
 fi
 

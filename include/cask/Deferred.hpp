@@ -195,7 +195,7 @@ void Deferred<T,E>::chainDownstream(
         upstream->cancel(transformUpstream(error));
     });
 
-    upstream->onComplete([downstreamWeak = std::weak_ptr(downstream), transformDownstream](Either<T,E> result) {
+    upstream->onComplete([downstreamWeak = std::weak_ptr<Promise<T2,E2>>(downstream), transformDownstream](Either<T,E> result) {
         auto transformResult = transformDownstream(result);
 
         if(auto downstream = downstreamWeak.lock()) {
@@ -217,7 +217,7 @@ void Deferred<T,E>::chainDownstreamAsync(
         upstream->cancel(transformUpstream(error));
     });
 
-    upstream->onComplete([downstreamWeak = std::weak_ptr(downstream), transformDownstream](Either<T,E> result) {
+    upstream->onComplete([downstreamWeak = std::weak_ptr<Promise<T2,E2>>(downstream), transformDownstream](Either<T,E> result) {
         DeferredRef<T2,E2> asyncTransformResult = transformDownstream(result);
 
         if(auto downstream = downstreamWeak.lock()) {
