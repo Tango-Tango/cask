@@ -3,6 +3,16 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 2.0
+
+- Make cancels value-less rather than requiring a value of the error type. With
+  this requirement working with errors (e.g. writing transforms) was difficult
+  because it implied that error transforms must be _bi-directional_ since cancels
+  flow in the reverse direction of normal errors. This would result in users
+  being forced to provide error transforms for both for errors being communicated
+  downstream (e.g. A -> B) and for cancels being communicated upstream
+  (e.g. B -> A).
+
 ## 1.5
 
 - Add the `runSync` method to `Task` which attempts to run a task synchronously

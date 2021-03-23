@@ -14,7 +14,7 @@ template <class T, class E>
 class EvalObservable final : public Observable<T,E> {
 public:
     explicit EvalObservable(std::function<T()> predicate);
-    CancelableRef<E> subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
+    CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
 
 private:
     std::function<T()> predicate;
@@ -26,7 +26,7 @@ EvalObservable<T,E>::EvalObservable(std::function<T()> predicate)
 {}
 
 template <class T, class E>
-CancelableRef<E> EvalObservable<T,E>::subscribe(
+CancelableRef EvalObservable<T,E>::subscribe(
     std::shared_ptr<Scheduler>,
     std::shared_ptr<Observer<T,E>> observer) const
 {
@@ -39,7 +39,7 @@ CancelableRef<E> EvalObservable<T,E>::subscribe(
         return deferred;
     } catch(E& error) {
         observer->onError(error);
-        return std::make_unique<IgnoreCancelation<E>>();
+        return std::make_unique<IgnoreCancelation>();
     }
 }
 

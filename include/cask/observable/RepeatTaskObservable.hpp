@@ -19,7 +19,7 @@ template <class T, class E>
 class RepeatTaskObservable final : public Observable<T,E> {
 public: 
     explicit RepeatTaskObservable(Task<T,E> task);
-    CancelableRef<E> subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
+    CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
 private:
     Task<T,E> task;
 };
@@ -30,7 +30,7 @@ RepeatTaskObservable<T,E>::RepeatTaskObservable(Task<T,E> task)
 {}
 
 template <class T, class E>
-CancelableRef<E> RepeatTaskObservable<T,E>::subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const {
+CancelableRef RepeatTaskObservable<T,E>::subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const {
     std::function<Task<Ack,E>(T)> pushToObserver =
         [observer = observer](T value) -> Task<Ack,E> {
             return Task<Ack,E>::deferAction([observer,value](auto) {

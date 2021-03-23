@@ -35,7 +35,7 @@ class PromiseDeferred;
  * consumers will be notified of the available result via an attached `Deferred` instance.
  */
 template <class T = None, class E = std::any>
-class Promise final : public Cancelable<E> {
+class Promise final : public Cancelable {
 public:
     /**
      * Create a promise which executes any deffered callbacks or transformations
@@ -93,17 +93,17 @@ public:
      *
      * @param callback The callback to run if this promise is canceled.
      */
-    void onCancel(std::function<void(const E&)> callback);
+    void onCancel(std::function<void()> callback);
 
-    void cancel(const E& error) override;
+    void cancel() override;
 private:
     friend deferred::PromiseDeferred<T,E>;
 
     std::optional<Either<T,E>> resultOpt;
-    std::optional<E> canceledOpt;
+    bool canceled;
     mutable std::mutex mutex;
     std::vector<std::function<void(Either<T,E>)>> completeCallbacks;
-    std::vector<std::function<void(const E&)>> cancelCallbacks;
+    std::vector<std::function<void()>> cancelCallbacks;
     std::vector<std::function<void(Either<T,E>, bool)>> eitherCallbacks;
     std::shared_ptr<Scheduler> sched;
 
@@ -119,7 +119,7 @@ std::shared_ptr<Promise<T,E>> Promise<T,E>::create(std::shared_ptr<Scheduler> sc
 template <class T, class E>
 Promise<T,E>::Promise(std::shared_ptr<Scheduler> sched)
     : resultOpt(std::nullopt)
-    , canceledOpt(std::nullopt)
+    , canceled(false)
     , mutex()
     , completeCallbacks()
     , cancelCallbacks()
@@ -142,7 +142,7 @@ void Promise<T,E>::complete(const Either<T,E>& value) {
 
     {
         std::lock_guard guard(mutex);
-        if(!resultOpt.has_value() && !canceledOpt.has_value()) {
+        if(!resultOpt.has_value() && !canceled) {
             resultOpt = value;
             runCallbacks = true;
         } else {
@@ -168,13 +168,13 @@ void Promise<T,E>::complete(const Either<T,E>& value) {
 }
 
 template <class T, class E>
-void Promise<T,E>::cancel(const E& error) {
+void Promise<T,E>::cancel() {
     bool runCallbacks = false;
 
     {
         std::lock_guard guard(mutex);
-        if(!resultOpt.has_value() && !canceledOpt.has_value()) {
-            canceledOpt = error;
+        if(!resultOpt.has_value() && !canceled) {
+            canceled = true;
             runCallbacks = true;
         }
     }
@@ -183,38 +183,33 @@ void Promise<T,E>::cancel(const E& error) {
         // Cancel callbacks are run schronously to try
         // and expedite the process of cancelling.
         for(auto& callback : cancelCallbacks) {
-            callback(error);
-        }
-
-        for(auto& callback : eitherCallbacks) {
-            callback(Either<T,E>::right(error), true);
+            callback();
         }
     }
 }
 
 template <class T, class E>
 bool Promise<T,E>::isCancelled() const {
-    std::lock_guard guard(mutex);
-    return canceledOpt.has_value();
+    return canceled;
 }
 
 template <class T, class E>
 std::optional<Either<T,E>> Promise<T,E>::get() const {
     std::lock_guard guard(mutex);
-    if(canceledOpt.has_value()) {
-        return Either<T,E>::right(*canceledOpt);
+    if(canceled) {
+        return {};
     } else {
         return resultOpt;
     }
 }
 
 template <class T, class E>
-void Promise<T,E>::onCancel(std::function<void(const E&)> callback) {
+void Promise<T,E>::onCancel(std::function<void()> callback) {
     bool runNow = false;
 
     {
         std::lock_guard guard(mutex);
-        if(canceledOpt.has_value()) {
+        if(canceled) {
             runNow = true;
         } else {
             cancelCallbacks.push_back(callback);
@@ -222,7 +217,7 @@ void Promise<T,E>::onCancel(std::function<void(const E&)> callback) {
     }
 
     if(runNow) {
-        callback(*canceledOpt);
+        callback();
     }
 }
 

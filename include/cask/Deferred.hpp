@@ -26,7 +26,7 @@ using DeferredRef = std::shared_ptr<Deferred<T,E>>;
  * other synchronous (via `map`) or asynchronouse (via `flatMap`) operations.
  */
 template <class T = None, class E = std::any>
-class Deferred : public Cancelable<E>, public std::enable_shared_from_this<Deferred<T,E>> {
+class Deferred : public Cancelable, public std::enable_shared_from_this<Deferred<T,E>> {
 public:
     /**
      * Create a deferred instance wrapping the already computed pure vale.
@@ -73,15 +73,11 @@ public:
      * @param transformDownstream Transform the result of this deferred (which
      *                            may be either a value or error) into its
      *                            downstream representation.
-     * @param transformUpstream Transform a cancels signal from the downstream
-     *                          promise to its upstream representation for this
-     *                          deferred.
      */
     template <class T2, class E2>
     void chainDownstream(
         PromiseRef<T2,E2> downstream,
-        std::function<Either<T2,E2>(Either<T,E>)> transformDownstream,
-        std::function<E(E2)> transformUpstream
+        std::function<Either<T2,E2>(Either<T,E>)> transformDownstream
     );
 
     /**
@@ -107,15 +103,11 @@ public:
      *                            may be either a value or error) into its
      *                            downstream representation. The results of this
      *                            transform will be provided asynchronously.
-     * @param transformUpstream Transform a cancels signal from the downstream
-     *                          promise to its upstream representation for this
-     *                          deferred.
      */
     template <class T2, class E2>
     void chainDownstreamAsync(
         PromiseRef<T2,E2> downstream,
-        std::function<DeferredRef<T2,E2>(Either<T,E>)> transformDownstream,
-        std::function<E(E2)> transformUpstream
+        std::function<DeferredRef<T2,E2>(Either<T,E>)> transformDownstream
     );
 
     /**
@@ -186,17 +178,16 @@ template<class T, class E>
 template<class T2, class E2>
 void Deferred<T,E>::chainDownstream(
     PromiseRef<T2,E2> downstream,
-    std::function<Either<T2,E2>(Either<T,E>)> transformDownstream,
-    std::function<E(E2)> transformUpstream
+    std::function<Either<T2,E2>(Either<T,E>)> transform
 ) {
     auto upstream = this->shared_from_this();
 
-    downstream->onCancel([upstream, transformUpstream](E2 error) {
-        upstream->cancel(transformUpstream(error));
+    downstream->onCancel([upstream]() {
+        upstream->cancel();
     });
 
-    upstream->onComplete([downstreamWeak = std::weak_ptr(downstream), transformDownstream](Either<T,E> result) {
-        auto transformResult = transformDownstream(result);
+    upstream->onComplete([downstreamWeak = std::weak_ptr(downstream), transform](Either<T,E> result) {
+        auto transformResult = transform(result);
 
         if(auto downstream = downstreamWeak.lock()) {
             downstream->complete(transformResult);
@@ -208,23 +199,21 @@ template<class T, class E>
 template <class T2, class E2>
 void Deferred<T,E>::chainDownstreamAsync(
     PromiseRef<T2,E2> downstream,
-    std::function<DeferredRef<T2,E2>(Either<T,E>)> transformDownstream,
-    std::function<E(E2)> transformUpstream
+    std::function<DeferredRef<T2,E2>(Either<T,E>)> transform
 ) {
     auto upstream = this->shared_from_this();
 
-    downstream->onCancel([upstream, transformUpstream](E2 error) {
-        upstream->cancel(transformUpstream(error));
+    downstream->onCancel([upstream]() {
+        upstream->cancel();
     });
 
-    upstream->onComplete([downstreamWeak = std::weak_ptr(downstream), transformDownstream](Either<T,E> result) {
-        DeferredRef<T2,E2> asyncTransformResult = transformDownstream(result);
+    upstream->onComplete([downstreamWeak = std::weak_ptr(downstream), transform](Either<T,E> result) {
+        DeferredRef<T2,E2> asyncTransformResult = transform(result);
 
         if(auto downstream = downstreamWeak.lock()) {
             asyncTransformResult->template chainDownstream<T2,E2>(
                 downstream,
-                [](auto result){ return result; },
-                [](auto cancel){ return cancel; }
+                [](auto result){ return result; }
             );
         }
     });
