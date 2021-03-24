@@ -40,6 +40,20 @@ TEST(Observable, RaiseErrorMapError) {
     EXPECT_EQ(result, "ekorb");
 }
 
+TEST(Observable, RaiseErrorMapToDifferentError) {
+    auto sched = Scheduler::global();
+    auto result = Observable<int, int>::raiseError(123)
+        ->mapError<float>([](auto error) {
+            return error * 1.5;
+        })
+        ->last()
+        .failed()
+        .run(sched)
+        ->await();
+
+    EXPECT_EQ(result, 184.5);
+}
+
 TEST(Observable, PureMapTask) {
     auto sched = Scheduler::global();
     auto result = Observable<int>::pure(123)
