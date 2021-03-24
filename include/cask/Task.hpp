@@ -331,9 +331,6 @@ constexpr Task<T,E> Task<T,E>::deferAction(std::function<DeferredRef<T,E>(std::s
                 } else {
                     return Either<std::any,std::any>::right(result.get_right());
                 }
-            },
-            [](std::any cancel) {
-                return std::any_cast<E>(cancel);
             });
 
             return Deferred<std::any,std::any>::forPromise(promise);
@@ -372,9 +369,6 @@ DeferredRef<T,E> Task<T,E>::run(std::shared_ptr<Scheduler> sched) const {
             } else {
                 return Either<T,E>::right(std::any_cast<E>(result.get_right()));
             }
-        },
-        [](auto cancel) {
-            return cancel;
         });
         return Deferred<T,E>::forPromise(promise);
     }
@@ -405,9 +399,6 @@ Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
                 } else {
                     return Either<T,E>::right(std::any_cast<E>(result.get_right()));
                 }
-            },
-            [](auto cancel) {
-                return cancel;
             });
             return Deferred<T,E>::forPromise(promise);
         });
@@ -591,9 +582,6 @@ constexpr Task<T,E> Task<T,E>::delay(int milliseconds) const noexcept {
                     } else {
                         return Either<std::any,std::any>::right(value.get_right());
                     }
-                },
-                [](auto cancel) {
-                    return std::any_cast<E>(cancel);
                 });
             });
 
@@ -631,9 +619,6 @@ constexpr Task<Either<T,T2>,E> Task<T,E>::raceWith(const Task<T2,E>& other) cons
                 } else {
                     return Either<std::any,std::any>::right(result.get_right());
                 }
-            },
-            [](auto cancel) {
-                return std::any_cast<E>(cancel);
             });
 
             rightDeferred->template chainDownstream<std::any,std::any>(promise, [](auto result) {
@@ -644,9 +629,6 @@ constexpr Task<Either<T,T2>,E> Task<T,E>::raceWith(const Task<T2,E>& other) cons
                 } else {
                     return Either<std::any,std::any>::right(result.get_right());
                 }
-            },
-            [](auto cancel) {
-                return std::any_cast<E>(cancel);
             });
 
             return Deferred<std::any,std::any>::forPromise(promise);

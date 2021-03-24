@@ -17,7 +17,7 @@ template <class T, class E>
 class VectorObservable final : public Observable<T,E> {
 public:
     explicit VectorObservable(const std::vector<T>& source);
-    CancelableRef<E> subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
+    CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
 private:
     std::vector<T> source;
 
@@ -36,7 +36,7 @@ VectorObservable<T,E>::VectorObservable(const std::vector<T>& source)
 {}
 
 template <class T, class E>
-CancelableRef<E> VectorObservable<T,E>::subscribe(
+CancelableRef VectorObservable<T,E>::subscribe(
     std::shared_ptr<Scheduler> sched,
     std::shared_ptr<Observer<T,E>> observer) const
 {

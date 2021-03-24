@@ -29,7 +29,7 @@ public:
     void onComplete(std::function<void(Either<T,E>)> callback) override;
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;
-    void cancel(const E& error) override;
+    void cancel() override;
     T await() override;
 
     std::shared_ptr<Promise<T,E>> promise;
@@ -67,12 +67,13 @@ void PromiseDeferred<T,E>::onError(std::function<void(E)> callback) {
 }
 
 template <class T, class E>
-void PromiseDeferred<T,E>::cancel(const E& override) {
-    promise->cancel(override);
+void PromiseDeferred<T,E>::cancel() {
+    promise->cancel();
 }
 
 template <class T, class E>
 T PromiseDeferred<T,E>::await() {
+    bool canceled = false;
     std::optional<Either<T,E>> result = promise->get();
 
     if(!result.has_value()) {
@@ -84,15 +85,17 @@ T PromiseDeferred<T,E>::await() {
             sem_post(&semaphore);
         });
 
-        promise->onCancel([&semaphore, &result](E error){
-            result = Either<T,E>::right(error);
+        promise->onCancel([&semaphore, &canceled](){
+            canceled = true;
             sem_post(&semaphore);
         });
 
         sem_wait(&semaphore);
     }
 
-    if(result->is_left()) {
+    if(canceled) {
+        throw std::runtime_error("Awaiting a promise which was canceled");
+    } else if(result->is_left()) {
         return result->get_left();
     } else {
         throw result->get_right();

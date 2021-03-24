@@ -124,16 +124,12 @@ DeferredRef<std::any,std::any> TrampolineRunLoop::executeAsyncBoundary(
                 } else {
                     return std::get<DeferredRef<std::any,std::any>>(result);
                 }
-            },
-            [](auto cancel) {
-                return cancel;
             }
         );
     } else {
         deferred->template chainDownstream<std::any,std::any>(
             promise,
-            [](auto result) { return result; },
-            [](auto cancel) { return cancel; }
+            [](auto result) { return result; }
         );
     }
     return Deferred<std::any,std::any>::forPromise(promise);

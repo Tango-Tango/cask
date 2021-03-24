@@ -220,15 +220,12 @@ TEST(Trampoline,AsyncCancel) {
     auto result = TrampolineRunLoop::execute(op, Scheduler::global());
     auto asyncResult = std::get<DeferredRef<std::any,std::any>>(result);
 
-    asyncResult->cancel(123);
+    asyncResult->cancel();
 
     try {
         asyncResult->await();
         FAIL() << "Expected operation to throw";
-    } catch(const std::any& error) {
-        auto value = std::any_cast<int>(error);
-        EXPECT_EQ(value, 123);
-    }
+    } catch(const std::runtime_error&) {}
 }
 
 TEST(Trampoline,AsyncCancelSync) {
@@ -241,15 +238,12 @@ TEST(Trampoline,AsyncCancelSync) {
     auto boundary = std::get<AsyncBoundary>(result);
     auto asyncResult = TrampolineRunLoop::executeAsyncBoundary(boundary, Scheduler::global());
 
-    asyncResult->cancel(123);
+    asyncResult->cancel();
 
     try {
         asyncResult->await();
         FAIL() << "Expected operation to throw";
-    } catch(const std::any& error) {
-        auto value = std::any_cast<int>(error);
-        EXPECT_EQ(value, 123);
-    }
+    } catch(std::runtime_error&) {}
 }
 
 TEST(Trampoline,FlatMapValue) {
@@ -437,14 +431,12 @@ TEST(Trampoline,FlatMapAsyncCancel) {
     auto result = TrampolineRunLoop::execute(op, Scheduler::global());
     auto asyncResult = std::get<DeferredRef<std::any,std::any>>(result);
 
-    asyncResult->cancel(123);
+    asyncResult->cancel();
 
     try {
         asyncResult->await();
         FAIL() << "Expected test to throw an error";
-    } catch(const std::any& error) {
-        EXPECT_EQ(std::any_cast<int>(error), 123);
-    }
+    } catch(const std::runtime_error& ) {}
 }
 
 TEST(Trampoline,FlatMapAssignment) {

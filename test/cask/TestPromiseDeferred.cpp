@@ -56,7 +56,7 @@ TEST(Deferred, PureAwait) {
 
 TEST(Deferred, PureIgnoresCancel) {
     auto deferred = Deferred<int, std::string>::pure(123);
-    deferred->cancel("canceled");
+    deferred->cancel();
     EXPECT_EQ(deferred->await(), 123);
 }
 
@@ -105,7 +105,7 @@ TEST(Deferred, ErrorAwait) {
 
 TEST(Deferred, ErrorIgnoresCancel) {
     auto deferred = Deferred<int,std::string>::raiseError("broke");
-    deferred->cancel("canceled");
+    deferred->cancel();
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
@@ -252,14 +252,12 @@ TEST(Deferred, PromiseCancel) {
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
-    deferred->cancel("canceled");
+    deferred->cancel();
 
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string& value) {
-        EXPECT_EQ(value, "canceled");
-    }
+    } catch(std::runtime_error&) {}
 }
 
 TEST(Deferred, PromiseSuccessIgnoresCancel) {
@@ -267,7 +265,7 @@ TEST(Deferred, PromiseSuccessIgnoresCancel) {
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     promise->success(123);
-    promise->cancel("canceled");
+    promise->cancel();
 
     EXPECT_EQ(deferred->await(), 123);
 }
@@ -277,7 +275,7 @@ TEST(Deferred, PromiseErrorIgnoresCancel) {
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     promise->error("broke");
-    promise->cancel("canceled");
+    promise->cancel();
 
     try {
         deferred->await();
@@ -291,45 +289,39 @@ TEST(Deferred, PromiseCancelIgnoresSuccess) {
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
-    promise->cancel("canceled");
+    promise->cancel();
     promise->success(123);
 
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string& value) {
-        EXPECT_EQ(value, "canceled");
-    }
+    } catch(std::runtime_error&) {}
 }
 
 TEST(Deferred, PromiseCancelIgnoresError) {
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
-    promise->cancel("canceled");
+    promise->cancel();
     promise->error("broke");
 
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string& value) {
-        EXPECT_EQ(value, "canceled");
-    }
+    } catch(std::runtime_error&) {}
 }
 
 TEST(Deferred, PromiseCancelIgnoresSubsequentCancel) {
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
-    promise->cancel("canceled");
-    promise->cancel("canceled again?");
+    promise->cancel();
+    promise->cancel();
 
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string& value) {
-        EXPECT_EQ(value, "canceled");
-    }
+    } catch(std::runtime_error&) {}
 }
 
 TEST(Deferred, PromiseCancelAffectsPeers) {
@@ -337,14 +329,12 @@ TEST(Deferred, PromiseCancelAffectsPeers) {
     auto deferred = Deferred<int,std::string>::forPromise(promise);
     auto sibling = Deferred<int,std::string>::forPromise(promise);
 
-    deferred->cancel("canceled");
+    deferred->cancel();
 
     try {
         sibling->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string& value) {
-        EXPECT_EQ(value, "canceled");
-    }
+    } catch(std::runtime_error&) {}
 }
 
 TEST(Deferred, DoesntAllowMultipleSuccesses) {

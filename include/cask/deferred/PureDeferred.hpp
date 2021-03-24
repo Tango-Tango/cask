@@ -21,7 +21,7 @@ public:
     void onComplete(std::function<void(Either<T,E>)> callback) override;
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;
-    void cancel(const E& override) override;
+    void cancel() override;
     T await() override;
 private:
 };
@@ -52,7 +52,7 @@ void PureDeferred<T,E>::onError(std::function<void(E)>) {
 }
 
 template <class T, class E>
-void PureDeferred<T,E>::cancel(const E&) {
+void PureDeferred<T,E>::cancel() {
     return;
 }
 

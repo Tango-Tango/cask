@@ -123,7 +123,7 @@ TEST(MVar, CleanupCanceledPut) {
     auto secondPut = mvar->put(2).run(Scheduler::global());
     auto thirdPut = mvar->put(3).run(Scheduler::global());
 
-    secondPut->cancel("cancelled");
+    secondPut->cancel();
 
     auto firstTake = mvar->take().run(Scheduler::global());
     auto secondTake = mvar->take().run(Scheduler::global());
@@ -142,7 +142,7 @@ TEST(MVar, CleanupCanceledTake) {
     auto secondTake = mvar->take().run(Scheduler::global());
     auto thirdTake = mvar->take().run(Scheduler::global());
 
-    secondTake->cancel("cancelled");
+    secondTake->cancel();
 
     auto firstPut = mvar->put(1).run(Scheduler::global());
     auto secondPut = mvar->put(2).run(Scheduler::global());

@@ -16,26 +16,22 @@ TEST(TaskNever,EvalutesSync) {
     auto continuation = result.get_right();
     auto deferred = continuation.run(Scheduler::global());
 
-    deferred->cancel(1.23);
+    deferred->cancel();
 
     try {
         deferred->await();
         FAIL() << "Excepted operation to throw.";
-    } catch(float& error) {
-        EXPECT_EQ(error, 1.23f);
-    }
+    } catch(std::runtime_error& error) {}
 }
 
 TEST(TaskNever,EvalutesAsync) {
     auto deferred = Task<int,float>::never().run(Scheduler::global());
-    deferred->cancel(1.23);
+
+    deferred->cancel();
 
     try {
-        
         deferred->await();
         FAIL() << "Excepted operation to throw.";
-    } catch(float& error) {
-        EXPECT_EQ(error, 1.23f);
-    }
+    } catch(std::runtime_error& error) {}
 }
 
