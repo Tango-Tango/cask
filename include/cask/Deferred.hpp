@@ -134,6 +134,8 @@ public:
      */
     virtual void onError(std::function<void(E)> callback) = 0;
 
+    virtual void onCancel(std::function<void()> callback) = 0;
+
     /**
      * Await the result of this operation by blocking the current
      * thread until the result is available. If the result is
