@@ -3,6 +3,12 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 2.2
+
+- Add the `recover` method to `Task`.
+- Correctly convey errors downstream in `Observable::flatMap` and resolve issues
+  with using `Observable::mapError`.
+
 ## 2.1
 
 - Add the `guarantee` method to `Observable`.

@@ -6,9 +6,11 @@
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
+#include <optional>
 
 using cask::Scheduler;
 using cask::Observable;
+using cask::ObservableRef;
 using cask::Task;
 using cask::None;
 
@@ -24,41 +26,11 @@ TEST(Observable, PureMap) {
     EXPECT_EQ(*result, 184.5);
 }
 
-TEST(Observable, RaiseErrorMapError) {
-    auto sched = Scheduler::global();
-    auto result = Observable<int, std::string>::raiseError("broke")
-        ->mapError<std::string>([](auto error) {
-            std::string copy(error);
-            std::reverse(copy.begin(), copy.end());
-            return copy;
-        })
-        ->last()
-        .failed()
-        .run(sched)
-        ->await();
-
-    EXPECT_EQ(result, "ekorb");
-}
-
 TEST(Observable, PureMapTask) {
     auto sched = Scheduler::global();
     auto result = Observable<int>::pure(123)
         ->mapTask<float>([](auto value) {
             return Task<float>::pure(value * 1.5);
-        })
-        ->last()
-        .run(sched)
-        ->await();
-
-    EXPECT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 184.5);
-}
-
-TEST(Observable, PureFlatMap) {
-    auto sched = Scheduler::global();
-    auto result = Observable<int>::pure(123)
-        ->flatMap<float>([](auto value) {
-            return Observable<float>::pure(value * 1.5);
         })
         ->last()
         .run(sched)

@@ -18,30 +18,46 @@ namespace cask::observable {
 template <class T, class EI, class EO>
 class MapErrorObserver final : public Observer<T,EI> {
 public:
-    MapErrorObserver(std::function<EO(EI)> predicate, std::shared_ptr<Observer<T,EO>> downstream);
-    DeferredRef<Ack,EO> onNext(T value);
+    MapErrorObserver(std::function<EO(EI)> predicate, std::shared_ptr<Observer<T,EO>> downstream, std::shared_ptr<Scheduler> sched);
+    DeferredRef<Ack,EI> onNext(T value);
     void onError(EI error);
     void onComplete();
 private:
     std::function<EO(EI)> predicate;
     std::shared_ptr<Observer<T,EO>> downstream;
+    std::shared_ptr<Scheduler> sched;
 };
 
 
 template <class T, class EI, class EO>
-MapErrorObserver<T,EI,EO>::MapErrorObserver(std::function<EO(EI)> predicate, std::shared_ptr<Observer<T,EO>> downstream)
+MapErrorObserver<T,EI,EO>::MapErrorObserver(std::function<EO(EI)> predicate, std::shared_ptr<Observer<T,EO>> downstream, std::shared_ptr<Scheduler> sched)
     : predicate(predicate)
     , downstream(downstream)
+    , sched(sched)
 {}
 
 template <class T, class EI, class EO>
-DeferredRef<Ack,EO> MapErrorObserver<T,EI,EO>::onNext(T value) {
-    return downstream->onNext(value);
+DeferredRef<Ack,EI> MapErrorObserver<T,EI,EO>::onNext(T value) {
+    auto promise = Promise<Ack, EI>::create(sched);
+    auto deferred = downstream->onNext(value);
+    deferred->template chainDownstream<Ack, EI>(
+        promise,
+        [](auto result) {
+            if(result.is_right()) {
+                return Either<Ack, EI>::left(Stop);
+            }
+            else {
+                return Either<Ack,EI>::left(result.get_left());
+            }
+        }
+    );
+    return Deferred<Ack,EI>::forPromise(promise);
 }
 
 template <class T, class EI, class EO>
 void MapErrorObserver<T,EI,EO>::onError(EI error) {
-    downstream->onError(predicate(error));
+    EO transformed = predicate(error);
+    downstream->onError(transformed);
 }
 
 template <class T, class EI, class EO>
