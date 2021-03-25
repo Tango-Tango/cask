@@ -52,7 +52,7 @@ jobs:
   
   build-mac:
     name: Mac Build and Test
-    runs-on: mac-10.15
+    runs-on: macos-10.15
     if: github.actor != 'engineering-at-tangotango'
 
     strategy:
