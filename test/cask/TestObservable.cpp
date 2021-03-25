@@ -6,9 +6,11 @@
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
+#include <optional>
 
 using cask::Scheduler;
 using cask::Observable;
+using cask::ObservableRef;
 using cask::Task;
 using cask::None;
 
@@ -42,16 +44,17 @@ TEST(Observable, RaiseErrorMapError) {
 
 TEST(Observable, RaiseErrorMapToDifferentError) {
     auto sched = Scheduler::global();
-    auto result = Observable<int, int>::raiseError(123)
-        ->mapError<float>([](auto error) {
-            return error * 1.5;
+
+    auto result = Observable<int,int>::raiseError(123)
+        ->mapError<std::string>([](auto err) {
+            return std::to_string(err);
         })
         ->last()
         .failed()
         .run(sched)
         ->await();
 
-    EXPECT_EQ(result, 184.5);
+    EXPECT_EQ(result, "123");
 }
 
 TEST(Observable, PureMapTask) {

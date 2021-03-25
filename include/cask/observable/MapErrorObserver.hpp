@@ -43,8 +43,12 @@ DeferredRef<Ack,EI> MapErrorObserver<T,EI,EO>::onNext(T value) {
     deferred->template chainDownstream<Ack, EI>(
         promise,
         [predicate=predicate](auto result) {
-            if(result.is_right()) { return Either<Ack, EI>::right(predicate(result.get_right())); }
-            else { return Either<Ack,EI>::left(result.get_left()); }
+            if(result.is_right()) {
+                return Either<Ack, EI>::left(Stop);
+            }
+            else {
+                return Either<Ack,EI>::left(result.get_left());
+            }
         }
     );
     return Deferred<Ack,EI>::forPromise(promise);
@@ -52,7 +56,8 @@ DeferredRef<Ack,EI> MapErrorObserver<T,EI,EO>::onNext(T value) {
 
 template <class T, class EI, class EO>
 void MapErrorObserver<T,EI,EO>::onError(EI error) {
-    downstream->onError(predicate(error));
+    EO transformed = predicate(error);
+    downstream->onError(transformed);
 }
 
 template <class T, class EI, class EO>

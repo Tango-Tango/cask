@@ -22,7 +22,7 @@ public:
     CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,EO>> observer) const;
 private:
     std::shared_ptr<const Observable<T,EI>> upstream;
-    std::function<EI(EO)> predicate;
+    std::function<EO(EI)> predicate;
 };
 
 template <class T, class EI, class EO>
