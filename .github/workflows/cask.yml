@@ -107,8 +107,6 @@ jobs:
         ./automatic_release.py -u engineering-at-tangotango -o Tango-Tango -r cask -s pre-build
     - name: Generate the Build Environment
       run: ./regenerate_env.sh clang
-    - name: Run cppcheck
-      run: ninja cppcheck -C build_clang
     - name: Run clang-tidy
       run: ninja clang-tidy -C build_clang
   
