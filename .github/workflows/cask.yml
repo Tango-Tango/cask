@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-linux:
-    name: Cask Build and Test
+    name: Linux Build and Test
     runs-on: ubuntu-20.04
     if: github.actor != 'engineering-at-tangotango'
 
@@ -51,7 +51,7 @@ jobs:
         fail_ci_if_error: true
   
   build-mac:
-    name: Cask Build and Test
+    name: Mac Build and Test
     runs-on: mac-10.15
     if: github.actor != 'engineering-at-tangotango'
 
