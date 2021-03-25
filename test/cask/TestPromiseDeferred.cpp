@@ -8,7 +8,6 @@
 #include "cask/None.hpp"
 #include <chrono>
 #include <thread>
-#include <semaphore.h>
 
 using cask::Promise;
 using cask::Deferred;
@@ -56,7 +55,7 @@ TEST(Deferred, PureAwait) {
 
 TEST(Deferred, PureIgnoresCancel) {
     auto deferred = Deferred<int, std::string>::pure(123);
-    deferred->cancel("canceled");
+    deferred->cancel();
     EXPECT_EQ(deferred->await(), 123);
 }
 
@@ -105,7 +104,7 @@ TEST(Deferred, ErrorAwait) {
 
 TEST(Deferred, ErrorIgnoresCancel) {
     auto deferred = Deferred<int,std::string>::raiseError("broke");
-    deferred->cancel("canceled");
+    deferred->cancel();
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
@@ -115,83 +114,79 @@ TEST(Deferred, ErrorIgnoresCancel) {
 }
 
 TEST(Deferred, PromiseOnCompleteSuccess) {
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
+    std::mutex mutex;
+    mutex.lock();
 
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     Either<int,std::string> result = Either<int,std::string>::left(0);
-    deferred->onComplete([&result, &semaphore](auto value) {
+    deferred->onComplete([&result, &mutex](auto value) {
         result = value;
-        sem_post(&semaphore);
+        mutex.unlock();
     });
 
     promise->success(123);
-    sem_wait(&semaphore);
+    mutex.lock();
 
     EXPECT_EQ(result.get_left(), 123);
-    sem_destroy(&semaphore);
 }
 
 TEST(Deferred, PromiseOnCompleteError) {
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
+    std::mutex mutex;
+    mutex.lock();
 
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     Either<int,std::string> result = Either<int,std::string>::left(0);
-    deferred->onComplete([&result, &semaphore](auto value) {
+    deferred->onComplete([&result, &mutex](auto value) {
         result = value;
-        sem_post(&semaphore);
+        mutex.unlock();
     });
 
     promise->error("broke");
-    sem_wait(&semaphore);
+    mutex.lock();
 
     EXPECT_EQ(result.get_right(), "broke");
-    sem_destroy(&semaphore);
 }
 
 TEST(Deferred, PromiseOnSuccess) {
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
+    std::mutex mutex;
+    mutex.lock();
 
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     int result = 0;
-    deferred->onSuccess([&result, &semaphore](auto value) {
+    deferred->onSuccess([&result, &mutex](auto value) {
         result = value;
-        sem_post(&semaphore);
+        mutex.unlock();
     });
 
     promise->success(123);
-    sem_wait(&semaphore);
+    mutex.lock();
 
     EXPECT_EQ(result, 123);
-    sem_destroy(&semaphore);
 }
 
 TEST(Deferred, PromiseOnError) {
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
+    std::mutex mutex;
+    mutex.lock();
 
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     std::string result = "not called";
-    deferred->onError([&result, &semaphore](auto value) {
+    deferred->onError([&result, &mutex](auto value) {
         result = value;
-        sem_post(&semaphore);
+        mutex.unlock();
     });
 
     promise->error("broke");
-    sem_wait(&semaphore);
+    mutex.lock();
 
     EXPECT_EQ(result, "broke");
-    sem_destroy(&semaphore);
 }
 
 TEST(Deferred, PromiseAwaitSyncSuccess) {
@@ -218,20 +213,20 @@ TEST(Deferred, PromiseAwaitSyncError) {
 }
 
 TEST(Deferred, PromiseAwaitAsync) {
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
+    std::mutex mutex;
+    mutex.lock();
 
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
     int value;
 
-    std::thread backgroundAwait([&value, &semaphore, &deferred]() {
-        sem_post(&semaphore);
+    std::thread backgroundAwait([&value, &mutex, &deferred]() {
+        mutex.unlock();
         value = deferred->await();
     });
 
     // Wait for background thread to get started
-    sem_wait(&semaphore);
+    mutex.lock();
 
     // Complete the promise after a small sleep (to be triple sure that
     // the await is running).
@@ -252,14 +247,12 @@ TEST(Deferred, PromiseCancel) {
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
-    deferred->cancel("canceled");
+    deferred->cancel();
 
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string& value) {
-        EXPECT_EQ(value, "canceled");
-    }
+    } catch(std::runtime_error&) {}
 }
 
 TEST(Deferred, PromiseSuccessIgnoresCancel) {
@@ -267,7 +260,7 @@ TEST(Deferred, PromiseSuccessIgnoresCancel) {
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     promise->success(123);
-    promise->cancel("canceled");
+    promise->cancel();
 
     EXPECT_EQ(deferred->await(), 123);
 }
@@ -277,7 +270,7 @@ TEST(Deferred, PromiseErrorIgnoresCancel) {
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     promise->error("broke");
-    promise->cancel("canceled");
+    promise->cancel();
 
     try {
         deferred->await();
@@ -291,45 +284,39 @@ TEST(Deferred, PromiseCancelIgnoresSuccess) {
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
-    promise->cancel("canceled");
+    promise->cancel();
     promise->success(123);
 
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string& value) {
-        EXPECT_EQ(value, "canceled");
-    }
+    } catch(std::runtime_error&) {}
 }
 
 TEST(Deferred, PromiseCancelIgnoresError) {
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
-    promise->cancel("canceled");
+    promise->cancel();
     promise->error("broke");
 
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string& value) {
-        EXPECT_EQ(value, "canceled");
-    }
+    } catch(std::runtime_error&) {}
 }
 
 TEST(Deferred, PromiseCancelIgnoresSubsequentCancel) {
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
-    promise->cancel("canceled");
-    promise->cancel("canceled again?");
+    promise->cancel();
+    promise->cancel();
 
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string& value) {
-        EXPECT_EQ(value, "canceled");
-    }
+    } catch(std::runtime_error&) {}
 }
 
 TEST(Deferred, PromiseCancelAffectsPeers) {
@@ -337,14 +324,12 @@ TEST(Deferred, PromiseCancelAffectsPeers) {
     auto deferred = Deferred<int,std::string>::forPromise(promise);
     auto sibling = Deferred<int,std::string>::forPromise(promise);
 
-    deferred->cancel("canceled");
+    deferred->cancel();
 
     try {
         sibling->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::string& value) {
-        EXPECT_EQ(value, "canceled");
-    }
+    } catch(std::runtime_error&) {}
 }
 
 TEST(Deferred, DoesntAllowMultipleSuccesses) {

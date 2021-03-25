@@ -14,18 +14,18 @@ namespace cask::observable {
 template <class T, class E>
 class EmptyObservable final : public Observable<T,E> {
 public:
-    CancelableRef<E> subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
+    CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
 private:
     friend class Observable<T,E>;
 };
 
 template <class T, class E>
-CancelableRef<E> EmptyObservable<T,E>::subscribe(
+CancelableRef EmptyObservable<T,E>::subscribe(
     std::shared_ptr<Scheduler>,
     std::shared_ptr<Observer<T,E>> observer) const
 {
     observer->onComplete();
-    return std::make_unique<IgnoreCancelation<E>>();
+    return std::make_unique<IgnoreCancelation>();
 }
 
 }

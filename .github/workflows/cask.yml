@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  build-linux:
     name: Cask Build and Test
     runs-on: ubuntu-20.04
     if: github.actor != 'engineering-at-tangotango'
@@ -50,6 +50,36 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: true
   
+  build-mac:
+    name: Cask Build and Test
+    runs-on: mac-10.15
+    if: github.actor != 'engineering-at-tangotango'
+
+    strategy:
+      matrix:
+        target: [clang]
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 2
+        token: ${{ secrets.AUTOMATION_USER_TOKEN }}
+      env:
+        AUTOMATION_USER_TOKEN: secrets.AUTOMATION_USER_TOKEN
+    - name: Install Python Development Dependencies
+      run: sudo python3 -m pip install meson==0.57.0
+    - name: Run the Pre-Build Release Stage
+      run: |
+        git config user.name engineering-at-tangotango
+        git config user.email engineering@tangotango.net
+        ./automatic_release.py -u engineering-at-tangotango -o Tango-Tango -r cask -s pre-build
+    - name: Generate the Build Environment
+      run: ./regenerate_env.sh ${{ matrix.target }}
+    - name: Build and Test
+      working-directory: build_${{ matrix.target }}
+      run: meson test --verbose
+  
   analyze:
     name: Analyze
     runs-on: ubuntu-20.04
@@ -83,7 +113,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-20.04
-    needs: [build, analyze]
+    needs: [build-linux, build-mac, analyze]
     if: contains(github.ref, 'master') && github.actor != 'engineering-at-tangotango'
 
     steps:

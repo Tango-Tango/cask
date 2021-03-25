@@ -128,7 +128,7 @@ public:
      * @param observer The observer to attach to the stream.
      * @return The handle which may be used to cancel computation on the stream.
      */
-    virtual CancelableRef<E> subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const = 0;
+    virtual CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const = 0;
 
     /**
      * Transform each element of the stream using the provided transforming predicate
@@ -365,8 +365,8 @@ Task<std::optional<T>,E> Observable<T,E>::last() const {
         auto observer = std::make_shared<observable::LastObserver<T,E>>(promise);
         auto subscription = self->subscribe(sched, observer);
 
-        promise->onCancel([subscription](auto cancelError) {
-            subscription->cancel(cancelError);
+        promise->onCancel([subscription]() {
+            subscription->cancel();
         });
 
         return Deferred<std::optional<T>,E>::forPromise(promise);
@@ -389,8 +389,8 @@ Task<std::vector<T>,E> Observable<T,E>::take(unsigned int amount) const {
             auto observer = std::shared_ptr<Observer<T,E>>(new observable::TakeObserver<T,E>(amount, promise));
             auto subscription = self->subscribe(sched, observer);
 
-            promise->onCancel([subscription](auto cancelError) {
-                subscription->cancel(cancelError);
+            promise->onCancel([subscription]() {
+                subscription->cancel();
             });
 
             return Deferred<std::vector<T>,E>::forPromise(promise);

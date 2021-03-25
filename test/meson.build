@@ -18,6 +18,13 @@ if not meson.is_subproject()
         'cask/observable/TestObservableTake.cpp',
         'cask/observable/TestObservableTakeWhile.cpp',
         'cask/observable/TestObservableTakeWhileInclusive.cpp',
+        'cask/task/TestTaskAssignment.cpp',
+        'cask/task/TestTaskDefer.cpp',
+        'cask/task/TestTaskEval.cpp',
+        'cask/task/TestTaskNever.cpp',
+        'cask/task/TestTaskNone.cpp',
+        'cask/task/TestTaskPure.cpp',
+        'cask/task/TestTaskRaiseError.cpp',
         'main.cpp'
     ]
 

@@ -19,7 +19,7 @@ template <class T, class EI, class EO>
 class MapErrorObservable final : public Observable<T,EO> {
 public:
     MapErrorObservable(std::shared_ptr<const Observable<T,EI>> upstream, std::function<EO(EI)> predicate);
-    CancelableRef<EO> subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,EO>> observer) const;
+    CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,EO>> observer) const;
 private:
     std::shared_ptr<const Observable<T,EI>> upstream;
     std::function<EI(EO)> predicate;
@@ -32,7 +32,7 @@ MapErrorObservable<T,EI,EO>::MapErrorObservable(std::shared_ptr<const Observable
 {}
 
 template <class T, class EI, class EO>
-CancelableRef<EO> MapErrorObservable<T,EI,EO>::subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,EO>> observer) const {
+CancelableRef MapErrorObservable<T,EI,EO>::subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,EO>> observer) const {
     auto mapObserver = std::make_shared<MapErrorObserver<T,EI,EO>>(predicate, observer);
     return upstream->subscribe(sched, mapObserver);
 }

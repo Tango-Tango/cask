@@ -117,6 +117,16 @@ public:
     DeferredRef<T,E> run(std::shared_ptr<Scheduler> scheduler) const;
 
     /**
+     * Attempt synchronous execution of this task. Either a synchronous
+     * result will be provided or a task which, when run with a scheduler,
+     * will provide an asynchronous result.
+     * 
+     * @return A value, an error, or a Task representing the asynchronous
+     *         continuation of this computation.
+     */
+    Either<Either<T,E>,Task<T,E>> runSync() const;
+
+    /**
      * Force an asynchronous boundary causing this task to defer
      * its continued execution to the scheduler.
      * @return A `Task` that, when executed, will immediately defer
@@ -258,8 +268,12 @@ public:
      */
     constexpr explicit Task(const std::shared_ptr<trampoline::TrampolineOp>& op) noexcept;
     constexpr explicit Task(std::shared_ptr<trampoline::TrampolineOp>&& op) noexcept;
+    constexpr Task(const Task<T,E>& other) noexcept;
+    constexpr Task(Task<T,E>&& other) noexcept;
+    constexpr Task<T,E>& operator=(const Task<T,E>& other) noexcept;
+    constexpr Task<T,E>& operator=(Task<T,E>&& other) noexcept;
 
-    const std::shared_ptr<trampoline::TrampolineOp> op;
+    std::shared_ptr<trampoline::TrampolineOp> op;
 };
 
 template <class T, class E>
@@ -317,9 +331,6 @@ constexpr Task<T,E> Task<T,E>::deferAction(std::function<DeferredRef<T,E>(std::s
                 } else {
                     return Either<std::any,std::any>::right(result.get_right());
                 }
-            },
-            [](std::any cancel) {
-                return std::any_cast<E>(cancel);
             });
 
             return Deferred<std::any,std::any>::forPromise(promise);
@@ -358,11 +369,40 @@ DeferredRef<T,E> Task<T,E>::run(std::shared_ptr<Scheduler> sched) const {
             } else {
                 return Either<T,E>::right(std::any_cast<E>(result.get_right()));
             }
-        },
-        [](auto cancel) {
-            return cancel;
         });
         return Deferred<T,E>::forPromise(promise);
+    }
+}
+
+template <class T, class E>
+Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
+    auto result = trampoline::TrampolineRunLoop::executeSync(op);
+
+    if(auto either = std::get_if<Either<std::any,std::any>>(&result)) {
+        if(either->is_left()) {
+            auto success = std::any_cast<T>(either->get_left());
+            auto syncResult = Either<T,E>::left(success);
+            return Either<Either<T,E>,Task<T,E>>::left(syncResult);
+        } else {
+            auto error = std::any_cast<E>(either->get_right());
+            auto syncResult = Either<T,E>::right(error);
+            return Either<Either<T,E>,Task<T,E>>::left(syncResult);
+        }
+    } else {
+        auto boundary = std::get<trampoline::AsyncBoundary>(result);
+        auto asyncTask = Task<T,E>::deferAction([boundary](auto sched) {
+            auto deferred = trampoline::TrampolineRunLoop::executeAsyncBoundary(boundary, sched);
+            auto promise = Promise<T,E>::create(sched);
+            deferred->template chainDownstream<T,E>(promise, [](auto result) mutable {
+                if(result.is_left()) {
+                    return Either<T,E>::left(std::any_cast<T>(result.get_left()));
+                } else {
+                    return Either<T,E>::right(std::any_cast<E>(result.get_right()));
+                }
+            });
+            return Deferred<T,E>::forPromise(promise);
+        });
+        return Either<Either<T,E>,Task<T,E>>::right(asyncTask);
     }
 }
 
@@ -542,9 +582,6 @@ constexpr Task<T,E> Task<T,E>::delay(int milliseconds) const noexcept {
                     } else {
                         return Either<std::any,std::any>::right(value.get_right());
                     }
-                },
-                [](auto cancel) {
-                    return std::any_cast<E>(cancel);
                 });
             });
 
@@ -582,9 +619,6 @@ constexpr Task<Either<T,T2>,E> Task<T,E>::raceWith(const Task<T2,E>& other) cons
                 } else {
                     return Either<std::any,std::any>::right(result.get_right());
                 }
-            },
-            [](auto cancel) {
-                return std::any_cast<E>(cancel);
             });
 
             rightDeferred->template chainDownstream<std::any,std::any>(promise, [](auto result) {
@@ -595,9 +629,6 @@ constexpr Task<Either<T,T2>,E> Task<T,E>::raceWith(const Task<T2,E>& other) cons
                 } else {
                     return Either<std::any,std::any>::right(result.get_right());
                 }
-            },
-            [](auto cancel) {
-                return std::any_cast<E>(cancel);
             });
 
             return Deferred<std::any,std::any>::forPromise(promise);
@@ -632,6 +663,28 @@ template <class T, class E>
 constexpr Task<T,E>::Task(std::shared_ptr<trampoline::TrampolineOp>&& op) noexcept
     : op(std::move(op))
 {}
+
+template <class T, class E>
+constexpr Task<T,E>::Task(const Task<T,E>& other) noexcept
+    : op(other.op)
+{}
+
+template <class T, class E>
+constexpr Task<T,E>::Task(Task<T,E>&& other) noexcept
+    : op(std::move(other.op))
+{}
+
+template <class T, class E>
+constexpr Task<T,E>& Task<T,E>::operator=(const Task<T,E>& other) noexcept{
+    this->op = other.op;
+    return *this;
+}
+
+template <class T, class E>
+constexpr Task<T,E>& Task<T,E>::operator=(Task<T,E>&& other) noexcept{
+    this->op = std::move(other.op);
+    return *this;
+}
 
 }
 

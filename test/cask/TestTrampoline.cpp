@@ -10,7 +10,9 @@
 using cask::Deferred;
 using cask::DeferredRef;
 using cask::Either;
+using cask::Promise;
 using cask::Scheduler;
+using cask::trampoline::AsyncBoundary;
 using cask::trampoline::TrampolineOp;
 using cask::trampoline::TrampolineRunLoop;
 
@@ -43,6 +45,14 @@ TEST(Trampoline,ValueMove) {
     EXPECT_EQ(std::any_cast<int>(left), std::any_cast<int>(right));
 }
 
+TEST(Trampoline,ValueSync) {
+    auto op = TrampolineOp::value(123);
+    auto result = TrampolineRunLoop::executeSync(op);
+    auto syncResult = std::get<Either<std::any,std::any>>(result);
+    auto value = std::any_cast<int>(syncResult.get_left());
+    EXPECT_EQ(value, 123);
+}
+
 TEST(Trampoline,Error) {
     auto op = TrampolineOp::error(123);
     auto result = TrampolineRunLoop::execute(op, Scheduler::global());
@@ -70,6 +80,14 @@ TEST(Trampoline,ErrorMove) {
     auto left = op->data.constantData->get_right();
     auto right = op3.data.constantData->get_right();
     EXPECT_EQ(std::any_cast<int>(left), std::any_cast<int>(right));
+}
+
+TEST(Trampoline,ErrorSync) {
+    auto op = TrampolineOp::error(123);
+    auto result = TrampolineRunLoop::executeSync(op);
+    auto syncResult = std::get<Either<std::any,std::any>>(result);
+    auto value = std::any_cast<int>(syncResult.get_right());
+    EXPECT_EQ(value, 123);
 }
 
 TEST(Trampoline,Thunk) {
@@ -101,6 +119,14 @@ TEST(Trampoline,ThunkMove) {
     EXPECT_EQ(left, right);
 }
 
+TEST(Trampoline,ThunkSync) {
+    auto op = TrampolineOp::thunk([]() { return 123; });
+    auto result = TrampolineRunLoop::executeSync(op);
+    auto syncResult = std::get<Either<std::any,std::any>>(result);
+    auto value = std::any_cast<int>(syncResult.get_left());
+    EXPECT_EQ(value, 123);
+}
+
 TEST(Trampoline,AsyncValue) {
     auto op = TrampolineOp::async([](auto) {
         return Deferred<std::any,std::any>::pure(123);
@@ -108,6 +134,20 @@ TEST(Trampoline,AsyncValue) {
 
     auto result = TrampolineRunLoop::execute(op, Scheduler::global());
     auto asyncResult = std::get<DeferredRef<std::any,std::any>>(result);
+    auto awaitResult = asyncResult->await();
+    auto value = std::any_cast<int>(awaitResult);
+    EXPECT_EQ(value, 123);
+}
+
+TEST(Trampoline,AsyncValueSync) {
+    auto op = TrampolineOp::async([](auto) {
+        return Deferred<std::any,std::any>::pure(123);
+    });
+
+    auto result = TrampolineRunLoop::executeSync(op);
+    auto boundary = std::get<AsyncBoundary>(result);
+
+    auto asyncResult = TrampolineRunLoop::executeAsyncBoundary(boundary, Scheduler::global());
     auto awaitResult = asyncResult->await();
     auto value = std::any_cast<int>(awaitResult);
     EXPECT_EQ(value, 123);
@@ -129,6 +169,22 @@ TEST(Trampoline,AsyncError) {
     }
 }
 
+TEST(Trampoline,AsyncErrorSync) {
+    auto op = TrampolineOp::async([](auto) {
+        return Deferred<std::any,std::any>::raiseError(123);
+    });
+
+    auto result = TrampolineRunLoop::executeSync(op);
+    auto boundary = std::get<AsyncBoundary>(result);
+    auto asyncResult = TrampolineRunLoop::executeAsyncBoundary(boundary, Scheduler::global());
+
+    try {
+        asyncResult->await();
+        FAIL() << "Exceted function to throw";
+    } catch(std::any& error) {
+        EXPECT_EQ(std::any_cast<int>(error), 123);
+    }
+}
 
 TEST(Trampoline,AsyncAssignment) {
     auto op = TrampolineOp::async([](auto) {
@@ -155,6 +211,41 @@ TEST(Trampoline,AsyncMove) {
     EXPECT_EQ(left, right);
 }
 
+TEST(Trampoline,AsyncCancel) {
+    auto op = TrampolineOp::async([](auto sched) {
+        auto promise = Promise<std::any,std::any>::create(sched);
+        return Deferred<std::any,std::any>::forPromise(promise);
+    });
+
+    auto result = TrampolineRunLoop::execute(op, Scheduler::global());
+    auto asyncResult = std::get<DeferredRef<std::any,std::any>>(result);
+
+    asyncResult->cancel();
+
+    try {
+        asyncResult->await();
+        FAIL() << "Expected operation to throw";
+    } catch(const std::runtime_error&) {}
+}
+
+TEST(Trampoline,AsyncCancelSync) {
+    auto op = TrampolineOp::async([](auto sched) {
+        auto promise = Promise<std::any,std::any>::create(sched);
+        return Deferred<std::any,std::any>::forPromise(promise);
+    });
+
+    auto result = TrampolineRunLoop::executeSync(op);
+    auto boundary = std::get<AsyncBoundary>(result);
+    auto asyncResult = TrampolineRunLoop::executeAsyncBoundary(boundary, Scheduler::global());
+
+    asyncResult->cancel();
+
+    try {
+        asyncResult->await();
+        FAIL() << "Expected operation to throw";
+    } catch(std::runtime_error&) {}
+}
+
 TEST(Trampoline,FlatMapValue) {
     auto op = TrampolineOp::value(123)->flatMap([](auto erased_value, auto isError) {
         if(isError) {
@@ -171,6 +262,22 @@ TEST(Trampoline,FlatMapValue) {
     EXPECT_EQ(value, 307.5);
 }
 
+TEST(Trampoline,FlatMapValueSync) {
+    auto op = TrampolineOp::value(123)->flatMap([](auto erased_value, auto isError) {
+        if(isError) {
+            auto value = std::any_cast<int>(erased_value);
+            return TrampolineOp::error(value * 1.5f);
+        } else {
+            auto value = std::any_cast<int>(erased_value);
+            return TrampolineOp::value(value * 2.5f);
+        }
+    });
+    auto result = TrampolineRunLoop::executeSync(op);
+    auto syncResult = std::get<Either<std::any,std::any>>(result);
+    auto value = std::any_cast<float>(syncResult.get_left());
+    EXPECT_EQ(value, 307.5);
+}
+
 TEST(Trampoline,FlatMapError) {
     auto op = TrampolineOp::error(123)->flatMap([](auto erased_value, auto isError) {
         if(isError) {
@@ -182,6 +289,22 @@ TEST(Trampoline,FlatMapError) {
         }
     });
     auto result = TrampolineRunLoop::execute(op, Scheduler::global());
+    auto syncResult = std::get<Either<std::any,std::any>>(result);
+    auto value = std::any_cast<float>(syncResult.get_right());
+    EXPECT_EQ(value, 184.5);
+}
+
+TEST(Trampoline,FlatMapErrorSync) {
+    auto op = TrampolineOp::error(123)->flatMap([](auto erased_value, auto isError) {
+        if(isError) {
+            auto value = std::any_cast<int>(erased_value);
+            return TrampolineOp::error(value * 1.5f);
+        } else {
+            auto value = std::any_cast<int>(erased_value);
+            return TrampolineOp::value(value * 2.5f);
+        }
+    });
+    auto result = TrampolineRunLoop::executeSync(op);
     auto syncResult = std::get<Either<std::any,std::any>>(result);
     auto value = std::any_cast<float>(syncResult.get_right());
     EXPECT_EQ(value, 184.5);
@@ -207,7 +330,30 @@ TEST(Trampoline,FlatMapAsyncValue) {
     EXPECT_EQ(std::any_cast<float>(awaitResult), 307.5);
 }
 
-TEST(Trampoline,FlatMapAsyncError) {
+TEST(Trampoline,FlatMapAsyncValueSync) {
+    auto op = TrampolineOp::async([](auto) {
+        return Deferred<std::any,std::any>::pure(123);
+    })
+    ->flatMap([](auto erased_value, auto isError) {
+        if(isError) {
+            auto value = std::any_cast<int>(erased_value);
+            return TrampolineOp::error(value * 1.5f);
+        } else {
+            auto value = std::any_cast<int>(erased_value);
+            return TrampolineOp::value(value * 2.5f);
+        }
+    });
+
+    auto result = TrampolineRunLoop::executeSync(op);
+    auto boundary = std::get<AsyncBoundary>(result);
+
+    auto asyncResult = TrampolineRunLoop::executeAsyncBoundary(boundary, Scheduler::global());
+    auto awaitResult = asyncResult->await();
+    EXPECT_EQ(std::any_cast<float>(awaitResult), 307.5);
+}
+
+
+TEST(Trampoline,FlatMapAsyncErrorSync) {
     auto op = TrampolineOp::async([](auto) {
         return Deferred<std::any,std::any>::raiseError(123);
     })
@@ -221,10 +367,11 @@ TEST(Trampoline,FlatMapAsyncError) {
         }
     });
 
-    auto result = TrampolineRunLoop::execute(op, Scheduler::global());
-    auto asyncResult = std::get<DeferredRef<std::any,std::any>>(result);
+    auto result = TrampolineRunLoop::executeSync(op);
+    auto boundary = std::get<AsyncBoundary>(result);
+    auto asyncResult = TrampolineRunLoop::executeAsyncBoundary(boundary, Scheduler::global());
 
-        try {
+    try {
         asyncResult->await();
         FAIL() << "Exceted function to throw";
     } catch(std::any& error) {
@@ -247,6 +394,49 @@ TEST(Trampoline,FlatMapAsyncNestedAsync) {
     auto asyncResult = std::get<DeferredRef<std::any,std::any>>(result);
     auto awaitResult = asyncResult->await();
     EXPECT_EQ(std::any_cast<float>(awaitResult), 184.5);
+}
+
+TEST(Trampoline,FlatMapAsyncNestedAsyncSync) {
+    auto op = TrampolineOp::async([](auto) {
+        return Deferred<std::any,std::any>::pure(123);
+    })
+    ->flatMap([](auto erased_value, auto) {
+        auto value = std::any_cast<int>(erased_value);
+        return TrampolineOp::async([value](auto) {
+            return Deferred<std::any,std::any>::pure(value * 1.5f);
+        });
+    });
+
+    auto result = TrampolineRunLoop::executeSync(op);
+    auto boundary = std::get<AsyncBoundary>(result);
+    auto asyncResult = TrampolineRunLoop::executeAsyncBoundary(boundary, Scheduler::global());
+
+    auto awaitResult = asyncResult->await();
+    EXPECT_EQ(std::any_cast<float>(awaitResult), 184.5);
+}
+
+TEST(Trampoline,FlatMapAsyncCancel) {
+    auto op = TrampolineOp::async([](auto sched) {
+        auto promise = Promise<std::any,std::any>::create(sched);
+        return Deferred<std::any,std::any>::forPromise(promise);
+    })
+    ->flatMap([](auto erased_value, auto isError) {
+        if(isError) {
+            return TrampolineOp::error(erased_value);
+        } else {
+            return TrampolineOp::value(erased_value);
+        }
+    });
+
+    auto result = TrampolineRunLoop::execute(op, Scheduler::global());
+    auto asyncResult = std::get<DeferredRef<std::any,std::any>>(result);
+
+    asyncResult->cancel();
+
+    try {
+        asyncResult->await();
+        FAIL() << "Expected test to throw an error";
+    } catch(const std::runtime_error& ) {}
 }
 
 TEST(Trampoline,FlatMapAssignment) {

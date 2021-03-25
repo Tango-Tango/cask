@@ -10,6 +10,13 @@ project(
 
 cpp = meson.get_compiler('cpp')
 
+# Discover Number of CPU Threads
+num_cpu_threads = 1
+threads_result = run_command('/bin/bash', '-c', 'cat /proc/cpuinfo | grep processor | wc -l')
+if threads_result.returncode() == 0
+    num_cpu_threads = threads_result.stdout().strip()
+endif
+
 # Declare Dependencies
 dependencies = []
 
@@ -20,11 +27,11 @@ run_target('docs', command : ['doxygen', meson.source_root() + '/Doxyfile'])
 run_target('cppcheck', command : [
     'cppcheck',
     '-q',
-    '-j', '4',
+    '-j', num_cpu_threads,
     '--enable=all',
     '--project=' + join_paths(meson.build_root(), 'compile_commands.json'),
     '--error-exitcode=1'
-]) 
+])
 
 # Setup the 'cask' project structure
 includes = include_directories('include')

@@ -11,16 +11,13 @@
 
 namespace cask {
 
-template <class E>
 class Cancelable;
 
-template <class E = std::any>
-using CancelableRef = std::shared_ptr<Cancelable<E>>;
+using CancelableRef = std::shared_ptr<Cancelable>;
 
 /**
  * Represents a computation that can be canceled.
  */
-template <class E = std::any>
 class Cancelable {
 public:
     /**
@@ -31,16 +28,14 @@ public:
      * must observe the computation itself for an indication of
      * if and when it as cancelled.
      */
-    virtual void cancel(const E& error) = 0;
+    virtual void cancel() = 0;
 
     virtual ~Cancelable() {};
 };
 
-
-template <class E>
-class IgnoreCancelation final : public Cancelable<E> {
+class IgnoreCancelation final : public Cancelable {
 public:
-    void cancel(const E&) override {}
+    void cancel() override {}
 };
 
 }
