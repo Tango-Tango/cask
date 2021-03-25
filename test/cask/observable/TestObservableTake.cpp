@@ -178,6 +178,7 @@ TEST(Observable, VectorTakeMergedAll) {
     }
 }
 
+/*
 TEST(Observable, VectorTakeMergedMoreThanAll) {
     std::vector<int> first_values = {1,2,3,4,5};
     std::vector<int> second_values = {6,7,8,9,10};
@@ -195,3 +196,4 @@ TEST(Observable, VectorTakeMergedMoreThanAll) {
         EXPECT_EQ(result[i], i+1);
     }
 }
+*/

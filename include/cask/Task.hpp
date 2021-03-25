@@ -167,6 +167,17 @@ public:
     template <class T2>
     constexpr Task<T2,E> flatMap(std::function<Task<T2,E>(T)> predicate) const noexcept;
 
+    /**
+     * Transform the error result of this task by appying the given function
+     * which also returns a task. The returned inner task will also be
+     * evaluated and its result applied to the output.
+     * 
+     * This method is simiilar to `flatMap` but it acts whenever an
+     * error occurs rather than a success value.
+     * 
+     * @param predicate The function to use for transforming the result.
+     * @return A new `Task` representing the new output value;
+     */
     template <class E2>
     constexpr Task<T,E2> flatMapError(std::function<Task<T,E2>(E)> predicate) const noexcept;
 
@@ -219,6 +230,14 @@ public:
      * @return A new `Task` represening the delayed execution.
      */
     constexpr Task<T,E> delay(int milliseconds) const noexcept;
+
+    /**
+     * Recover from an error by transforming it into some success value.
+     * 
+     * @param predicate The recovery method.
+     * @return A new `Task` that will recover from errors.
+     */
+    constexpr Task<T,E> recover(std::function<T(E)> predicate) const noexcept;
 
     /**
      * Restarts this task until the given predicate function returns true.
@@ -586,6 +605,24 @@ constexpr Task<T,E> Task<T,E>::delay(int milliseconds) const noexcept {
             });
 
             return Deferred<std::any,std::any>::forPromise(promise);
+        })
+    );
+}
+
+template <class T, class E>
+constexpr Task<T,E> Task<T,E>::recover(std::function<T(E)> predicate) const noexcept {
+    return Task<T,E>(
+        op->flatMap([predicate](auto erased_input, auto isError) {
+            try {
+                if(isError) {
+                    auto input = std::any_cast<E>(erased_input);
+                    return trampoline::TrampolineOp::value(predicate(input));
+                } else {
+                    return trampoline::TrampolineOp::value(erased_input);
+                }
+            } catch(E& error) {
+                return trampoline::TrampolineOp::value(predicate(error));
+            }
         })
     );
 }
