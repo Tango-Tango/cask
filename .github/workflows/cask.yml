@@ -68,7 +68,7 @@ jobs:
       env:
         AUTOMATION_USER_TOKEN: secrets.AUTOMATION_USER_TOKEN
     - name: Install Brew Development Dependencies
-      run: sudo brew install ninja
+      run: brew install ninja
     - name: Install Python Development Dependencies
       run: sudo python3 -m pip install meson==0.57.0
     - name: Run the Pre-Build Release Stage
