@@ -33,7 +33,7 @@ MapErrorObservable<T,EI,EO>::MapErrorObservable(std::shared_ptr<const Observable
 
 template <class T, class EI, class EO>
 CancelableRef MapErrorObservable<T,EI,EO>::subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,EO>> observer) const {
-    auto mapObserver = std::make_shared<MapErrorObserver<T,EI,EO>>(predicate, observer);
+    auto mapObserver = std::make_shared<MapErrorObserver<T,EI,EO>>(predicate, observer, sched);
     return upstream->subscribe(sched, mapObserver);
 }
 
