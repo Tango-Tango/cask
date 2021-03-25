@@ -220,6 +220,9 @@ public:
      */
     constexpr Task<T,E> delay(int milliseconds) const noexcept;
 
+
+    constexpr Task<T,E> recover(std::function<T(E)> predicate) const noexcept;
+
     /**
      * Restarts this task until the given predicate function returns true.
      * 
@@ -586,6 +589,24 @@ constexpr Task<T,E> Task<T,E>::delay(int milliseconds) const noexcept {
             });
 
             return Deferred<std::any,std::any>::forPromise(promise);
+        })
+    );
+}
+
+template <class T, class E>
+constexpr Task<T,E> Task<T,E>::recover(std::function<T(E)> predicate) const noexcept {
+    return Task<T,E>(
+        op->flatMap([predicate](auto erased_input, auto isError) {
+            try {
+                if(isError) {
+                    auto input = std::any_cast<E>(erased_input);
+                    return trampoline::TrampolineOp::value(predicate(input));
+                } else {
+                    return trampoline::TrampolineOp::value(erased_input);
+                }
+            } catch(E& error) {
+                return trampoline::TrampolineOp::value(predicate(error));
+            }
         })
     );
 }

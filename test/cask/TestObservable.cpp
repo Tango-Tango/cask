@@ -26,56 +26,11 @@ TEST(Observable, PureMap) {
     EXPECT_EQ(*result, 184.5);
 }
 
-TEST(Observable, RaiseErrorMapError) {
-    auto sched = Scheduler::global();
-    auto result = Observable<int, std::string>::raiseError("broke")
-        ->mapError<std::string>([](auto error) {
-            std::string copy(error);
-            std::reverse(copy.begin(), copy.end());
-            return copy;
-        })
-        ->last()
-        .failed()
-        .run(sched)
-        ->await();
-
-    EXPECT_EQ(result, "ekorb");
-}
-
-TEST(Observable, RaiseErrorMapToDifferentError) {
-    auto sched = Scheduler::global();
-
-    auto result = Observable<int,int>::raiseError(123)
-        ->mapError<std::string>([](auto err) {
-            return std::to_string(err);
-        })
-        ->last()
-        .failed()
-        .run(sched)
-        ->await();
-
-    EXPECT_EQ(result, "123");
-}
-
 TEST(Observable, PureMapTask) {
     auto sched = Scheduler::global();
     auto result = Observable<int>::pure(123)
         ->mapTask<float>([](auto value) {
             return Task<float>::pure(value * 1.5);
-        })
-        ->last()
-        .run(sched)
-        ->await();
-
-    EXPECT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 184.5);
-}
-
-TEST(Observable, PureFlatMap) {
-    auto sched = Scheduler::global();
-    auto result = Observable<int>::pure(123)
-        ->flatMap<float>([](auto value) {
-            return Observable<float>::pure(value * 1.5);
         })
         ->last()
         .run(sched)

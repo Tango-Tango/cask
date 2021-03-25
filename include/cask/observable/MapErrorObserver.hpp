@@ -42,7 +42,7 @@ DeferredRef<Ack,EI> MapErrorObserver<T,EI,EO>::onNext(T value) {
     auto deferred = downstream->onNext(value);
     deferred->template chainDownstream<Ack, EI>(
         promise,
-        [predicate=predicate](auto result) {
+        [](auto result) {
             if(result.is_right()) {
                 return Either<Ack, EI>::left(Stop);
             }
