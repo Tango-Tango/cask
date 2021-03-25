@@ -88,13 +88,7 @@ public:
      */
     bool isCancelled() const;
 
-    /**
-     * Register a callback to be processed in the event of a cancelation.
-     *
-     * @param callback The callback to run if this promise is canceled.
-     */
-    void onCancel(std::function<void()> callback);
-
+    void onCancel(std::function<void()> callback) override;
     void cancel() override;
 private:
     friend deferred::PromiseDeferred<T,E>;
