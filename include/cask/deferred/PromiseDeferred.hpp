@@ -28,6 +28,7 @@ public:
     void onComplete(std::function<void(Either<T,E>)> callback) override;
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;
+    void onCancel(std::function<void()> callback) override;
     void cancel() override;
     T await() override;
 
@@ -63,6 +64,11 @@ void PromiseDeferred<T,E>::onError(std::function<void(E)> callback) {
             callback(value.get_right());
         }
     });
+}
+
+template <class T, class E>
+void PromiseDeferred<T,E>::onCancel(std::function<void()> callback) {
+    promise->onCancel(callback);
 }
 
 template <class T, class E>

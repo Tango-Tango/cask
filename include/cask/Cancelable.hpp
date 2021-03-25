@@ -8,6 +8,7 @@
 
 #include <any>
 #include <memory>
+#include <functional>
 
 namespace cask {
 
@@ -30,12 +31,20 @@ public:
      */
     virtual void cancel() = 0;
 
+    /**
+     * Register a callback to be processed in the event of a cancelation.
+     *
+     * @param callback The callback to run if this promise is canceled.
+     */
+    virtual void onCancel(std::function<void()>) = 0;
+
     virtual ~Cancelable() {};
 };
 
 class IgnoreCancelation final : public Cancelable {
 public:
     void cancel() override {}
+    void onCancel(std::function<void()>) override {}
 };
 
 }

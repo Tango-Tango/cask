@@ -3,6 +3,10 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 2.1
+
+- Add the `guarantee` method to `Observable`.
+
 ## 2.0
 
 - Make cancels value-less rather than requiring a value of the error type. With

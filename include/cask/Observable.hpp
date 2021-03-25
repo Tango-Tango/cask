@@ -251,6 +251,16 @@ public:
      */
     ObservableRef<T,E> takeWhileInclusive(std::function<bool(T)> predicate) const;
 
+    /**
+     * Ensure the given task will be run when this observer completes on success,
+     * error, or the subscription is cancelled.
+     * 
+     * @param task The task to ensure is executed in all shutdown cases.
+     * @return An observable for which the given task is guaranteed to execute
+     *         before shutdown.
+     */
+    ObservableRef<T,E> guarantee(const Task<None,E>& task) const;
+
     virtual ~Observable();
 };
 
@@ -261,6 +271,7 @@ public:
 #include "observable/EmptyObservable.hpp"
 #include "observable/EvalObservable.hpp"
 #include "observable/FlatMapObservable.hpp"
+#include "observable/GuaranteeObservable.hpp"
 #include "observable/LastObserver.hpp"
 #include "observable/MapObservable.hpp"
 #include "observable/MapErrorObservable.hpp"
@@ -408,6 +419,12 @@ template <class T, class E>
 ObservableRef<T,E> Observable<T,E>::takeWhileInclusive(std::function<bool(T)> predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::TakeWhileObservable<T,E>>(self, predicate, true);
+}
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::guarantee(const Task<None,E>& task) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::GuaranteeObservable<T,E>>(self, task);
 }
 
 template <class T, class E>
