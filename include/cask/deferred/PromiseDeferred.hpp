@@ -11,7 +11,6 @@
 #include <optional>
 #include <memory>
 #include <mutex>
-#include <semaphore.h>
 #include <variant>
 #include <vector>
 #include "../Scheduler.hpp"
@@ -29,6 +28,7 @@ public:
     void onComplete(std::function<void(Either<T,E>)> callback) override;
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;
+    void onCancel(std::function<void()> callback) override;
     void cancel() override;
     T await() override;
 
@@ -67,6 +67,11 @@ void PromiseDeferred<T,E>::onError(std::function<void(E)> callback) {
 }
 
 template <class T, class E>
+void PromiseDeferred<T,E>::onCancel(std::function<void()> callback) {
+    promise->onCancel(callback);
+}
+
+template <class T, class E>
 void PromiseDeferred<T,E>::cancel() {
     promise->cancel();
 }
@@ -77,20 +82,20 @@ T PromiseDeferred<T,E>::await() {
     std::optional<Either<T,E>> result = promise->get();
 
     if(!result.has_value()) {
-        sem_t semaphore;
-        sem_init(&semaphore, 0, 0);
+        std::mutex mutex;
+        mutex.lock();
 
-        promise->onComplete([&semaphore, &result](Either<T,E> newResult){
+        promise->onComplete([&mutex, &result](Either<T,E> newResult){
             result = newResult;
-            sem_post(&semaphore);
+            mutex.unlock();
         });
 
-        promise->onCancel([&semaphore, &canceled](){
+        promise->onCancel([&mutex, &canceled](){
             canceled = true;
-            sem_post(&semaphore);
+            mutex.unlock();
         });
 
-        sem_wait(&semaphore);
+        mutex.lock();
     }
 
     if(canceled) {

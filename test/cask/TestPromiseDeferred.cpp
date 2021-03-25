@@ -8,7 +8,6 @@
 #include "cask/None.hpp"
 #include <chrono>
 #include <thread>
-#include <semaphore.h>
 
 using cask::Promise;
 using cask::Deferred;
@@ -115,83 +114,79 @@ TEST(Deferred, ErrorIgnoresCancel) {
 }
 
 TEST(Deferred, PromiseOnCompleteSuccess) {
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
+    std::mutex mutex;
+    mutex.lock();
 
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     Either<int,std::string> result = Either<int,std::string>::left(0);
-    deferred->onComplete([&result, &semaphore](auto value) {
+    deferred->onComplete([&result, &mutex](auto value) {
         result = value;
-        sem_post(&semaphore);
+        mutex.unlock();
     });
 
     promise->success(123);
-    sem_wait(&semaphore);
+    mutex.lock();
 
     EXPECT_EQ(result.get_left(), 123);
-    sem_destroy(&semaphore);
 }
 
 TEST(Deferred, PromiseOnCompleteError) {
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
+    std::mutex mutex;
+    mutex.lock();
 
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     Either<int,std::string> result = Either<int,std::string>::left(0);
-    deferred->onComplete([&result, &semaphore](auto value) {
+    deferred->onComplete([&result, &mutex](auto value) {
         result = value;
-        sem_post(&semaphore);
+        mutex.unlock();
     });
 
     promise->error("broke");
-    sem_wait(&semaphore);
+    mutex.lock();
 
     EXPECT_EQ(result.get_right(), "broke");
-    sem_destroy(&semaphore);
 }
 
 TEST(Deferred, PromiseOnSuccess) {
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
+    std::mutex mutex;
+    mutex.lock();
 
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     int result = 0;
-    deferred->onSuccess([&result, &semaphore](auto value) {
+    deferred->onSuccess([&result, &mutex](auto value) {
         result = value;
-        sem_post(&semaphore);
+        mutex.unlock();
     });
 
     promise->success(123);
-    sem_wait(&semaphore);
+    mutex.lock();
 
     EXPECT_EQ(result, 123);
-    sem_destroy(&semaphore);
 }
 
 TEST(Deferred, PromiseOnError) {
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
+    std::mutex mutex;
+    mutex.lock();
 
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     std::string result = "not called";
-    deferred->onError([&result, &semaphore](auto value) {
+    deferred->onError([&result, &mutex](auto value) {
         result = value;
-        sem_post(&semaphore);
+        mutex.unlock();
     });
 
     promise->error("broke");
-    sem_wait(&semaphore);
+    mutex.lock();
 
     EXPECT_EQ(result, "broke");
-    sem_destroy(&semaphore);
 }
 
 TEST(Deferred, PromiseAwaitSyncSuccess) {
@@ -218,20 +213,20 @@ TEST(Deferred, PromiseAwaitSyncError) {
 }
 
 TEST(Deferred, PromiseAwaitAsync) {
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
+    std::mutex mutex;
+    mutex.lock();
 
     auto promise = Promise<int,std::string>::create(Scheduler::global());
     auto deferred = Deferred<int,std::string>::forPromise(promise);
     int value;
 
-    std::thread backgroundAwait([&value, &semaphore, &deferred]() {
-        sem_post(&semaphore);
+    std::thread backgroundAwait([&value, &mutex, &deferred]() {
+        mutex.unlock();
         value = deferred->await();
     });
 
     // Wait for background thread to get started
-    sem_wait(&semaphore);
+    mutex.lock();
 
     // Complete the promise after a small sleep (to be triple sure that
     // the await is running).
