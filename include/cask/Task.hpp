@@ -167,6 +167,17 @@ public:
     template <class T2>
     constexpr Task<T2,E> flatMap(std::function<Task<T2,E>(T)> predicate) const noexcept;
 
+    /**
+     * Transform the error result of this task by appying the given function
+     * which also returns a task. The returned inner task will also be
+     * evaluated and its result applied to the output.
+     * 
+     * This method is simiilar to `flatMap` but it acts whenever an
+     * error occurs rather than a success value.
+     * 
+     * @param predicate The function to use for transforming the result.
+     * @return A new `Task` representing the new output value;
+     */
     template <class E2>
     constexpr Task<T,E2> flatMapError(std::function<Task<T,E2>(E)> predicate) const noexcept;
 
@@ -220,7 +231,12 @@ public:
      */
     constexpr Task<T,E> delay(int milliseconds) const noexcept;
 
-
+    /**
+     * Recover from an error by transforming it into some success value.
+     * 
+     * @param predicate The recovery method.
+     * @return A new `Task` that will recover from errors.
+     */
     constexpr Task<T,E> recover(std::function<T(E)> predicate) const noexcept;
 
     /**
