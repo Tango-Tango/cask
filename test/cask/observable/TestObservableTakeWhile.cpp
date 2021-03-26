@@ -67,3 +67,17 @@ TEST(ObservableTakeWhile, Finite) {
     ASSERT_EQ(result.size(), 1);
     EXPECT_EQ(result[0], 123);
 }
+
+TEST(ObservableTakeWhile, CompletesOnlyOnce) {
+    auto result = Observable<int>::deferTask([]{
+            return Task<int>::pure(123);
+        })
+        ->takeWhile([](auto) {
+            return false;
+        })
+        ->last()
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_FALSE(result.has_value());
+}
