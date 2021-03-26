@@ -12,6 +12,7 @@ if not meson.is_subproject()
         'cask/TestResource.cpp',
         'cask/TestTask.cpp',
         'cask/TestTrampoline.cpp',
+        'cask/observable/TestObservableFilter.cpp',
         'cask/observable/TestObservableFlatMap.cpp',
         'cask/observable/TestObservableFlatten.cpp',
         'cask/observable/TestObservableFromTask.cpp',

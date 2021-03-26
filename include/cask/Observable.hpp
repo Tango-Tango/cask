@@ -191,6 +191,19 @@ public:
     ObservableRef<T2,E> flatten() const;
 
     /**
+     * Filter events keeping only those for which the given predicate function
+     * returns true.
+     * 
+     * @param predicate A function which is evaluated for every event and
+     *                  should return true for any event which should be
+     *                  emitted downstream and false for any event which
+     *                  should be dropped.
+     * @return An observerable who emits only values which match the given
+     *         predicate function.
+     */
+    ObservableRef<T,E> filter(std::function<bool(T)> predicate) const;
+
+    /**
      * Emit the last value of this stream seen. Note that if the stream of
      * values is infinite this task will never complete.
      * 
@@ -270,6 +283,7 @@ public:
 #include "observable/DeferTaskObservable.hpp"
 #include "observable/EmptyObservable.hpp"
 #include "observable/EvalObservable.hpp"
+#include "observable/FilterObservable.hpp"
 #include "observable/FlatMapObservable.hpp"
 #include "observable/GuaranteeObservable.hpp"
 #include "observable/LastObserver.hpp"
@@ -366,6 +380,12 @@ template <class T2, typename std::enable_if<
 >::type*>
 ObservableRef<T2,E> Observable<T,E>::flatten() const {
     return this->template flatMap<T2>([](auto inner){ return inner; });
+}
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::filter(std::function<bool(T)> predicate) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::FilterObservable<T,E>>(self, predicate);
 }
 
 template <class T, class E>

@@ -3,6 +3,10 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 2.3
+
+- Add the `filter` method to `Observable`.
+
 ## 2.2
 
 - Add the `recover` method to `Task`.
