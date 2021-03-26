@@ -33,7 +33,7 @@ private:
     ObserverRef<T,E> downstream;
     std::function<bool(T)> predicate;
     bool inclusive;
-    bool completed;
+    std::atomic_flag completed;
 };
 
 template <class T, class E>
@@ -65,7 +65,7 @@ DeferredRef<Ack,E> TakeWhileObserver<T,E>::onNext(T value) {
                 })
                 .run(sched);
         } else {
-            downstream->onComplete();
+            onComplete();
             return Deferred<Ack,E>::pure(Stop);
         }
     }
@@ -73,13 +73,14 @@ DeferredRef<Ack,E> TakeWhileObserver<T,E>::onNext(T value) {
 
 template <class T, class E>
 void TakeWhileObserver<T,E>::onError(E error) {
-    downstream->onError(error);
+    if(!completed.test_and_set()) {
+        downstream->onError(error);
+    }
 }
 
 template <class T, class E>
 void TakeWhileObserver<T,E>::onComplete() {
-    if(!completed) {
-        completed = true;
+    if(!completed.test_and_set()) {
         downstream->onComplete();
     }
 }
