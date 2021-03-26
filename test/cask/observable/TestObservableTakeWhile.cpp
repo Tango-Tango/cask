@@ -69,7 +69,6 @@ TEST(ObservableTakeWhile, Finite) {
 }
 
 TEST(ObservableTakeWhile, CompletesOnlyOnce) {
-    std::vector<int> values = {1, 2, 3, 4, 5, 6};
     auto result = Observable<int>::deferTask([]{
             return Task<int>::pure(123);
         })
