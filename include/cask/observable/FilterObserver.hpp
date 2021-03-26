@@ -19,9 +19,9 @@ template <class T, class E>
 class FilterObserver final : public Observer<T,E> {
 public:
     FilterObserver(std::function<bool(T)> predicate, std::shared_ptr<Observer<T,E>> downstream);
-    DeferredRef<Ack,E> onNext(T value);
-    void onError(E error);
-    void onComplete();
+    DeferredRef<Ack,E> onNext(T value) override;
+    void onError(E error) override;
+    void onComplete() override;
 private:
     std::function<bool(T)> predicate;
     std::shared_ptr<Observer<T,E>> downstream;
