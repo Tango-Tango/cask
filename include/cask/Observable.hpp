@@ -7,6 +7,7 @@
 #define _CASK_OBSERVABLE_H_
 
 #include <any>
+#include "BufferRef.hpp"
 #include "Cancelable.hpp"
 #include "Observer.hpp"
 #include "Task.hpp"
@@ -129,6 +130,16 @@ public:
      * @return The handle which may be used to cancel computation on the stream.
      */
     virtual CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const = 0;
+
+    /**
+     * Buffer input up to the given size and emit the buffer downstream. At
+     * stream close a buffer will be emitted containing whatever has been
+     * accumulated since the last time a buffer was emitted downstream.
+     * 
+     * @param size The number of items to accumulate in the buffer.
+     * @return An observable which emits buffered items.
+     */
+    ObservableRef<BufferRef<T>,E> buffer(unsigned int size) const;
 
     /**
      * Transform each element of the stream using the provided transforming predicate
@@ -279,6 +290,7 @@ public:
 
 }
 
+#include "observable/BufferObservable.hpp"
 #include "observable/DeferObservable.hpp"
 #include "observable/DeferTaskObservable.hpp"
 #include "observable/EmptyObservable.hpp"
@@ -344,6 +356,12 @@ ObservableRef<T,E> Observable<T,E>::fromTask(Task<T,E> task) {
 template <class T, class E>
 ObservableRef<T,E> Observable<T,E>::fromVector(const std::vector<T>& vector) {
     return std::make_shared<observable::VectorObservable<T,E>>(vector);
+}
+
+template <class T, class E>
+std::shared_ptr<Observable<BufferRef<T>,E>> Observable<T,E>::buffer(unsigned int size) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::BufferObservable<T,E>>(self, size);
 }
 
 template <class T, class E>

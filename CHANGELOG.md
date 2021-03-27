@@ -3,6 +3,10 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 2.4
+
+- Add the `buffer` method to `Observable`.
+
 ## 2.3
 
 - Add the `filter` method to `Observable`.
