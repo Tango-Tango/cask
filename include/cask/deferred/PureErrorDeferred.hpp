@@ -22,6 +22,7 @@ public:
     void onCancel(std::function<void()> callback) override;
     void cancel() override;
     T await() override;
+    std::optional<Either<T,E>> get() override;
 };
 
 template <class T, class E>
@@ -57,6 +58,11 @@ void PureErrorDeferred<T,E>::cancel() {
 template <class T, class E>
 T PureErrorDeferred<T,E>::await() {
     throw error;
+}
+
+template <class T, class E>
+std::optional<Either<T,E>> PureErrorDeferred<T,E>::get() {
+    throw Either<T,E>::right(error);
 }
 
 }

@@ -10,6 +10,7 @@
 #include <functional>
 #include "Promise.hpp"
 #include <exception>
+#include <optional>
 
 namespace cask {
 
@@ -142,6 +143,8 @@ public:
      * @return The result value of the asynchronous computation.
      */
     virtual T await() = 0;
+
+    virtual std::optional<Either<T,E>> get() = 0;
 
     virtual ~Deferred() {};
 };

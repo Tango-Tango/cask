@@ -101,38 +101,64 @@ DeferredRef<std::any,std::any> TrampolineRunLoop::executeAsyncBoundary(
     auto promise = Promise<std::any,std::any>::create(sched);
     auto deferred = (*async)(sched);
 
-    if(nextOp) {
-        deferred->template chainDownstreamAsync<std::any,std::any>(
-            promise,
-            [nextOp, sched](auto value) {
-                std::any nextInput;
+    if(auto value = deferred->get()) {
+        if(nextOp) {
+            std::any nextInput;
 
-                if(value.is_left()) {
-                    nextInput = value.get_left();
-                } else {
-                    nextInput = value.get_right();
-                }
-
-                auto result = TrampolineRunLoop::execute(nextOp(nextInput, value.is_right()), sched);
-
-                if(auto syncResult = std::get_if<Either<std::any,std::any>>(&result)) {
-                    if(syncResult->is_left()) {
-                        return Deferred<std::any,std::any>::pure(syncResult->get_left());
-                    } else {
-                        return Deferred<std::any,std::any>::raiseError(syncResult->get_right());
-                    }
-                } else {
-                    return std::get<DeferredRef<std::any,std::any>>(result);
-                }
+            if(value->is_left()) {
+                nextInput = value->get_left();
+            } else {
+                nextInput = value->get_right();
             }
-        );
+
+            auto result = TrampolineRunLoop::execute(nextOp(nextInput, value->is_right()), sched);
+
+            if(auto syncResult = std::get_if<Either<std::any,std::any>>(&result)) {
+                if(syncResult->is_left()) {
+                    return Deferred<std::any,std::any>::pure(syncResult->get_left());
+                } else {
+                    return Deferred<std::any,std::any>::raiseError(syncResult->get_right());
+                }
+            } else {
+                return std::get<DeferredRef<std::any,std::any>>(result);
+            }
+        } else {
+            return deferred;
+        }
     } else {
-        deferred->template chainDownstream<std::any,std::any>(
-            promise,
-            [](auto result) { return result; }
-        );
+        if(nextOp) {
+            deferred->template chainDownstreamAsync<std::any,std::any>(
+                promise,
+                [nextOp, sched](auto value) {
+                    std::any nextInput;
+
+                    if(value.is_left()) {
+                        nextInput = value.get_left();
+                    } else {
+                        nextInput = value.get_right();
+                    }
+
+                    auto result = TrampolineRunLoop::execute(nextOp(nextInput, value.is_right()), sched);
+
+                    if(auto syncResult = std::get_if<Either<std::any,std::any>>(&result)) {
+                        if(syncResult->is_left()) {
+                            return Deferred<std::any,std::any>::pure(syncResult->get_left());
+                        } else {
+                            return Deferred<std::any,std::any>::raiseError(syncResult->get_right());
+                        }
+                    } else {
+                        return std::get<DeferredRef<std::any,std::any>>(result);
+                    }
+                }
+            );
+        } else {
+            deferred->template chainDownstream<std::any,std::any>(
+                promise,
+                [](auto result) { return result; }
+            );
+        }
+        return Deferred<std::any,std::any>::forPromise(promise);
     }
-    return Deferred<std::any,std::any>::forPromise(promise);
 }
 
 } // namespace cask::trampoline
