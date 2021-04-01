@@ -14,7 +14,7 @@ using cask::None;
 
 TEST(ObservableGuarantee, RunsOnCompletion) {
     int run_count = 0;
-    auto task = Task<None,float>::eval([&run_count]() {
+    auto task = Task<None,None>::eval([&run_count]() {
         run_count++;
         return None();
     });
@@ -31,7 +31,7 @@ TEST(ObservableGuarantee, RunsOnCompletion) {
 
 TEST(ObservableGuarantee, RunsOnDownstreamStop) {
     int run_count = 0;
-    auto task = Task<None,float>::eval([&run_count]() {
+    auto task = Task<None,None>::eval([&run_count]() {
         run_count++;
         return None();
     });
@@ -50,7 +50,7 @@ TEST(ObservableGuarantee, RunsOnDownstreamStop) {
 
 TEST(ObservableGuarantee, RunsOnError) {
     int run_count = 0;
-    auto task = Task<None,float>::eval([&run_count]() {
+    auto task = Task<None,None>::eval([&run_count]() {
         run_count++;
         return None();
     });
@@ -68,7 +68,7 @@ TEST(ObservableGuarantee, RunsOnError) {
 
 TEST(ObservableGuarantee, RunsOnSubscriptionCancel) {
     int run_count = 0;
-    auto task = Task<None,float>::eval([&run_count]() {
+    auto task = Task<None,None>::eval([&run_count]() {
         run_count++;
         return None();
     });

@@ -20,9 +20,9 @@ template <class T, class E>
 class TakeObserver final : public Observer<T,E> {
 public:
     TakeObserver(unsigned int amount, std::weak_ptr<Promise<std::vector<T>,E>> promise);
-    DeferredRef<Ack,E> onNext(T value);
-    void onError(E error);
-    void onComplete();
+    Task<Ack,None> onNext(T value);
+    Task<None,None> onError(E error);
+    Task<None,None> onComplete();
 private:
     int remaining;
     std::vector<T> entries;
@@ -37,7 +37,7 @@ TakeObserver<T,E>::TakeObserver(unsigned int amount, std::weak_ptr<Promise<std::
 {}
 
 template <class T, class E>
-DeferredRef<Ack,E> TakeObserver<T,E>::onNext(T value) {
+Task<Ack,None> TakeObserver<T,E>::onNext(T value) {
     entries.push_back(value);
     remaining -= 1;
 
@@ -45,27 +45,30 @@ DeferredRef<Ack,E> TakeObserver<T,E>::onNext(T value) {
         if(auto promiseLock = promise.lock()) {
             promiseLock->success(entries);
         }
-        return Deferred<Ack,E>::pure(Stop);
+        return Task<Ack,None>::pure(Stop);
     } else {
-        return Deferred<Ack,E>::pure(Continue);
+        return Task<Ack,None>::pure(Continue);
     }
 }
 
 template <class T, class E>
-void TakeObserver<T,E>::onError(E error) {
+Task<None,None> TakeObserver<T,E>::onError(E error) {
     if(auto promiseLock = promise.lock()) {
         promiseLock->error(error);
     }
-    
+
+    return Task<None,None>::none();
 }
 
 template <class T, class E>
-void TakeObserver<T,E>::onComplete() {
+Task<None,None> TakeObserver<T,E>::onComplete() {
     if(auto promiseLock = promise.lock()) {
         if(!promiseLock->get().has_value()) {
             promiseLock->success(entries);
         }
     }
+
+    return Task<None,None>::none();
 }
 
 }

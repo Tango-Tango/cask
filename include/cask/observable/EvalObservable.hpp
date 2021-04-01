@@ -27,19 +27,17 @@ EvalObservable<T,E>::EvalObservable(std::function<T()> predicate)
 
 template <class T, class E>
 CancelableRef EvalObservable<T,E>::subscribe(
-    std::shared_ptr<Scheduler>,
+    std::shared_ptr<Scheduler> sched,
     std::shared_ptr<Observer<T,E>> observer) const
 {
     try {
-        auto deferred = observer->onNext(predicate());
-        deferred->onSuccess([observer](auto) {
-            observer->onComplete();
-        });
-
-        return deferred;
+        return observer->onNext(predicate())
+            .template flatMap<None>([observer](auto) {
+                return observer->onComplete();;
+            })
+            .run(sched);
     } catch(E& error) {
-        observer->onError(error);
-        return std::make_unique<IgnoreCancelation>();
+        return observer->onError(error).run(sched);
     }
 }
 

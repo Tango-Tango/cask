@@ -25,9 +25,9 @@ public:
         std::function<bool(T)> predicate,
         bool inclusive
     );
-    DeferredRef<Ack,E> onNext(T value);
-    void onError(E error);
-    void onComplete();
+    Task<Ack,None> onNext(T value);
+    Task<None,None> onError(E error);
+    Task<None,None> onComplete();
 private:
     std::shared_ptr<Scheduler> sched;
     ObserverRef<T,E> downstream;
@@ -51,38 +51,42 @@ TakeWhileObserver<T,E>::TakeWhileObserver(
 {}
 
 template <class T, class E>
-DeferredRef<Ack,E> TakeWhileObserver<T,E>::onNext(T value) {
+Task<Ack,None> TakeWhileObserver<T,E>::onNext(T value) {
     if(predicate(value)) {
         return downstream->onNext(value);
     } else {
         if(inclusive) {
-            return Task<Ack,E>::deferAction([downstream = this->downstream, value](auto) {
-                    return downstream->onNext(value);
+            return downstream->onNext(value)
+                .template flatMap<None>([this](auto) {
+                    return onComplete();
                 })
-                .template map<Ack>([this](auto) {
-                    onComplete();
+                .template map<Ack>([](auto) {
                     return Stop;
-                })
-                .run(sched);
+                });
         } else {
-            onComplete();
-            return Deferred<Ack,E>::pure(Stop);
+            return onComplete().template map<Ack>([](auto) {
+                return Stop;
+            });
         }
     }
 }
 
 template <class T, class E>
-void TakeWhileObserver<T,E>::onError(E error) {
+Task<None,None> TakeWhileObserver<T,E>::onError(E error) {
     if(!completed.test_and_set()) {
         downstream->onError(error);
     }
+
+    return Task<None,None>::none();
 }
 
 template <class T, class E>
-void TakeWhileObserver<T,E>::onComplete() {
+Task<None,None> TakeWhileObserver<T,E>::onComplete() {
     if(!completed.test_and_set()) {
         downstream->onComplete();
     }
+
+    return Task<None,None>::none();
 }
 
 }

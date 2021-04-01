@@ -19,9 +19,9 @@ template <class TI, class TO, class E>
 class MapObserver final : public Observer<TI,E> {
 public:
     MapObserver(std::function<TO(TI)> predicate, std::shared_ptr<Observer<TO,E>> downstream);
-    DeferredRef<Ack,E> onNext(TI value);
-    void onError(E error);
-    void onComplete();
+    Task<Ack,None> onNext(TI value);
+    Task<None,None> onError(E error);
+    Task<None,None> onComplete();
 private:
     std::function<TO(TI)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
@@ -35,18 +35,18 @@ MapObserver<TI,TO,E>::MapObserver(std::function<TO(TI)> predicate, std::shared_p
 {}
 
 template <class TI, class TO, class E>
-DeferredRef<Ack,E> MapObserver<TI,TO,E>::onNext(TI value) {
+Task<Ack,None> MapObserver<TI,TO,E>::onNext(TI value) {
     return downstream->onNext(predicate(value));
 }
 
 template <class TI, class TO, class E>
-void MapObserver<TI,TO,E>::onError(E error) {
-    downstream->onError(error);
+Task<None,None> MapObserver<TI,TO,E>::onError(E error) {
+    return downstream->onError(error);
 }
 
 template <class TI, class TO, class E>
-void MapObserver<TI,TO,E>::onComplete() {
-    downstream->onComplete();
+Task<None,None> MapObserver<TI,TO,E>::onComplete() {
+    return downstream->onComplete();
 }
 
 }

@@ -181,6 +181,12 @@ public:
     template <class E2>
     constexpr Task<T,E2> flatMapError(std::function<Task<T,E2>(E)> predicate) const noexcept;
 
+    template <class T2, class E2>
+    constexpr Task<T2,E2> flatMapBoth(
+        std::function<Task<T2,E2>(T)> successPredicate,
+        std::function<Task<T2,E2>(E)> errorPredicate
+    ) const noexcept;
+
     /**
      * Transpose the success and error types - causing errors to be treated
      * as successes and vice versa.  This allows operations such as `map`
@@ -512,6 +518,34 @@ constexpr Task<T,E2> Task<T,E>::flatMapError(std::function<Task<T,E2>(E)> predic
                 return trampoline::TrampolineOp::error(error);
             } catch(E& error) {
                 auto resultTask = predicate(error);
+                return resultTask.op;
+            }
+        })
+    );
+}
+
+template <class T, class E>
+template <class T2, class E2>
+constexpr Task<T2,E2> Task<T,E>::flatMapBoth(
+    std::function<Task<T2,E2>(T)> successPredicate,
+    std::function<Task<T2,E2>(E)> errorPredicate
+) const noexcept {
+        return Task<T2,E2>(
+            op->flatMap([successPredicate, errorPredicate](auto erased_input, auto isError) {
+            try {
+                if(isError) {
+                    auto input = std::any_cast<E>(erased_input);
+                    auto resultTask = errorPredicate(input);
+                    return resultTask.op;
+                } else {
+                    auto input = std::any_cast<T>(erased_input);
+                    auto resultTask = successPredicate(input);
+                    return resultTask.op;
+                }
+            } catch(E2& error) {
+                return trampoline::TrampolineOp::error(error);
+            } catch(E& error) {
+                auto resultTask = errorPredicate(error);
                 return resultTask.op;
             }
         })

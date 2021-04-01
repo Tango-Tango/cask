@@ -33,8 +33,7 @@ CancelableRef DeferObservable<T,E>::subscribe(
     try {
         return predicate()->subscribe(sched, observer);
     } catch (E& error) {
-        observer->onError(error);
-        return std::make_unique<IgnoreCancelation>();
+        return observer->onError(error).run(sched);
     }
 }
 

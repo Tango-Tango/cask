@@ -22,9 +22,9 @@ class LastObserver final : public Observer<T,E> {
 public:
     explicit LastObserver(std::weak_ptr<Promise<std::optional<T>,E>> promise);
 
-    DeferredRef<Ack,E> onNext(T value);
-    void onError(E error);
-    void onComplete();
+    Task<Ack,None> onNext(T value);
+    Task<None,None> onError(E error);
+    Task<None,None> onComplete();
 private:
     std::optional<T> lastValue;
     std::weak_ptr<Promise<std::optional<T>,E>> promise;
@@ -37,23 +37,27 @@ LastObserver<T,E>::LastObserver(std::weak_ptr<Promise<std::optional<T>,E>> promi
 {}
 
 template <class T, class E>
-DeferredRef<Ack, E> LastObserver<T,E>::onNext(T value) {
+Task<Ack, None> LastObserver<T,E>::onNext(T value) {
     lastValue = value;
-    return Deferred<Ack,E>::pure(Continue);
+    return Task<Ack,None>::pure(Continue);
 }
 
 template <class T, class E>
-void LastObserver<T,E>::onError(E error) {
+Task<None,None> LastObserver<T,E>::onError(E error) {
     if(auto promiseLock = promise.lock()) {
         promiseLock->error(error);
     }
+
+    return Task<None,None>::none();
 }
 
 template <class T, class E>
-void LastObserver<T,E>::onComplete() {
+Task<None,None>  LastObserver<T,E>::onComplete() {
     if(auto promiseLock = promise.lock()) {
         promiseLock->success(lastValue);
-    }   
+    }
+
+    return Task<None,None>::none();
 }
 
 }

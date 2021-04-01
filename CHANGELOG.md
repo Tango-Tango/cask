@@ -3,6 +3,23 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 3.0
+
+- Update the `Observer` interface so that `onNext`, `onComplete` and `onError`
+  each return a `Task`. This not only makes these effects easier to reason
+  about - but it addresses a severe performance issue where async boundaries
+  were being inserted all over the place when running an observable pipeline.
+  By using `Task` these effects can either be sychronous or asynchronous without
+  requiring further complication of the `Observer` interface.
+- `Observer::onNext` no longer allows observers to convey errors of type `E`
+  upstream. This clarifies the contract between `Observable` and `Observer`
+  such that (a) errors travel from upstream to downstream and (b) when an
+  `onNext` call encounters an error the proper default upstream signal is
+  to feed a `Stop` back rather than the error.
+- Change `Observable::guarantee` to take a `Task<None,None>` to fully clarify
+  that both errors and values of the guaranteed task will be ignored - the given
+  task will be executed as a pure side-effect.
+
 ## 2.4
 
 - Add the `buffer` method to `Observable`.

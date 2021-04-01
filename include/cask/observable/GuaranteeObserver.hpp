@@ -19,22 +19,21 @@ namespace cask::observable {
 template <class T, class E>
 class GuaranteeObserver final : public Observer<T,E> {
 public:
-    GuaranteeObserver(std::shared_ptr<Observer<T,E>> downstream, const Task<None,E>& task, std::shared_ptr<Scheduler> sched);
-    DeferredRef<Ack,E> onNext(T value);
-    void onError(E error);
-    void onComplete();
-
-    void cleanup();
+    GuaranteeObserver(std::shared_ptr<Observer<T,E>> downstream, const Task<None,None>& task, std::shared_ptr<Scheduler> sched);
+    Task<Ack,None> onNext(T value);
+    Task<None,None> onError(E error);
+    Task<None,None> onComplete();
+    Task<None,None> onCancel();
 
 private:
     std::shared_ptr<Observer<T,E>> downstream;
-    Task<None,E> task;
+    Task<None,None> task;
     std::shared_ptr<Scheduler> sched;
     std::atomic_flag completed;
 };
 
 template <class T, class E>
-GuaranteeObserver<T,E>::GuaranteeObserver(std::shared_ptr<Observer<T,E>> downstream, const Task<None,E>& task, std::shared_ptr<Scheduler> sched)
+GuaranteeObserver<T,E>::GuaranteeObserver(std::shared_ptr<Observer<T,E>> downstream, const Task<None,None>& task, std::shared_ptr<Scheduler> sched)
     : downstream(downstream)
     , task(task)
     , sched(sched)
@@ -42,26 +41,40 @@ GuaranteeObserver<T,E>::GuaranteeObserver(std::shared_ptr<Observer<T,E>> downstr
 {}
 
 template <class T, class E>
-DeferredRef<Ack,E> GuaranteeObserver<T,E>::onNext(T value) {
+Task<Ack,None> GuaranteeObserver<T,E>::onNext(T value) {
     return downstream->onNext(value);
 }
 
 template <class T, class E>
-void GuaranteeObserver<T,E>::onError(E error) {
-    downstream->onError(error);
-    cleanup();
-}
-
-template <class T, class E>
-void GuaranteeObserver<T,E>::onComplete() {
-    downstream->onComplete();
-    cleanup();
-}
-
-template <class T, class E>
-void GuaranteeObserver<T,E>::cleanup() {
+Task<None,None> GuaranteeObserver<T,E>::onError(E error) {
     if(!completed.test_and_set()) {
-        task.run(sched)->await();
+        return downstream->onError(error)
+            .template flatMap<None>([task = task](auto) {
+                return task;
+            });
+    } else {
+        return Task<None,None>::none();
+    }
+}
+
+template <class T, class E>
+Task<None,None> GuaranteeObserver<T,E>::onComplete() {
+    if(!completed.test_and_set()) {
+        return downstream->onComplete()
+            .template flatMap<None>([task = task](auto) {
+                return task;
+            });
+    } else {
+        return Task<None,None>::none();
+    }
+}
+
+template <class T, class E>
+Task<None,None> GuaranteeObserver<T,E>::onCancel() {
+    if(!completed.test_and_set()) {
+        return task;
+    } else {
+        return Task<None,None>::none();
     }
 }
 

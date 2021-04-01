@@ -161,6 +161,12 @@ public:
     template <class E2>
     ObservableRef<T,E2> mapError(std::function<E2(E)> predicate) const;
 
+    template <class T2, class E2>
+    std::shared_ptr<Observable<T2,E2>> mapBothTask(
+        std::function<Task<T2,E2>(T)> successPredicate,
+        std::function<Task<T2,E2>(E)> errorPredicate
+    ) const;
+
     /**
      * Transform each element of the stream using the providing transforming predicat
      * function which may execute synchronously or asynchronously in the context of the
@@ -283,7 +289,7 @@ public:
      * @return An observable for which the given task is guaranteed to execute
      *         before shutdown.
      */
-    ObservableRef<T,E> guarantee(const Task<None,E>& task) const;
+    ObservableRef<T,E> guarantee(const Task<None,None>& task) const;
 
     virtual ~Observable();
 };
@@ -302,6 +308,7 @@ public:
 #include "observable/MapObservable.hpp"
 #include "observable/MapErrorObservable.hpp"
 #include "observable/MapTaskObservable.hpp"
+#include "observable/MapBothTaskObservable.hpp"
 #include "observable/RepeatTaskObservable.hpp"
 #include "observable/TakeObserver.hpp"
 #include "observable/TakeWhileObservable.hpp"
@@ -376,6 +383,16 @@ template <class E2>
 std::shared_ptr<Observable<T,E2>> Observable<T,E>::mapError(std::function<E2(E)> predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::MapErrorObservable<T,E,E2>>(self, predicate);
+}
+
+template <class T, class E>
+template <class T2, class E2>
+std::shared_ptr<Observable<T2,E2>> Observable<T,E>::mapBothTask(
+    std::function<Task<T2,E2>(T)> successPredicate,
+    std::function<Task<T2,E2>(E)> errorPredicate
+) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::MapBothTaskObservable<T,T2,E,E2>>(self, successPredicate, errorPredicate);
 }
 
 template <class T, class E>
@@ -460,7 +477,7 @@ ObservableRef<T,E> Observable<T,E>::takeWhileInclusive(std::function<bool(T)> pr
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::guarantee(const Task<None,E>& task) const {
+ObservableRef<T,E> Observable<T,E>::guarantee(const Task<None,None>& task) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::GuaranteeObservable<T,E>>(self, task);
 }
