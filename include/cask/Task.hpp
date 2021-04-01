@@ -530,26 +530,47 @@ constexpr Task<T2,E2> Task<T,E>::flatMapBoth(
     std::function<Task<T2,E2>(T)> successPredicate,
     std::function<Task<T2,E2>(E)> errorPredicate
 ) const noexcept {
+    if constexpr (std::is_same<E,E2>::value) {
         return Task<T2,E2>(
             op->flatMap([successPredicate, errorPredicate](auto erased_input, auto isError) {
-            try {
-                if(isError) {
-                    auto input = std::any_cast<E>(erased_input);
-                    auto resultTask = errorPredicate(input);
-                    return resultTask.op;
-                } else {
-                    auto input = std::any_cast<T>(erased_input);
-                    auto resultTask = successPredicate(input);
+                try {
+                    if(isError) {
+                        auto input = std::any_cast<E>(erased_input);
+                        auto resultTask = errorPredicate(input);
+                        return resultTask.op;
+                    } else {
+                        auto input = std::any_cast<T>(erased_input);
+                        auto resultTask = successPredicate(input);
+                        return resultTask.op;
+                    }
+                } catch(E& error) {
+                    auto resultTask = errorPredicate(error);
                     return resultTask.op;
                 }
-            } catch(E2& error) {
-                return trampoline::TrampolineOp::error(error);
-            } catch(E& error) {
-                auto resultTask = errorPredicate(error);
-                return resultTask.op;
-            }
-        })
-    );
+            })
+        );
+    } else {
+        return Task<T2,E2>(
+            op->flatMap([successPredicate, errorPredicate](auto erased_input, auto isError) {
+                try {
+                    if(isError) {
+                        auto input = std::any_cast<E>(erased_input);
+                        auto resultTask = errorPredicate(input);
+                        return resultTask.op;
+                    } else {
+                        auto input = std::any_cast<T>(erased_input);
+                        auto resultTask = successPredicate(input);
+                        return resultTask.op;
+                    }
+                } catch(E2& error) {
+                    return trampoline::TrampolineOp::error(error);
+                } catch(E& error) {
+                    auto resultTask = errorPredicate(error);
+                    return resultTask.op;
+                }
+            })
+        );
+    }
 }
 
 template <class T, class E>
