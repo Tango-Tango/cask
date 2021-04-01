@@ -19,6 +19,10 @@ in this file. This project follows [semantic versioning](https://semver.org/).
 - Change `Observable::guarantee` to take a `Task<None,None>` to fully clarify
   that both errors and values of the guaranteed task will be ignored - the given
   task will be executed as a pure side-effect.
+- Add the `Observable::mapBothTask` operator which allows users to simultaneously
+  transform both success and error values.
+- Add the `Task::flatMapBoth` operator which allows user to simulataneously transform
+  both success and error values.
 
 ## 2.4
 

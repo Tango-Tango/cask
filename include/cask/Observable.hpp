@@ -161,6 +161,29 @@ public:
     template <class E2>
     ObservableRef<T,E2> mapError(std::function<E2(E)> predicate) const;
 
+    /**
+     * Transform both success and error values by return a Task which
+     * implements the transform. 
+     * 
+     * 1. When upstream provides a value the successPredicate is called. If
+     *    it returns another success value then downstreams onNext is called. If
+     *    it returns an error then downstreams onError is called and upstream
+     *    is stopped.
+     * 2. When upstream provides an error the errorPredicate is called. If it
+     *    returns a success value then downstreams onNext is called and then
+     *    downstream is completed with OnComplete. If it returns an error
+     *    value then downstream's onError is called.
+     * 
+     * These semantics allow a stream to, in a single step, be transformed
+     * to any downstream stream type.
+     *
+     * @param successPredicate The function to apply on each normal value
+     *        provided by upstream.
+     * @param errorPredicate The function to apply on error values provided
+     *        by upstream.
+     * @return A new observable which transforms both normal and error values
+     *         according to the given predicates.
+     */
     template <class T2, class E2>
     std::shared_ptr<Observable<T2,E2>> mapBothTask(
         std::function<Task<T2,E2>(T)> successPredicate,

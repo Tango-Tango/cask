@@ -181,6 +181,17 @@ public:
     template <class E2>
     constexpr Task<T,E2> flatMapError(std::function<Task<T,E2>(E)> predicate) const noexcept;
 
+    /**
+     * Transform both the error and success types of this task using the given
+     * predicate functions. The successPredicate is called to transform normal
+     * values into either a new success value or a new error value. The errorPredicate
+     * is called to transform error values into either a success value (essentially
+     * recovering from the error) or a new error value.
+     * 
+     * @param successPredicate The function to use for transforming success values.
+     * @param errorPredicate The function to use for transforming error values.
+     * @return A new `Task` with transformed success and error values
+     */
     template <class T2, class E2>
     constexpr Task<T2,E2> flatMapBoth(
         std::function<Task<T2,E2>(T)> successPredicate,
