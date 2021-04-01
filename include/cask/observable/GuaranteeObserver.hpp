@@ -19,7 +19,7 @@ namespace cask::observable {
 template <class T, class E>
 class GuaranteeObserver final : public Observer<T,E> {
 public:
-    GuaranteeObserver(std::shared_ptr<Observer<T,E>> downstream, const Task<None,None>& task, std::shared_ptr<Scheduler> sched);
+    GuaranteeObserver(std::shared_ptr<Observer<T,E>> downstream, const Task<None,None>& task);
     Task<Ack,None> onNext(T value);
     Task<None,None> onError(E error);
     Task<None,None> onComplete();
@@ -33,10 +33,9 @@ private:
 };
 
 template <class T, class E>
-GuaranteeObserver<T,E>::GuaranteeObserver(std::shared_ptr<Observer<T,E>> downstream, const Task<None,None>& task, std::shared_ptr<Scheduler> sched)
+GuaranteeObserver<T,E>::GuaranteeObserver(std::shared_ptr<Observer<T,E>> downstream, const Task<None,None>& task)
     : downstream(downstream)
     , task(task)
-    , sched(sched)
     , completed(false)
 {}
 

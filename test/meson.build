@@ -1,6 +1,7 @@
 if not meson.is_subproject()
     test_dependencies = [
-        subproject('gtest').get_variable('gtest_dep')
+        subproject('gtest').get_variable('gtest_dep'),
+        subproject('trompeloeil').get_variable('trompeloeil_dep')
     ]
 
     test_sources = [
@@ -19,6 +20,7 @@ if not meson.is_subproject()
         'cask/observable/TestObservableFromTask.cpp',
         'cask/observable/TestObservableGuarantee.cpp',
         'cask/observable/TestObservableLast.cpp',
+        'cask/observable/TestObservableMapBothTask.cpp',
         'cask/observable/TestObservableMapError.cpp',
         'cask/observable/TestObservableTake.cpp',
         'cask/observable/TestObservableTakeWhile.cpp',

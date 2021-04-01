@@ -21,8 +21,7 @@ public:
     MapBothTaskObserver(
         std::function<Task<TO,EO>(TI)> successPredicate,
         std::function<Task<TO,EO>(EI)> errorPredicate,
-        std::shared_ptr<Observer<TO,EO>> downstream,
-        std::shared_ptr<Scheduler> sched
+        std::shared_ptr<Observer<TO,EO>> downstream
     );
 
     Task<Ack,None> onNext(TI value);
@@ -32,7 +31,6 @@ private:
     std::function<Task<TO,EO>(TI)> successPredicate;
     std::function<Task<TO,EO>(EI)> errorPredicate;
     std::shared_ptr<Observer<TO,EO>> downstream;
-    std::shared_ptr<Scheduler> sched;
     std::atomic_flag completed;
 };
 
@@ -41,13 +39,11 @@ template <class TI, class TO, class EI, class EO>
 MapBothTaskObserver<TI,TO,EI,EO>::MapBothTaskObserver(
     std::function<Task<TO,EO>(TI)> successPredicate,
     std::function<Task<TO,EO>(EI)> errorPredicate,
-    ObserverRef<TO,EO> downstream,
-    std::shared_ptr<Scheduler> sched
+    ObserverRef<TO,EO> downstream
 )
     : successPredicate(successPredicate)
     , errorPredicate(errorPredicate)
     , downstream(downstream)
-    , sched(sched)
     , completed(false)
 {}
 

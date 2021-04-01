@@ -81,12 +81,8 @@ public:
      */
     virtual Task<None,None> onComplete() = 0;
 
-    virtual ~Observer();
+    virtual ~Observer() = default;
 };
-
-template <class T, class E>
-Observer<T,E>::~Observer()
-{}
 
 }
 
