@@ -33,7 +33,7 @@ CancelableRef EvalObservable<T,E>::subscribe(
     try {
         return observer->onNext(predicate())
             .template flatMap<None>([observer](auto) {
-                return observer->onComplete();;
+                return observer->onComplete();
             })
             .run(sched);
     } catch(E& error) {
