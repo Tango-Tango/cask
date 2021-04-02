@@ -6,7 +6,7 @@
 #ifndef _CASK_OBSERVER_H_
 #define _CASK_OBSERVER_H_
 
-#include "Deferred.hpp"
+#include "Task.hpp"
 
 namespace cask {
 
@@ -72,22 +72,17 @@ public:
      * @return A signal to the upstream observable that processing
      *         can continue or needs to stop.
      */
-    virtual DeferredRef<Ack,E> onNext(T value) = 0;
+    virtual Task<Ack,None> onNext(T value) = 0;
 
-    virtual void onError(E error) = 0;
+    virtual Task<None,None> onError(E error) = 0;
 
     /**
      * Handle stream close because all events have been processed.
      */
-    virtual void onComplete() = 0;
+    virtual Task<None,None> onComplete() = 0;
 
-
-    virtual ~Observer();
+    virtual ~Observer() = default;
 };
-
-template <class T, class E>
-Observer<T,E>::~Observer()
-{}
 
 }
 

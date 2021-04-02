@@ -20,9 +20,9 @@ template <class T, class E>
 class BufferObserver final : public Observer<T,E> {
 public:
     BufferObserver(std::shared_ptr<Observer<BufferRef<T>,E>> downstream, unsigned int buffer_size);
-    DeferredRef<Ack,E> onNext(T value) override;
-    void onError(E error) override;
-    void onComplete() override;
+    Task<Ack,None> onNext(T value) override;
+    Task<None,None> onError(E error) override;
+    Task<None,None> onComplete() override;
 private:
     std::shared_ptr<Observer<BufferRef<T>,E>> downstream;
     unsigned int buffer_size;
@@ -40,29 +40,33 @@ BufferObserver<T,E>::BufferObserver(std::shared_ptr<Observer<BufferRef<T>,E>> do
 }
 
 template <class T, class E>
-DeferredRef<Ack,E> BufferObserver<T,E>::onNext(T value) {
+Task<Ack,None> BufferObserver<T,E>::onNext(T value) {
     buffer->emplace_back(value);
     if(buffer->size() == buffer_size) {
-        auto deferred = downstream->onNext(buffer);
+        auto downstreamTask = downstream->onNext(buffer);
         buffer = std::make_shared<std::vector<T>>();
         buffer->reserve(buffer_size);
-        return deferred;
+        return downstreamTask;
     } else {
-        return Deferred<Ack,E>::pure(Continue);
+        return Task<Ack,None>::pure(Continue);
     }
 }
 
 template <class T, class E>
-void BufferObserver<T,E>::onError(E error) {
-    downstream->onError(error);
+Task<None,None> BufferObserver<T,E>::onError(E error) {
+    return downstream->onError(error);
 }
 
 template <class T, class E>
-void BufferObserver<T,E>::onComplete() {
+Task<None,None> BufferObserver<T,E>::onComplete() {
     if(buffer->size() != 0) {
-        downstream->onNext(buffer)->await();
+        return downstream->onNext(buffer)
+            .template flatMap<None>([downstream = downstream](auto) {
+                return downstream->onComplete();
+            });
+    } else {
+        return downstream->onComplete();
     }
-    downstream->onComplete();
 }
 
 }

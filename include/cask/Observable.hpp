@@ -162,6 +162,35 @@ public:
     ObservableRef<T,E2> mapError(std::function<E2(E)> predicate) const;
 
     /**
+     * Transform both success and error values by return a Task which
+     * implements the transform. 
+     * 
+     * 1. When upstream provides a value the successPredicate is called. If
+     *    it returns another success value then downstreams onNext is called. If
+     *    it returns an error then downstreams onError is called and upstream
+     *    is stopped.
+     * 2. When upstream provides an error the errorPredicate is called. If it
+     *    returns a success value then downstreams onNext is called and then
+     *    downstream is completed with OnComplete. If it returns an error
+     *    value then downstream's onError is called.
+     * 
+     * These semantics allow a stream to, in a single step, be transformed
+     * to any downstream stream type.
+     *
+     * @param successPredicate The function to apply on each normal value
+     *        provided by upstream.
+     * @param errorPredicate The function to apply on error values provided
+     *        by upstream.
+     * @return A new observable which transforms both normal and error values
+     *         according to the given predicates.
+     */
+    template <class T2, class E2>
+    std::shared_ptr<Observable<T2,E2>> mapBothTask(
+        std::function<Task<T2,E2>(T)> successPredicate,
+        std::function<Task<T2,E2>(E)> errorPredicate
+    ) const;
+
+    /**
      * Transform each element of the stream using the providing transforming predicat
      * function which may execute synchronously or asynchronously in the context of the
      * returned task.
@@ -283,7 +312,7 @@ public:
      * @return An observable for which the given task is guaranteed to execute
      *         before shutdown.
      */
-    ObservableRef<T,E> guarantee(const Task<None,E>& task) const;
+    ObservableRef<T,E> guarantee(const Task<None,None>& task) const;
 
     virtual ~Observable();
 };
@@ -302,6 +331,7 @@ public:
 #include "observable/MapObservable.hpp"
 #include "observable/MapErrorObservable.hpp"
 #include "observable/MapTaskObservable.hpp"
+#include "observable/MapBothTaskObservable.hpp"
 #include "observable/RepeatTaskObservable.hpp"
 #include "observable/TakeObserver.hpp"
 #include "observable/TakeWhileObservable.hpp"
@@ -376,6 +406,16 @@ template <class E2>
 std::shared_ptr<Observable<T,E2>> Observable<T,E>::mapError(std::function<E2(E)> predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::MapErrorObservable<T,E,E2>>(self, predicate);
+}
+
+template <class T, class E>
+template <class T2, class E2>
+std::shared_ptr<Observable<T2,E2>> Observable<T,E>::mapBothTask(
+    std::function<Task<T2,E2>(T)> successPredicate,
+    std::function<Task<T2,E2>(E)> errorPredicate
+) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::MapBothTaskObservable<T,T2,E,E2>>(self, successPredicate, errorPredicate);
 }
 
 template <class T, class E>
@@ -460,7 +500,7 @@ ObservableRef<T,E> Observable<T,E>::takeWhileInclusive(std::function<bool(T)> pr
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::guarantee(const Task<None,E>& task) const {
+ObservableRef<T,E> Observable<T,E>::guarantee(const Task<None,None>& task) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::GuaranteeObservable<T,E>>(self, task);
 }

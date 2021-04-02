@@ -21,11 +21,10 @@ private:
 
 template <class T, class E>
 CancelableRef EmptyObservable<T,E>::subscribe(
-    std::shared_ptr<Scheduler>,
+    std::shared_ptr<Scheduler> sched,
     std::shared_ptr<Observer<T,E>> observer) const
 {
-    observer->onComplete();
-    return std::make_unique<IgnoreCancelation>();
+    return observer->onComplete().run(sched);
 }
 
 }

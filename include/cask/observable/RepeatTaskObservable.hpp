@@ -31,14 +31,21 @@ RepeatTaskObservable<T,E>::RepeatTaskObservable(Task<T,E> task)
 
 template <class T, class E>
 CancelableRef RepeatTaskObservable<T,E>::subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const {
-    std::function<Task<Ack,E>(T)> pushToObserver =
-        [observer = observer](T value) -> Task<Ack,E> {
-            return Task<Ack,E>::deferAction([observer,value](auto) {
-                return observer->onNext(value);
-            });
+    std::function<Task<Ack,None>(T)> pushToObserver =
+        [observer = observer](T value) -> Task<Ack,None> {
+            return observer->onNext(value);
         };
 
-    return task.flatMap(pushToObserver)
+    std::function<Task<Ack,None>(E)> pushError =
+        [observer = observer](E error) -> Task<Ack,None> {
+            return observer->onError(error)
+                .template map<Ack>([](auto) {
+                    return Stop;
+                });
+        };
+
+
+    return task.template flatMapBoth<Ack,None>(pushToObserver,pushError)
         .restartUntil([](auto ack) { return ack == Stop; })
         .run(sched);
 }

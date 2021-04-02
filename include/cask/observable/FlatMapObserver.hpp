@@ -19,17 +19,15 @@ template <class TI, class TO, class E>
 class FlatMapObserver final : public Observer<TI,E> {
 public:
     FlatMapObserver(std::function<ObservableRef<TO,E>(TI)> predicate,
-                    std::shared_ptr<Observer<TO,E>> downstream,
-                    std::shared_ptr<Scheduler> sched);
+                    std::shared_ptr<Observer<TO,E>> downstream);
     
 
-    DeferredRef<Ack,E> onNext(TI value);
-    void onError(E value);
-    void onComplete();
+    Task<Ack,None> onNext(TI value);
+    Task<None,None> onError(E value);
+    Task<None,None> onComplete();
 private:
     std::function<ObservableRef<TO,E>(TI)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
-    std::shared_ptr<Scheduler> sched;
     std::atomic_flag completed;
 };
 
@@ -37,22 +35,25 @@ private:
 template <class TI, class TO, class E>
 FlatMapObserver<TI,TO,E>::FlatMapObserver(
     std::function<ObservableRef<TO,E>(TI)> predicate,
-    std::shared_ptr<Observer<TO,E>> downstream,
-    std::shared_ptr<Scheduler> sched)
+    std::shared_ptr<Observer<TO,E>> downstream)
     : predicate(predicate)
     , downstream(downstream)
-    , sched(sched)
     , completed(false)
 {}
 
 template <class TI, class TO, class E>
-DeferredRef<Ack,E> FlatMapObserver<TI,TO,E>::onNext(TI value) {
+Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(TI value) {
     return predicate(value)
-        ->template mapTask<Ack>([downstream = downstream](auto resultValue) {
-            return Task<Ack,E>::deferAction([downstream, resultValue](auto) {
-                return downstream->onNext(resultValue);
-            });
-        })
+        ->template mapBothTask<Ack,None>(
+            [downstream = downstream](auto result) {
+                return downstream->onNext(result);
+            },
+            [this](auto error) {
+                return onError(error).template map<Ack>([](auto) {
+                    return Stop;
+                });
+            }
+        )
         ->takeWhileInclusive([](auto ack){
             return ack == Continue;
         })
@@ -63,25 +64,24 @@ DeferredRef<Ack,E> FlatMapObserver<TI,TO,E>::onNext(TI value) {
             } else {
                 return Continue;
             }
-        })
-        .recover([this](auto error) {
-            onError(error);
-            return Stop;
-        })
-        .run(sched);
+        });
 }
 
 template <class TI, class TO, class E>
-void FlatMapObserver<TI,TO,E>::onError(E error) {
+Task<None,None> FlatMapObserver<TI,TO,E>::onError(E error) {
     if(!completed.test_and_set()) {
-        downstream->onError(error);
+        return downstream->onError(error);
+    } else {
+        return Task<None,None>::none();
     }
 }
 
 template <class TI, class TO, class E>
-void FlatMapObserver<TI,TO,E>::onComplete() {
+Task<None,None> FlatMapObserver<TI,TO,E>::onComplete() {
     if(!completed.test_and_set()) {
         return downstream->onComplete();
+    } else {
+        return Task<None,None>::none();
     }
 }
 

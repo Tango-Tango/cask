@@ -11,7 +11,38 @@ using cask::Observable;
 using cask::Scheduler;
 using cask::Task;
 
-TEST(ObservableMapError, SameType) {
+TEST(ObservableMapError, Empty) {
+    auto sched = Scheduler::global();
+    auto result = Observable<int, std::string>::empty()
+        ->mapError<std::string>([](auto error) {
+            std::string copy(error);
+            std::reverse(copy.begin(), copy.end());
+            return copy;
+        })
+        ->last()
+        .run(sched)
+        ->await();
+
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(ObservableMapError, Value) {
+    auto sched = Scheduler::global();
+    auto result = Observable<int, std::string>::pure(123)
+        ->mapError<std::string>([](auto error) {
+            std::string copy(error);
+            std::reverse(copy.begin(), copy.end());
+            return copy;
+        })
+        ->last()
+        .run(sched)
+        ->await();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, 123);
+}
+
+TEST(ObservableMapError, ErrorSameType) {
     auto sched = Scheduler::global();
     auto result = Observable<int, std::string>::raiseError("broke")
         ->mapError<std::string>([](auto error) {
@@ -27,7 +58,7 @@ TEST(ObservableMapError, SameType) {
     EXPECT_EQ(result, "ekorb");
 }
 
-TEST(ObservableMapError, DifferentType) {
+TEST(ObservableMapError, ErrorDifferentType) {
     auto sched = Scheduler::global();
 
     auto result = Observable<int,int>::raiseError(123)
@@ -42,7 +73,7 @@ TEST(ObservableMapError, DifferentType) {
     EXPECT_EQ(result, "123");
 }
 
-TEST(ObservableMapError, UpstreamError) {
+TEST(ObservableMapError, ErrorUpstream) {
     auto counter = 0;
     auto sched = Scheduler::global();
 
@@ -63,7 +94,7 @@ TEST(ObservableMapError, UpstreamError) {
     EXPECT_EQ(counter, 1);
 }
 
-TEST(ObservableMapError, DownstreamError) {
+TEST(ObservableMapError, ErrorDownstream) {
     auto counter = 0;
     auto sched = Scheduler::global();
 

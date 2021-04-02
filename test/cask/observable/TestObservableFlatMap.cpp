@@ -4,12 +4,24 @@
 //          https://www.boost.org/LICENSE_1_0.txt)
 
 #include "gtest/gtest.h"
+#include "gtest/trompeloeil.hpp"
 #include "cask/Observable.hpp"
 
 using cask::Observable;
 using cask::ObservableRef;
+using cask::Observer;
 using cask::Scheduler;
 using cask::Task;
+using cask::None;
+using cask::Ack;
+using cask::observable::FlatMapObserver;
+
+class MockFlatMapDownstreamObserver : public trompeloeil::mock_interface<Observer<float,std::string>> {
+public:
+    IMPLEMENT_MOCK1(onNext);
+    IMPLEMENT_MOCK1(onError);
+    IMPLEMENT_MOCK0(onComplete);
+};
 
 TEST(ObservableFlatMap, Pure) {
     auto sched = Scheduler::global();
@@ -84,5 +96,46 @@ TEST(ObservableFlatMap, StopsUpstreamOnDownstreamComplete) {
 
     EXPECT_EQ(result.size(), 10);
     EXPECT_EQ(counter, 10);
+}
 
+TEST(ObservableFlatMap, IgnoresRepeatedCompletes) {
+    int counter = 0;
+
+    auto mockDownstream = std::make_shared<MockFlatMapDownstreamObserver>();
+    REQUIRE_CALL(*mockDownstream, onComplete())
+        .LR_SIDE_EFFECT(counter++)
+        .RETURN(Task<None,None>::none());
+    
+    auto observer = std::make_shared<FlatMapObserver<int,float,std::string>>(
+        [](auto value) {
+            return Observable<float,std::string>::pure(value * 1.5f);
+        },
+        mockDownstream
+    );
+
+    observer->onComplete().run(Scheduler::global())->await();
+    observer->onComplete().run(Scheduler::global())->await();
+
+    EXPECT_EQ(counter, 1);
+}
+
+TEST(ObservableFlatMap, IgnoresRepeatedErrors) {
+    int counter = 0;
+
+    auto mockDownstream = std::make_shared<MockFlatMapDownstreamObserver>();
+    REQUIRE_CALL(*mockDownstream, onError("broke"))
+        .LR_SIDE_EFFECT(counter++)
+        .RETURN(Task<None,None>::none());
+    
+    auto observer = std::make_shared<FlatMapObserver<int,float,std::string>>(
+        [](auto value) {
+            return Observable<float,std::string>::pure(value * 1.5f);
+        },
+        mockDownstream
+    );
+
+    observer->onError("broke").run(Scheduler::global())->await();
+    observer->onError("broke").run(Scheduler::global())->await();
+
+    EXPECT_EQ(counter, 1);
 }

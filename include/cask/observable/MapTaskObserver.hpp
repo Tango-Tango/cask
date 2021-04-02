@@ -18,44 +18,53 @@ namespace cask::observable {
 template <class TI, class TO, class E>
 class MapTaskObserver final : public Observer<TI,E> {
 public:
-    MapTaskObserver(std::function<Task<TO,E>(TI)> predicate, std::shared_ptr<Observer<TO,E>> downstream, std::shared_ptr<Scheduler> sched);
+    MapTaskObserver(std::function<Task<TO,E>(TI)> predicate, std::shared_ptr<Observer<TO,E>> downstream);
 
-    DeferredRef<Ack,E> onNext(TI value);
-    void onError(E error);
-    void onComplete();
+    Task<Ack,None> onNext(TI value);
+    Task<None,None> onError(E error);
+    Task<None,None> onComplete();
 private:
     std::function<Task<TO,E>(TI)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
-    std::shared_ptr<Scheduler> sched;
+    std::atomic_flag completed;
 };
 
 
 template <class TI, class TO, class E>
-MapTaskObserver<TI,TO,E>::MapTaskObserver(std::function<Task<TO,E>(TI)> predicate, ObserverRef<TO,E> downstream, std::shared_ptr<Scheduler> sched)
+MapTaskObserver<TI,TO,E>::MapTaskObserver(std::function<Task<TO,E>(TI)> predicate, ObserverRef<TO,E> downstream)
     : predicate(predicate)
     , downstream(downstream)
-    , sched(sched)
+    , completed(false)
 {}
 
 template <class TI, class TO, class E>
-DeferredRef<Ack,E> MapTaskObserver<TI,TO,E>::onNext(TI value) {
-    return predicate(value)
-    .template flatMap<Ack>([downstream = downstream](auto result) {
-        return Task<Ack,E>::deferAction([downstream, result](auto) {
-            return downstream->onNext(result);
-        });
-    })
-    .run(sched);
+Task<Ack,None> MapTaskObserver<TI,TO,E>::onNext(TI value) {
+    return predicate(value).template flatMapBoth<Ack,None>(
+        [this](auto downstreamValue) { return downstream->onNext(downstreamValue); },
+        [this](auto error) {
+            return onError(error).template map<Ack>([](auto) {
+                return Stop;
+            });
+        }
+    );
 }
 
 template <class TI, class TO, class E>
-void MapTaskObserver<TI,TO,E>::onError(E error) {
-    downstream->onError(error);
+Task<None,None> MapTaskObserver<TI,TO,E>::onError(E error) {
+    if(!completed.test_and_set()) {
+        return downstream->onError(error);
+    } else {
+        return Task<None,None>::none();
+    }
 }
 
 template <class TI, class TO, class E>
-void MapTaskObserver<TI,TO,E>::onComplete() {
-    downstream->onComplete();
+Task<None,None> MapTaskObserver<TI,TO,E>::onComplete() {
+    if(!completed.test_and_set()) {
+        return downstream->onComplete();
+    } else {
+        return Task<None,None>::none();
+    }
 }
 
 }

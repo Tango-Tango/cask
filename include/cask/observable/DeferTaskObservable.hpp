@@ -32,22 +32,20 @@ CancelableRef DeferTaskObservable<T,E>::subscribe(
 {
     try {
         return predicate()
-        .template flatMap<Ack>([observer](auto result) {
-            return Task<Ack,E>::deferAction([observer,result](auto) {
-                return observer->onNext(result);
-            });
-        })
-        .onError([observer](auto error) {
-            observer->onError(error);
-        })
-        .template map<None>([observer](auto) {
-            observer->onComplete();
-            return None();
-        })
+        .template flatMapBoth<None,None>(
+            [observer](auto result) {
+                return observer->onNext(result)
+                .template flatMap<None>([observer](auto) {
+                    return observer->onComplete();
+                });
+            },
+            [observer](auto error) {
+                return observer->onError(error);
+            }
+        )
         .run(sched);
     } catch(E& error) {
-        observer->onError(error);
-        return std::make_shared<IgnoreCancelation>();
+        return observer->onError(error).run(sched);
     }
 }
 

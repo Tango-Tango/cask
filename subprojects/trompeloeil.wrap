@@ -1,0 +1,6 @@
+[wrap-git]
+directory = trompeloeil-40
+patch_directory = trompeloeil-40-patch
+url = https://github.com/rollbear/trompeloeil.git
+revision = v40
+depth = 1

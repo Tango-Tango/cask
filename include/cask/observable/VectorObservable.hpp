@@ -21,7 +21,7 @@ public:
 private:
     std::vector<T> source;
 
-    static Task<Ack,E> pushEvent(
+    static Task<Ack,None> pushEvent(
         unsigned int i,
         const std::vector<T>& source,
         std::shared_ptr<Scheduler> sched,
@@ -44,7 +44,7 @@ CancelableRef VectorObservable<T,E>::subscribe(
 }
 
 template <class T, class E>
-Task<Ack,E> VectorObservable<T,E>::pushEvent(
+Task<Ack,None> VectorObservable<T,E>::pushEvent(
     unsigned int i,
     const std::vector<T>& source,
     std::shared_ptr<Scheduler> sched,
@@ -52,17 +52,17 @@ Task<Ack,E> VectorObservable<T,E>::pushEvent(
     Ack lastAck
 ) {
     if(i >= source.size()) {
-        observer->onComplete();
-        return Task<Ack,E>::pure(Stop);
+        return observer->onComplete()
+            .template map<Ack>([](auto) {
+                return Stop;
+            });
     } else if(lastAck == Continue) {
         auto value = source[i];
 
-        return Task<Ack,E>::deferAction([observer, value](auto) {
-                return observer->onNext(value);
-            })
+        return observer->onNext(value)
             .template flatMap<Ack>(std::bind(pushEvent, i + 1, source, sched, observer, _1));
     } else {
-        return Task<Ack,E>::pure(Stop);
+        return Task<Ack,None>::pure(Stop);
     }
 }
 

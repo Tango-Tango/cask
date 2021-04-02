@@ -14,32 +14,6 @@ using cask::ObservableRef;
 using cask::Task;
 using cask::None;
 
-TEST(Observable, PureMap) {
-    auto sched = Scheduler::global();
-    auto result = Observable<int>::pure(123)
-        ->map<float>([](auto value) { return value * 1.5; })
-        ->last()
-        .run(sched)
-        ->await();
-
-    EXPECT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 184.5);
-}
-
-TEST(Observable, PureMapTask) {
-    auto sched = Scheduler::global();
-    auto result = Observable<int>::pure(123)
-        ->mapTask<float>([](auto value) {
-            return Task<float>::pure(value * 1.5);
-        })
-        ->last()
-        .run(sched)
-        ->await();
-
-    EXPECT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 184.5);
-}
-
 TEST(Observable, Empty) {
     auto sched = Scheduler::global();
     auto result = Observable<int>::empty()
