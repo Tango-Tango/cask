@@ -31,6 +31,7 @@ if not meson.is_subproject()
         'cask/task/TestTaskAssignment.cpp',
         'cask/task/TestTaskDefer.cpp',
         'cask/task/TestTaskEval.cpp',
+        'cask/task/TestTaskFlatMapBoth.cpp',
         'cask/task/TestTaskNever.cpp',
         'cask/task/TestTaskNone.cpp',
         'cask/task/TestTaskPure.cpp',
