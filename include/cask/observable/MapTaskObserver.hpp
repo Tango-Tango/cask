@@ -18,7 +18,7 @@ namespace cask::observable {
 template <class TI, class TO, class E>
 class MapTaskObserver final : public Observer<TI,E> {
 public:
-    MapTaskObserver(std::function<Task<TO,E>(TI)> predicate, std::shared_ptr<Observer<TO,E>> downstream, std::shared_ptr<Scheduler> sched);
+    MapTaskObserver(std::function<Task<TO,E>(TI)> predicate, std::shared_ptr<Observer<TO,E>> downstream);
 
     Task<Ack,None> onNext(TI value);
     Task<None,None> onError(E error);
@@ -26,16 +26,14 @@ public:
 private:
     std::function<Task<TO,E>(TI)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
-    std::shared_ptr<Scheduler> sched;
     std::atomic_flag completed;
 };
 
 
 template <class TI, class TO, class E>
-MapTaskObserver<TI,TO,E>::MapTaskObserver(std::function<Task<TO,E>(TI)> predicate, ObserverRef<TO,E> downstream, std::shared_ptr<Scheduler> sched)
+MapTaskObserver<TI,TO,E>::MapTaskObserver(std::function<Task<TO,E>(TI)> predicate, ObserverRef<TO,E> downstream)
     : predicate(predicate)
     , downstream(downstream)
-    , sched(sched)
     , completed(false)
 {}
 

@@ -33,7 +33,7 @@ MapTaskObservable<TI,TO,E>::MapTaskObservable(std::shared_ptr<const Observable<T
 
 template <class TI, class TO, class E>
 CancelableRef MapTaskObservable<TI,TO,E>::subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<TO,E>> observer) const {
-    auto mapObserver = std::make_shared<MapTaskObserver<TI,TO,E>>(predicate, observer, sched);
+    auto mapObserver = std::make_shared<MapTaskObserver<TI,TO,E>>(predicate, observer);
     return upstream->subscribe(sched, mapObserver);
 }
 

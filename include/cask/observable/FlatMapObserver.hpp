@@ -19,8 +19,7 @@ template <class TI, class TO, class E>
 class FlatMapObserver final : public Observer<TI,E> {
 public:
     FlatMapObserver(std::function<ObservableRef<TO,E>(TI)> predicate,
-                    std::shared_ptr<Observer<TO,E>> downstream,
-                    std::shared_ptr<Scheduler> sched);
+                    std::shared_ptr<Observer<TO,E>> downstream);
     
 
     Task<Ack,None> onNext(TI value);
@@ -29,7 +28,6 @@ public:
 private:
     std::function<ObservableRef<TO,E>(TI)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
-    std::shared_ptr<Scheduler> sched;
     std::atomic_flag completed;
 };
 
@@ -37,11 +35,9 @@ private:
 template <class TI, class TO, class E>
 FlatMapObserver<TI,TO,E>::FlatMapObserver(
     std::function<ObservableRef<TO,E>(TI)> predicate,
-    std::shared_ptr<Observer<TO,E>> downstream,
-    std::shared_ptr<Scheduler> sched)
+    std::shared_ptr<Observer<TO,E>> downstream)
     : predicate(predicate)
     , downstream(downstream)
-    , sched(sched)
     , completed(false)
 {}
 
