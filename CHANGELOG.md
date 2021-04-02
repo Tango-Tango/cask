@@ -3,6 +3,11 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 3.1
+
+- Add the `List` data structure which is a simple immutable and persistent list
+  that supports O(1) head and tail access, O(1) prepend and O(n) append.
+
 ## 3.0
 
 - Update the `Observer` interface so that `onNext`, `onComplete` and `onError`
