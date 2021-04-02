@@ -107,7 +107,7 @@ TEST(ObservableFlatMap, IgnoresRepeatedCompletes) {
         .RETURN(Task<None,None>::none());
     
     auto observer = std::make_shared<FlatMapObserver<int,float,std::string>>(
-        [&counter](auto value) {
+        [](auto value) {
             return Observable<float,std::string>::pure(value * 1.5f);
         },
         mockDownstream
@@ -128,7 +128,7 @@ TEST(ObservableFlatMap, IgnoresRepeatedErrors) {
         .RETURN(Task<None,None>::none());
     
     auto observer = std::make_shared<FlatMapObserver<int,float,std::string>>(
-        [&counter](auto value) {
+        [](auto value) {
             return Observable<float,std::string>::pure(value * 1.5f);
         },
         mockDownstream

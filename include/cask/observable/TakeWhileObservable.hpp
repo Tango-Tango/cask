@@ -35,7 +35,7 @@ TakeWhileObservable<T,E>::TakeWhileObservable(std::shared_ptr<const Observable<T
 
 template <class T, class E>
 CancelableRef TakeWhileObservable<T,E>::subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const {
-    auto takeWhileObserver = std::make_shared<TakeWhileObserver<T,E>>(sched, observer, predicate, inclusive);
+    auto takeWhileObserver = std::make_shared<TakeWhileObserver<T,E>>(observer, predicate, inclusive);
     return upstream->subscribe(sched, takeWhileObserver);
 }
 

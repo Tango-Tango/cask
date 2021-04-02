@@ -20,7 +20,6 @@ template <class T, class E>
 class TakeWhileObserver final : public Observer<T,E> {
 public:
     TakeWhileObserver(
-        std::shared_ptr<Scheduler> sched,
         ObserverRef<T,E> downstream,
         std::function<bool(T)> predicate,
         bool inclusive
@@ -29,7 +28,6 @@ public:
     Task<None,None> onError(E error);
     Task<None,None> onComplete();
 private:
-    std::shared_ptr<Scheduler> sched;
     ObserverRef<T,E> downstream;
     std::function<bool(T)> predicate;
     bool inclusive;
@@ -38,13 +36,11 @@ private:
 
 template <class T, class E>
 TakeWhileObserver<T,E>::TakeWhileObserver(
-    std::shared_ptr<Scheduler> sched,
     ObserverRef<T,E> downstream,
     std::function<bool(T)> predicate,
     bool inclusive
 )
-    : sched(sched)
-    , downstream(downstream)
+    : downstream(downstream)
     , predicate(predicate)
     , inclusive(inclusive)
     , completed(false)

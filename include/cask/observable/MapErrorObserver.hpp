@@ -18,22 +18,20 @@ namespace cask::observable {
 template <class T, class EI, class EO>
 class MapErrorObserver final : public Observer<T,EI> {
 public:
-    MapErrorObserver(std::function<EO(EI)> predicate, std::shared_ptr<Observer<T,EO>> downstream, std::shared_ptr<Scheduler> sched);
+    MapErrorObserver(std::function<EO(EI)> predicate, std::shared_ptr<Observer<T,EO>> downstream);
     Task<Ack,None> onNext(T value);
     Task<None,None> onError(EI error);
     Task<None,None> onComplete();
 private:
     std::function<EO(EI)> predicate;
     std::shared_ptr<Observer<T,EO>> downstream;
-    std::shared_ptr<Scheduler> sched;
 };
 
 
 template <class T, class EI, class EO>
-MapErrorObserver<T,EI,EO>::MapErrorObserver(std::function<EO(EI)> predicate, std::shared_ptr<Observer<T,EO>> downstream, std::shared_ptr<Scheduler> sched)
+MapErrorObserver<T,EI,EO>::MapErrorObserver(std::function<EO(EI)> predicate, std::shared_ptr<Observer<T,EO>> downstream)
     : predicate(predicate)
     , downstream(downstream)
-    , sched(sched)
 {}
 
 template <class T, class EI, class EO>
