@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 #include "cask/MVar.hpp"
 
+using cask::DeferredRef;
 using cask::Task;
 using cask::MVar;
 using cask::Scheduler;
@@ -162,4 +163,19 @@ TEST(MVar, Read) {
     auto secondRead = mvar->read().run(Scheduler::global());
     EXPECT_EQ(firstRead->await(), 123);
     EXPECT_EQ(secondRead->await(), 123);
+}
+
+TEST(MVar, ReadManyTimes) {
+    const static unsigned int iterations = 1000;
+    std::vector<DeferredRef<int, std::string>> reads;
+
+    auto mvar = MVar<int, std::string>::create(Scheduler::global(), 123);
+    for(unsigned int i = 0; i < iterations; i++) {
+        auto deferred = mvar->read().run(Scheduler::global());
+        reads.push_back(deferred);
+    }
+
+    for(auto deferred : reads) {
+        EXPECT_EQ(deferred->await(), 123);
+    }
 }
