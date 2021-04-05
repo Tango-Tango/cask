@@ -74,6 +74,17 @@ public:
      */
     virtual ListRef<T> tail() = 0;
 
+    /**
+     * Drop elements from the head of the list until the given
+     * predicate returns false.
+     * 
+     * @param predicate The function to evaluate and continue
+     *                  dropping while it returns true.
+     * @return A list with the head elements matching the predicate
+     *         dropped.
+     */ 
+    virtual ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) = 0;
+
     virtual ~List() = default;
 };
 

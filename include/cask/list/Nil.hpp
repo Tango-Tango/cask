@@ -23,6 +23,7 @@ public:
     bool is_empty() const override;
     std::optional<T> head() const override;
     ListRef<T> tail() override;
+    ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) override;
 };
 
 }
@@ -58,6 +59,11 @@ std::optional<T> Nil<T>::head() const {
 
 template <class T>
 ListRef<T> Nil<T>::tail() {
+    return this->shared_from_this();
+}
+
+template <class T>
+ListRef<T> Nil<T>::dropWhile(const std::function<bool(const T&)>&) {
     return this->shared_from_this();
 }
 
