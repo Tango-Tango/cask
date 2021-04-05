@@ -3,6 +3,16 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 4.0
+
+- Update `MVar` to remove the use of `std::mutex` and use `Ref` instead. In
+  several common cases (putting a value when the mvar is empty, or taking
+  a value when it is full) `MVar` operations can now be resolved without
+  creating any asynchronous boundaries.
+- Resolve issues with `MVar` sometimes hanging during unit test.
+- Update the `MVar` API to take a scheduler during construction. This
+  scheduler will be used to schedule any asynchronous takes or puts.
+
 ## 3.1
 
 - Add the `List` data structure which is a simple immutable and persistent list

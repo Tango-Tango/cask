@@ -35,6 +35,8 @@ public:
     /**
      * Create an MVar that currently holds no data.
      *
+     * @param sched The scheduler on which MVar will schedule
+     *              any asynchronous puts or takes.
      * @return An empty MVar reference.
      */
     static MVarRef<T,E> empty(const std::shared_ptr<Scheduler>& sched);
@@ -42,6 +44,8 @@ public:
     /**
      * Create an MVar that initially holds a value.
      *
+     * @param sched The scheduler on which MVar will schedule
+     *              any asynchronous puts or takes.
      * @param initialValue The initial value to store in the MVar.
      * @return A non-empty MVar reference.
      */
