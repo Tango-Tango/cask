@@ -13,6 +13,10 @@
 
 namespace cask::mvar {
 
+/**
+ * Represents the internal state of an MVar. It should not be used directly by consumers. It does
+ * not provide any concurrency protection on its own and is expected to be protected by a `Ref`.
+ */
 template <class T, class E>
 class MVarState {
 public:
@@ -66,10 +70,14 @@ MVarState<T,E>::MVarState(std::shared_ptr<Scheduler>&& sched, std::optional<T>&&
 
 template <class T, class E>
 std::tuple<MVarState<T,E>,Task<None,E>> MVarState<T,E>::put(const T& value) const {
-    if(!pendingTakes->is_empty()) {
-        auto takePromise = *(pendingTakes->head());
+    auto filteredTakes = pendingTakes->dropWhile([](auto promise) {
+        return promise->isCancelled();
+    });
+
+    if(!filteredTakes->is_empty()) {
+        auto takePromise = *(filteredTakes->head());
         return std::make_tuple(
-            MVarState(sched, valueOpt, pendingPuts, pendingTakes->tail()),
+            MVarState(sched, valueOpt, pendingPuts, filteredTakes->tail()),
             Task<None,E>::eval([takePromise, value] {
                 takePromise->success(value);
                 return None();
@@ -77,7 +85,7 @@ std::tuple<MVarState<T,E>,Task<None,E>> MVarState<T,E>::put(const T& value) cons
         );
     } else if(!valueOpt.has_value()) {
         return std::make_tuple(
-            MVarState(sched, value, pendingPuts, pendingTakes),
+            MVarState(sched, value, pendingPuts, filteredTakes),
             Task<None,E>::none()
         );
     } else {
@@ -85,7 +93,7 @@ std::tuple<MVarState<T,E>,Task<None,E>> MVarState<T,E>::put(const T& value) cons
         auto pending = std::make_tuple(promise, value);
 
         return std::make_tuple(
-            MVarState(sched, valueOpt, pendingPuts->append(pending), pendingTakes),
+            MVarState(sched, valueOpt, pendingPuts->append(pending), filteredTakes),
             Task<None,E>::forPromise(promise)
         );
     }
@@ -93,17 +101,22 @@ std::tuple<MVarState<T,E>,Task<None,E>> MVarState<T,E>::put(const T& value) cons
 
 template <class T, class E>
 std::tuple<MVarState<T,E>,Task<T,E>> MVarState<T,E>::take() const {
+    auto filteredPuts = pendingPuts->dropWhile([](auto pending) {
+        auto promise = std::get<0>(pending);
+        return promise->isCancelled();
+    });
+
     if(valueOpt.has_value()) {
         return std::make_tuple(
-            MVarState(sched, {}, pendingPuts, pendingTakes),
+            MVarState(sched, {}, filteredPuts, pendingTakes),
             Task<T,E>::pure(*valueOpt)
         );
-    } else if(!pendingPuts->is_empty()) {
-        auto pending = *(pendingPuts->head());
+    } else if(!filteredPuts->is_empty()) {
+        auto pending = *(filteredPuts->head());
         auto putPromise = std::get<0>(pending);
         auto value = std::get<1>(pending);
         return std::make_tuple(
-            MVarState(sched, valueOpt, pendingPuts->tail(), pendingTakes),
+            MVarState(sched, valueOpt, filteredPuts->tail(), pendingTakes),
             Task<T,E>::eval([putPromise, value] {
                 putPromise->success(None());
                 return value;
@@ -112,7 +125,7 @@ std::tuple<MVarState<T,E>,Task<T,E>> MVarState<T,E>::take() const {
     } else {
         auto promise = Promise<T,E>::create(sched);
         return std::make_tuple(
-            MVarState(sched, valueOpt, pendingPuts, pendingTakes->append(promise)),
+            MVarState(sched, valueOpt, filteredPuts, pendingTakes->append(promise)),
             Task<T,E>::forPromise(promise)
         );
     }

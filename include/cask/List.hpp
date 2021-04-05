@@ -74,6 +74,8 @@ public:
      */
     virtual ListRef<T> tail() = 0;
 
+    virtual ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) = 0;
+
     virtual ~List() = default;
 };
 

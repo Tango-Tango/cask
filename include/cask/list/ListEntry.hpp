@@ -24,6 +24,7 @@ public:
     bool is_empty() const override;
     std::optional<T> head() const override;
     ListRef<T> tail() override;
+    ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) override;
 
 private:
     T headValue;
@@ -64,6 +65,15 @@ std::optional<T> ListEntry<T>::head() const {
 template <class T>
 ListRef<T> ListEntry<T>::tail() {
     return tailRef;
+}
+
+template <class T>
+ListRef<T> ListEntry<T>::dropWhile(const std::function<bool(const T&)>& predicate) {
+    if(predicate(headValue)) {
+        return tailRef->dropWhile(predicate);
+    } else {
+        return this->shared_from_this(); 
+    }
 }
 
 }

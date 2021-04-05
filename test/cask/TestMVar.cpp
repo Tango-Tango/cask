@@ -116,7 +116,6 @@ TEST(MVar, InterleavesTakesAndPuts) {
     EXPECT_EQ(thirdPut->await(), None());
 }
 
-/*
 TEST(MVar, CleanupCanceledPut) {
     auto mvar = MVar<int,std::string>::empty(Scheduler::global());
 
@@ -156,7 +155,6 @@ TEST(MVar, CleanupCanceledTake) {
     EXPECT_EQ(secondPut->await(), None());
     EXPECT_EQ(thirdPut->await(), None());
 }
-*/
 
 TEST(MVar, Read) {
     auto mvar = MVar<int, std::string>::create(Scheduler::global(), 123);
