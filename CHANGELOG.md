@@ -12,6 +12,7 @@ in this file. This project follows [semantic versioning](https://semver.org/).
 - Resolve issues with `MVar` sometimes hanging during unit test.
 - Update the `MVar` API to take a scheduler during construction. This
   scheduler will be used to schedule any asynchronous takes or puts.
+- Add the `dropWhile` operator to `List`.
 
 ## 3.1
 
