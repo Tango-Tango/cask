@@ -99,6 +99,13 @@ public:
      */
     constexpr static Task<T,E> deferAction(std::function<DeferredRef<T,E>(std::shared_ptr<Scheduler>)> predicate) noexcept;
 
+    /**
+     * Create a task which wraps the given already created promise. The given
+     * task will provide a value when the given promise completes.
+     * 
+     * @param promise The promise to wrap in a task.
+     * @return The task wrapping the given promise.
+     */
     constexpr static Task<T,E> forPromise(const PromiseRef<T,E>& promise) noexcept;
 
     /**

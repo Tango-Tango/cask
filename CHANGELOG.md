@@ -13,6 +13,7 @@ in this file. This project follows [semantic versioning](https://semver.org/).
 - Update the `MVar` API to take a scheduler during construction. This
   scheduler will be used to schedule any asynchronous takes or puts.
 - Add the `dropWhile` operator to `List`.
+- Add the `forPromise` operator to `Task`.
 
 ## 3.1
 
