@@ -99,6 +99,8 @@ public:
      */
     constexpr static Task<T,E> deferAction(std::function<DeferredRef<T,E>(std::shared_ptr<Scheduler>)> predicate) noexcept;
 
+    constexpr static Task<T,E> forPromise(const PromiseRef<T,E>& promise) noexcept;
+
     /**
      * Creates a task that will never finish evaluation.
      *  
@@ -370,6 +372,26 @@ constexpr Task<T,E> Task<T,E>::deferAction(std::function<DeferredRef<T,E>(std::s
             });
 
             return Deferred<std::any,std::any>::forPromise(promise);
+        })
+    );
+}
+
+template <class T, class E>
+constexpr Task<T,E> Task<T,E>::forPromise(const PromiseRef<T,E>& promise) noexcept {
+    return Task<T,E>(
+        trampoline::TrampolineOp::async([promise](auto sched) {
+            auto erasedPromise = Promise<std::any,std::any>::create(sched);
+            auto deferred = Deferred<T,E>::forPromise(promise);
+
+            deferred->template chainDownstream<std::any,std::any>(erasedPromise, [](Either<T,E> result) {
+                if(result.is_left()) {
+                    return Either<std::any,std::any>::left(result.get_left());
+                } else {
+                    return Either<std::any,std::any>::right(result.get_right());
+                }
+            });
+
+            return Deferred<std::any,std::any>::forPromise(erasedPromise);
         })
     );
 }
