@@ -175,7 +175,7 @@ TEST(MVar, ReadManyTimes) {
         reads.push_back(deferred);
     }
 
-    for(auto deferred : reads) {
+    for(auto& deferred : reads) {
         EXPECT_EQ(deferred->await(), 123);
     }
 }
