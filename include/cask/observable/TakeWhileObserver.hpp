@@ -24,8 +24,8 @@ public:
         std::function<bool(T)> predicate,
         bool inclusive
     );
-    Task<Ack,None> onNext(T value);
-    Task<None,None> onError(E error);
+    Task<Ack,None> onNext(const T& value);
+    Task<None,None> onError(const E& error);
     Task<None,None> onComplete();
 private:
     ObserverRef<T,E> downstream;
@@ -47,7 +47,7 @@ TakeWhileObserver<T,E>::TakeWhileObserver(
 {}
 
 template <class T, class E>
-Task<Ack,None> TakeWhileObserver<T,E>::onNext(T value) {
+Task<Ack,None> TakeWhileObserver<T,E>::onNext(const T& value) {
     if(predicate(value)) {
         return downstream->onNext(value);
     } else {
@@ -68,7 +68,7 @@ Task<Ack,None> TakeWhileObserver<T,E>::onNext(T value) {
 }
 
 template <class T, class E>
-Task<None,None> TakeWhileObserver<T,E>::onError(E error) {
+Task<None,None> TakeWhileObserver<T,E>::onError(const E& error) {
     if(!completed.test_and_set()) {
         downstream->onError(error);
     }

@@ -20,8 +20,8 @@ template <class T, class E>
 class TakeObserver final : public Observer<T,E> {
 public:
     TakeObserver(unsigned int amount, std::weak_ptr<Promise<std::vector<T>,E>> promise);
-    Task<Ack,None> onNext(T value);
-    Task<None,None> onError(E error);
+    Task<Ack,None> onNext(const T& value);
+    Task<None,None> onError(const E& error);
     Task<None,None> onComplete();
 private:
     int remaining;
@@ -37,7 +37,7 @@ TakeObserver<T,E>::TakeObserver(unsigned int amount, std::weak_ptr<Promise<std::
 {}
 
 template <class T, class E>
-Task<Ack,None> TakeObserver<T,E>::onNext(T value) {
+Task<Ack,None> TakeObserver<T,E>::onNext(const T& value) {
     entries.push_back(value);
     remaining -= 1;
 
@@ -52,7 +52,7 @@ Task<Ack,None> TakeObserver<T,E>::onNext(T value) {
 }
 
 template <class T, class E>
-Task<None,None> TakeObserver<T,E>::onError(E error) {
+Task<None,None> TakeObserver<T,E>::onError(const E& error) {
     if(auto promiseLock = promise.lock()) {
         promiseLock->error(error);
     }

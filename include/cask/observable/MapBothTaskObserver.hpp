@@ -24,8 +24,8 @@ public:
         std::shared_ptr<Observer<TO,EO>> downstream
     );
 
-    Task<Ack,None> onNext(TI value);
-    Task<None,None> onError(EI error);
+    Task<Ack,None> onNext(const TI& value);
+    Task<None,None> onError(const EI& error);
     Task<None,None> onComplete();
 private:
     std::function<Task<TO,EO>(TI)> successPredicate;
@@ -48,7 +48,7 @@ MapBothTaskObserver<TI,TO,EI,EO>::MapBothTaskObserver(
 {}
 
 template <class TI, class TO, class EI, class EO>
-Task<Ack,None> MapBothTaskObserver<TI,TO,EI,EO>::onNext(TI value) {
+Task<Ack,None> MapBothTaskObserver<TI,TO,EI,EO>::onNext(const TI& value) {
     return successPredicate(value).template flatMapBoth<Ack,None>(
         [this](TO downstreamValue) -> Task<Ack,None> {
             return downstream->onNext(downstreamValue);
@@ -66,7 +66,7 @@ Task<Ack,None> MapBothTaskObserver<TI,TO,EI,EO>::onNext(TI value) {
 }
 
 template <class TI, class TO, class EI, class EO>
-Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onError(EI error) {
+Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onError(const EI& error) {
     if(!completed.test_and_set()) {
         return errorPredicate(error).template flatMapBoth<None,None>(
             [this](TO downstreamValue) -> Task<None,None> {

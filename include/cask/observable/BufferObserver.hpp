@@ -20,8 +20,8 @@ template <class T, class E>
 class BufferObserver final : public Observer<T,E> {
 public:
     BufferObserver(std::shared_ptr<Observer<BufferRef<T>,E>> downstream, unsigned int buffer_size);
-    Task<Ack,None> onNext(T value) override;
-    Task<None,None> onError(E error) override;
+    Task<Ack,None> onNext(const T& value) override;
+    Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
 private:
     std::shared_ptr<Observer<BufferRef<T>,E>> downstream;
@@ -40,7 +40,7 @@ BufferObserver<T,E>::BufferObserver(std::shared_ptr<Observer<BufferRef<T>,E>> do
 }
 
 template <class T, class E>
-Task<Ack,None> BufferObserver<T,E>::onNext(T value) {
+Task<Ack,None> BufferObserver<T,E>::onNext(const T& value) {
     buffer->emplace_back(value);
     if(buffer->size() == buffer_size) {
         auto downstreamTask = downstream->onNext(buffer);
@@ -53,7 +53,7 @@ Task<Ack,None> BufferObserver<T,E>::onNext(T value) {
 }
 
 template <class T, class E>
-Task<None,None> BufferObserver<T,E>::onError(E error) {
+Task<None,None> BufferObserver<T,E>::onError(const E& error) {
     return downstream->onError(error);
 }
 

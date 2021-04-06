@@ -19,8 +19,8 @@ template <class TI, class TO, class E>
 class MapObserver final : public Observer<TI,E> {
 public:
     MapObserver(std::function<TO(TI)> predicate, std::shared_ptr<Observer<TO,E>> downstream);
-    Task<Ack,None> onNext(TI value);
-    Task<None,None> onError(E error);
+    Task<Ack,None> onNext(const TI& value);
+    Task<None,None> onError(const E& error);
     Task<None,None> onComplete();
 private:
     std::function<TO(TI)> predicate;
@@ -35,12 +35,12 @@ MapObserver<TI,TO,E>::MapObserver(std::function<TO(TI)> predicate, std::shared_p
 {}
 
 template <class TI, class TO, class E>
-Task<Ack,None> MapObserver<TI,TO,E>::onNext(TI value) {
+Task<Ack,None> MapObserver<TI,TO,E>::onNext(const TI& value) {
     return downstream->onNext(predicate(value));
 }
 
 template <class TI, class TO, class E>
-Task<None,None> MapObserver<TI,TO,E>::onError(E error) {
+Task<None,None> MapObserver<TI,TO,E>::onError(const E& error) {
     return downstream->onError(error);
 }
 

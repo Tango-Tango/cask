@@ -22,8 +22,8 @@ public:
                     std::shared_ptr<Observer<TO,E>> downstream);
     
 
-    Task<Ack,None> onNext(TI value);
-    Task<None,None> onError(E value);
+    Task<Ack,None> onNext(const TI& value);
+    Task<None,None> onError(const E& value);
     Task<None,None> onComplete();
 private:
     std::function<ObservableRef<TO,E>(TI)> predicate;
@@ -42,7 +42,7 @@ FlatMapObserver<TI,TO,E>::FlatMapObserver(
 {}
 
 template <class TI, class TO, class E>
-Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(TI value) {
+Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(const TI& value) {
     return predicate(value)
         ->template mapBothTask<Ack,None>(
             [downstream = downstream](auto result) {
@@ -68,7 +68,7 @@ Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(TI value) {
 }
 
 template <class TI, class TO, class E>
-Task<None,None> FlatMapObserver<TI,TO,E>::onError(E error) {
+Task<None,None> FlatMapObserver<TI,TO,E>::onError(const E& error) {
     if(!completed.test_and_set()) {
         return downstream->onError(error);
     } else {

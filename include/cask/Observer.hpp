@@ -72,9 +72,9 @@ public:
      * @return A signal to the upstream observable that processing
      *         can continue or needs to stop.
      */
-    virtual Task<Ack,None> onNext(T value) = 0;
+    virtual Task<Ack,None> onNext(const T& value) = 0;
 
-    virtual Task<None,None> onError(E error) = 0;
+    virtual Task<None,None> onError(const E& error) = 0;
 
     /**
      * Handle stream close because all events have been processed.

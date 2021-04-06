@@ -19,8 +19,8 @@ template <class T, class EI, class EO>
 class MapErrorObserver final : public Observer<T,EI> {
 public:
     MapErrorObserver(std::function<EO(EI)> predicate, std::shared_ptr<Observer<T,EO>> downstream);
-    Task<Ack,None> onNext(T value);
-    Task<None,None> onError(EI error);
+    Task<Ack,None> onNext(const T& value);
+    Task<None,None> onError(const EI& error);
     Task<None,None> onComplete();
 private:
     std::function<EO(EI)> predicate;
@@ -35,12 +35,12 @@ MapErrorObserver<T,EI,EO>::MapErrorObserver(std::function<EO(EI)> predicate, std
 {}
 
 template <class T, class EI, class EO>
-Task<Ack,None> MapErrorObserver<T,EI,EO>::onNext(T value) {
+Task<Ack,None> MapErrorObserver<T,EI,EO>::onNext(const T& value) {
     return downstream->onNext(value);
 }
 
 template <class T, class EI, class EO>
-Task<None,None> MapErrorObserver<T,EI,EO>::onError(EI error) {
+Task<None,None> MapErrorObserver<T,EI,EO>::onError(const EI& error) {
     EO transformed = predicate(error);
     return downstream->onError(transformed);
 }

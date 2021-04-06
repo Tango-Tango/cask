@@ -19,8 +19,8 @@ template <class T, class E>
 class FilterObserver final : public Observer<T,E> {
 public:
     FilterObserver(std::function<bool(T)> predicate, std::shared_ptr<Observer<T,E>> downstream);
-    Task<Ack,None> onNext(T value) override;
-    Task<None,None> onError(E error) override;
+    Task<Ack,None> onNext(const T& value) override;
+    Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
 private:
     std::function<bool(T)> predicate;
@@ -35,7 +35,7 @@ FilterObserver<T,E>::FilterObserver(std::function<bool(T)> predicate, std::share
 {}
 
 template <class T, class E>
-Task<Ack,None> FilterObserver<T,E>::onNext(T value) {
+Task<Ack,None> FilterObserver<T,E>::onNext(const T& value) {
     if(predicate(value)) {
         return downstream->onNext(value);
     } else {
@@ -44,7 +44,7 @@ Task<Ack,None> FilterObserver<T,E>::onNext(T value) {
 }
 
 template <class T, class E>
-Task<None,None> FilterObserver<T,E>::onError(E error) {
+Task<None,None> FilterObserver<T,E>::onError(const E& error) {
     return downstream->onError(error);
 }
 
