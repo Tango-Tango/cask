@@ -16,7 +16,7 @@ template <class T, class E>
 class BufferObservable final : public Observable<BufferRef<T>,E> {
 public:
     explicit BufferObservable(std::shared_ptr<const Observable<T,E>> upstream, unsigned int buffer_size);
-    CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<BufferRef<T>,E>> observer) const;
+    CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<BufferRef<T>,E>>& observer) const;
 private:
     std::shared_ptr<const Observable<T,E>> upstream;
     unsigned int buffer_size;
@@ -30,8 +30,8 @@ BufferObservable<T,E>::BufferObservable(std::shared_ptr<const Observable<T,E>> u
 
 template <class T, class E>
 CancelableRef BufferObservable<T,E>::subscribe(
-    std::shared_ptr<Scheduler> sched,
-    std::shared_ptr<Observer<BufferRef<T>,E>> observer) const
+    const std::shared_ptr<Scheduler>& sched,
+    const std::shared_ptr<Observer<BufferRef<T>,E>>& observer) const
 {
     auto bufferObserver = std::make_shared<BufferObserver<T,E>>(observer, buffer_size);
     return upstream->subscribe(sched, bufferObserver);

@@ -72,7 +72,7 @@ public:
      * @param predicate The function to evaluate.
      * @return An observable wrapping the given function.
      */
-    static ObservableRef<T,E> eval(std::function<T()> predicate);
+    static ObservableRef<T,E> eval(const std::function<T()>& predicate);
 
     /**
      * Create an observable which, upon subscription, defers that
@@ -82,7 +82,7 @@ public:
      * @param predicate The method to use for creating an observable.
      * @return An observable wrapping the given deferral function.
      */
-    static ObservableRef<T,E> defer(std::function<ObservableRef<T,E>()> predicate);
+    static ObservableRef<T,E> defer(const std::function<ObservableRef<T,E>()>& predicate);
 
     /**
      * Create an observable which, upon subscription, evaluates the
@@ -92,7 +92,7 @@ public:
      * @param predicate The method to use for creating a task.
      * @return An observable wrapping the given deferral function.
      */
-    static ObservableRef<T,E> deferTask(std::function<Task<T,E>()> predicate);
+    static ObservableRef<T,E> deferTask(const std::function<Task<T,E>()>& predicate);
 
     /**
      * Create and observable which repeatedly evaluates the given task and
@@ -101,7 +101,7 @@ public:
      * @return A new observable which will infinitely execute the given task
      *         until canceled or the observer stops the execution.
      */
-    static ObservableRef<T,E> repeatTask(Task<T,E> task);
+    static ObservableRef<T,E> repeatTask(const Task<T,E>& task);
 
     /**
      * Create an observable which evalutes the given task a single time and
@@ -109,7 +109,7 @@ public:
      * @param task The task to execute.
      * @return A new observable which will execute the give task a single time.
      */
-    static ObservableRef<T,E> fromTask(Task<T,E> task);
+    static ObservableRef<T,E> fromTask(const Task<T,E>& task);
 
     /**
      * Create an observable who emits each element of the given vector
@@ -129,7 +129,7 @@ public:
      * @param observer The observer to attach to the stream.
      * @return The handle which may be used to cancel computation on the stream.
      */
-    virtual CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const = 0;
+    virtual CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const = 0;
 
     /**
      * Buffer input up to the given size and emit the buffer downstream. At
@@ -139,7 +139,7 @@ public:
      * @param size The number of items to accumulate in the buffer.
      * @return An observable which emits buffered items.
      */
-    ObservableRef<BufferRef<T>,E> buffer(unsigned int size) const;
+    ObservableRef<BufferRef<T>,E> buffer(uint32_t size) const;
 
     /**
      * Transform each element of the stream using the provided transforming predicate
@@ -149,7 +149,7 @@ public:
      * @return A new observable which transforms each element of the stream.
      */
     template <class T2>
-    ObservableRef<T2,E> map(std::function<T2(T)> predicate) const;
+    ObservableRef<T2,E> map(const std::function<T2(const T&)>& predicate) const;
 
     /**
      * Transform each error of the stream using the provided transforming predicate
@@ -159,7 +159,7 @@ public:
      * @return A new observable which transforms each error of the stream.
      */
     template <class E2>
-    ObservableRef<T,E2> mapError(std::function<E2(E)> predicate) const;
+    ObservableRef<T,E2> mapError(const std::function<E2(const E&)>& predicate) const;
 
     /**
      * Transform both success and error values by return a Task which
@@ -186,8 +186,8 @@ public:
      */
     template <class T2, class E2>
     std::shared_ptr<Observable<T2,E2>> mapBothTask(
-        std::function<Task<T2,E2>(T)> successPredicate,
-        std::function<Task<T2,E2>(E)> errorPredicate
+        const std::function<Task<T2,E2>(const T&)>& successPredicate,
+        const std::function<Task<T2,E2>(const E&)>& errorPredicate
     ) const;
 
     /**
@@ -199,7 +199,7 @@ public:
      * @return A new observable which transforms each element of the stream.
      */
     template <class T2>
-    ObservableRef<T2,E> mapTask(std::function<Task<T2,E>(T)> predicate) const;
+    ObservableRef<T2,E> mapTask(const std::function<Task<T2,E>(const T&)>& predicate) const;
 
     /**
      * For each element in stream emit a possible infinite series of elements
@@ -213,7 +213,7 @@ public:
      * @return An observable which applies the given transform to each element of the stream.
      */
     template <class T2>
-    ObservableRef<T2,E> flatMap(std::function<ObservableRef<T2,E>(T)> predicate) const;
+    ObservableRef<T2,E> flatMap(const std::function<ObservableRef<T2,E>(const T&)>& predicate) const;
 
     /**
      * Given a nested observable (an observable who emits other observables)
@@ -241,7 +241,7 @@ public:
      * @return An observerable who emits only values which match the given
      *         predicate function.
      */
-    ObservableRef<T,E> filter(std::function<bool(T)> predicate) const;
+    ObservableRef<T,E> filter(const std::function<bool(const T&)>& predicate) const;
 
     /**
      * Emit the last value of this stream seen. Note that if the stream of
@@ -273,7 +273,7 @@ public:
      * @param amount The number of elements to accumulate frm the stream.
      * @return A vector containing the accumulated results.
      */
-    Task<std::vector<T>,E> take(unsigned int amount) const;
+    Task<std::vector<T>,E> take(uint32_t amount) const;
 
     /**
      * Consume from the upstream observable and emit downstream while the
@@ -288,7 +288,7 @@ public:
      * @return An observable that emits only the first elements matching the given
      *         predicate function.
      */
-    ObservableRef<T,E> takeWhile(std::function<bool(T)> predicate) const;
+    ObservableRef<T,E> takeWhile(const std::function<bool(const T&)>& predicate) const;
 
     /**
      * Consume from the upstream observable and emit downstream while the
@@ -302,7 +302,7 @@ public:
      * @return An observable that emits only the first elements matching the given
      *         predicate function.
      */
-    ObservableRef<T,E> takeWhileInclusive(std::function<bool(T)> predicate) const;
+    ObservableRef<T,E> takeWhileInclusive(const std::function<bool(const T&)>& predicate) const;
 
     /**
      * Ensure the given task will be run when this observer completes on success,
@@ -359,27 +359,27 @@ ObservableRef<T,E> Observable<T,E>::empty() {
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::eval(std::function<T()> predicate) {
+ObservableRef<T,E> Observable<T,E>::eval(const std::function<T()>& predicate) {
     return std::make_shared<observable::EvalObservable<T,E>>(predicate);
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::defer(std::function<ObservableRef<T,E>()> predicate) {
+ObservableRef<T,E> Observable<T,E>::defer(const std::function<ObservableRef<T,E>()>& predicate) {
     return std::make_shared<observable::DeferObservable<T,E>>(predicate);
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::deferTask(std::function<Task<T,E>()> predicate) {
+ObservableRef<T,E> Observable<T,E>::deferTask(const std::function<Task<T,E>()>& predicate) {
     return std::make_shared<observable::DeferTaskObservable<T,E>>(predicate);
 }
 
 template <class T, class E>
-std::shared_ptr<Observable<T,E>> Observable<T,E>::repeatTask(Task<T,E> task) {
+std::shared_ptr<Observable<T,E>> Observable<T,E>::repeatTask(const Task<T,E>& task) {
     return std::make_shared<observable::RepeatTaskObservable<T,E>>(task);
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::fromTask(Task<T,E> task) {
+ObservableRef<T,E> Observable<T,E>::fromTask(const Task<T,E>& task) {
     return deferTask([task](){ return task; });
 }
 
@@ -389,21 +389,21 @@ ObservableRef<T,E> Observable<T,E>::fromVector(const std::vector<T>& vector) {
 }
 
 template <class T, class E>
-std::shared_ptr<Observable<BufferRef<T>,E>> Observable<T,E>::buffer(unsigned int size) const {
+std::shared_ptr<Observable<BufferRef<T>,E>> Observable<T,E>::buffer(uint32_t size) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::BufferObservable<T,E>>(self, size);
 }
 
 template <class T, class E>
 template <class T2>
-std::shared_ptr<Observable<T2,E>> Observable<T,E>::map(std::function<T2(T)> predicate) const {
+std::shared_ptr<Observable<T2,E>> Observable<T,E>::map(const std::function<T2(const T&)>& predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::MapObservable<T,T2,E>>(self, predicate);
 }
 
 template <class T, class E>
 template <class E2>
-std::shared_ptr<Observable<T,E2>> Observable<T,E>::mapError(std::function<E2(E)> predicate) const {
+std::shared_ptr<Observable<T,E2>> Observable<T,E>::mapError(const std::function<E2(const E&)>& predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::MapErrorObservable<T,E,E2>>(self, predicate);
 }
@@ -411,8 +411,8 @@ std::shared_ptr<Observable<T,E2>> Observable<T,E>::mapError(std::function<E2(E)>
 template <class T, class E>
 template <class T2, class E2>
 std::shared_ptr<Observable<T2,E2>> Observable<T,E>::mapBothTask(
-    std::function<Task<T2,E2>(T)> successPredicate,
-    std::function<Task<T2,E2>(E)> errorPredicate
+    const std::function<Task<T2,E2>(const T&)>& successPredicate,
+    const std::function<Task<T2,E2>(const E&)>& errorPredicate
 ) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::MapBothTaskObservable<T,T2,E,E2>>(self, successPredicate, errorPredicate);
@@ -420,14 +420,14 @@ std::shared_ptr<Observable<T2,E2>> Observable<T,E>::mapBothTask(
 
 template <class T, class E>
 template <class T2>
-std::shared_ptr<Observable<T2,E>> Observable<T,E>::mapTask(std::function<Task<T2,E>(T)> predicate) const {
+std::shared_ptr<Observable<T2,E>> Observable<T,E>::mapTask(const std::function<Task<T2,E>(const T&)>& predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::MapTaskObservable<T,T2,E>>(self, predicate);
 }
 
 template <class T, class E>
 template <class T2>
-ObservableRef<T2,E> Observable<T,E>::flatMap(std::function<ObservableRef<T2,E>(T)> predicate) const {
+ObservableRef<T2,E> Observable<T,E>::flatMap(const std::function<ObservableRef<T2,E>(const T&)>& predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::FlatMapObservable<T,T2,E>>(self, predicate);
 }
@@ -441,7 +441,7 @@ ObservableRef<T2,E> Observable<T,E>::flatten() const {
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::filter(std::function<bool(T)> predicate) const {
+ObservableRef<T,E> Observable<T,E>::filter(const std::function<bool(const T&)>& predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::FilterObservable<T,E>>(self, predicate);
 }
@@ -468,7 +468,7 @@ Task<None,E> Observable<T,E>::completed() const {
 }
 
 template <class T, class E>
-Task<std::vector<T>,E> Observable<T,E>::take(unsigned int amount) const {
+Task<std::vector<T>,E> Observable<T,E>::take(uint32_t amount) const {
     if(amount == 0) {
         return Task<std::vector<T>,E>::pure(std::vector<T>());
     } else {
@@ -488,13 +488,13 @@ Task<std::vector<T>,E> Observable<T,E>::take(unsigned int amount) const {
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::takeWhile(std::function<bool(T)> predicate) const {
+ObservableRef<T,E> Observable<T,E>::takeWhile(const std::function<bool(const T&)>& predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::TakeWhileObservable<T,E>>(self, predicate, false);
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::takeWhileInclusive(std::function<bool(T)> predicate) const {
+ObservableRef<T,E> Observable<T,E>::takeWhileInclusive(const std::function<bool(const T&)>& predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::TakeWhileObservable<T,E>>(self, predicate, true);
 }

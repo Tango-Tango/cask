@@ -15,7 +15,7 @@ template <class T, class E>
 class DeferTaskObservable final : public Observable<T,E> {
 public:
     explicit DeferTaskObservable(std::function<Task<T,E>()> predicate);
-    CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
+    CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const;
 private:
     std::function<Task<T,E>()> predicate;
 };
@@ -27,8 +27,8 @@ DeferTaskObservable<T,E>::DeferTaskObservable(std::function<Task<T,E>()> predica
 
 template <class T, class E>
 CancelableRef DeferTaskObservable<T,E>::subscribe(
-    std::shared_ptr<Scheduler> sched,
-    std::shared_ptr<Observer<T,E>> observer) const
+    const std::shared_ptr<Scheduler>& sched,
+    const std::shared_ptr<Observer<T,E>>& observer) const
 {
     try {
         return predicate()

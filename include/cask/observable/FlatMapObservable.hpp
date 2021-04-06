@@ -19,7 +19,7 @@ template <class TI, class TO, class E>
 class FlatMapObservable final : public Observable<TO,E> {
 public:
     FlatMapObservable(std::shared_ptr<const Observable<TI,E>> upstream, std::function<ObservableRef<TO,E>(TI)> predicate);
-    CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<TO,E>> observer) const;
+    CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const;
 private:
     std::shared_ptr<const Observable<TI,E>> upstream;
     std::function<ObservableRef<TO,E>(TI)> predicate;
@@ -36,7 +36,7 @@ FlatMapObservable<TI,TO,E>::FlatMapObservable(
 {}
 
 template <class TI, class TO, class E>
-CancelableRef FlatMapObservable<TI,TO,E>::subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<TO,E>> observer) const {
+CancelableRef FlatMapObservable<TI,TO,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const {
     auto flatMapObserver = std::make_shared<FlatMapObserver<TI,TO,E>>(predicate, observer);
     return upstream->subscribe(sched, flatMapObserver);
 }

@@ -19,7 +19,7 @@ template <class T, class E>
 class FilterObservable final : public Observable<T,E> {
 public:
     FilterObservable(std::shared_ptr<const Observable<T,E>> upstream, std::function<bool(T)> predicate);
-    CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const override;
+    CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     std::shared_ptr<const Observable<T,E>> upstream;
     std::function<bool(T)> predicate;
@@ -32,7 +32,7 @@ FilterObservable<T,E>::FilterObservable(std::shared_ptr<const Observable<T,E>> u
 {}
 
 template <class T, class E>
-CancelableRef FilterObservable<T,E>::subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const {
+CancelableRef FilterObservable<T,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const {
     auto filterObserver = std::make_shared<FilterObserver<T,E>>(predicate, observer);
     return upstream->subscribe(sched, filterObserver);
 }
