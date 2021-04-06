@@ -54,7 +54,7 @@ void Scheduler::submit(const std::function<void()>& task) {
     dataInQueue.notify_one();
 }
 
-void Scheduler::submitAfter(int milliseconds, const std::function<void()>& task) {
+void Scheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
     int64_t executionTick = ticks.load() + milliseconds;
     {
         std::lock_guard guard(timerMutex);
