@@ -18,10 +18,10 @@ namespace cask::observable {
 template <class T, class EI, class EO>
 class MapErrorObserver final : public Observer<T,EI> {
 public:
-    MapErrorObserver(std::function<EO(EI)> predicate, std::shared_ptr<Observer<T,EO>> downstream);
-    Task<Ack,None> onNext(T value);
-    Task<None,None> onError(EI error);
-    Task<None,None> onComplete();
+    MapErrorObserver(const std::function<EO(const EI&)>& predicate, const std::shared_ptr<Observer<T,EO>>& downstream);
+    Task<Ack,None> onNext(const T& value) override;
+    Task<None,None> onError(const EI& error) override;
+    Task<None,None> onComplete() override;
 private:
     std::function<EO(EI)> predicate;
     std::shared_ptr<Observer<T,EO>> downstream;
@@ -29,18 +29,18 @@ private:
 
 
 template <class T, class EI, class EO>
-MapErrorObserver<T,EI,EO>::MapErrorObserver(std::function<EO(EI)> predicate, std::shared_ptr<Observer<T,EO>> downstream)
+MapErrorObserver<T,EI,EO>::MapErrorObserver(const std::function<EO(const EI&)>& predicate, const std::shared_ptr<Observer<T,EO>>& downstream)
     : predicate(predicate)
     , downstream(downstream)
 {}
 
 template <class T, class EI, class EO>
-Task<Ack,None> MapErrorObserver<T,EI,EO>::onNext(T value) {
+Task<Ack,None> MapErrorObserver<T,EI,EO>::onNext(const T& value) {
     return downstream->onNext(value);
 }
 
 template <class T, class EI, class EO>
-Task<None,None> MapErrorObserver<T,EI,EO>::onError(EI error) {
+Task<None,None> MapErrorObserver<T,EI,EO>::onError(const EI& error) {
     EO transformed = predicate(error);
     return downstream->onError(transformed);
 }

@@ -276,7 +276,7 @@ TEST(Task, NeverRaceWith) {
 TEST(Task, RecurseWithoutExploding) {
     auto sched = Scheduler::global();
 
-    std::function<Task<int>(int)> recurse = [&recurse](auto counter) {
+    std::function<Task<int>(const int&)> recurse = [&recurse](auto counter) {
         return Task<int>::defer([counter, &recurse]() {
             char yuge[8192];
             memset(yuge, 0, 8192);

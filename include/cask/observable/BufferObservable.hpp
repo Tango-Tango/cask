@@ -15,23 +15,23 @@ namespace cask::observable {
 template <class T, class E>
 class BufferObservable final : public Observable<BufferRef<T>,E> {
 public:
-    explicit BufferObservable(std::shared_ptr<const Observable<T,E>> upstream, unsigned int buffer_size);
-    CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<BufferRef<T>,E>> observer) const;
+    explicit BufferObservable(const std::shared_ptr<const Observable<T,E>>& upstream, uint32_t buffer_size);
+    CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<BufferRef<T>,E>>& observer) const override;
 private:
     std::shared_ptr<const Observable<T,E>> upstream;
-    unsigned int buffer_size;
+    uint32_t buffer_size;
 };
 
 template <class T, class E>
-BufferObservable<T,E>::BufferObservable(std::shared_ptr<const Observable<T,E>> upstream, unsigned int buffer_size)
+BufferObservable<T,E>::BufferObservable(const std::shared_ptr<const Observable<T,E>>& upstream, uint32_t buffer_size)
     : upstream(upstream)
     , buffer_size(buffer_size)
 {}
 
 template <class T, class E>
 CancelableRef BufferObservable<T,E>::subscribe(
-    std::shared_ptr<Scheduler> sched,
-    std::shared_ptr<Observer<BufferRef<T>,E>> observer) const
+    const std::shared_ptr<Scheduler>& sched,
+    const std::shared_ptr<Observer<BufferRef<T>,E>>& observer) const
 {
     auto bufferObserver = std::make_shared<BufferObserver<T,E>>(observer, buffer_size);
     return upstream->subscribe(sched, bufferObserver);

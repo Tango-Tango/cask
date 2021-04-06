@@ -63,7 +63,7 @@ public:
      *                     submitting to the pool
      * @param task The task the submit after the wait time has elapsed.
      */
-    void submitAfter(int milliseconds, const std::function<void()>& task);
+    void submitAfter(int64_t milliseconds, const std::function<void()>& task);
 private:
     bool running;
 
@@ -71,7 +71,7 @@ private:
     std::condition_variable dataInQueue;
     std::queue<std::function<void()>> readyQueue;
     std::mutex timerMutex;
-    std::map<long,std::vector<std::function<void()>>> timers;
+    std::map<int64_t,std::vector<std::function<void()>>> timers;
     std::vector<std::thread> runThreads;
     std::thread timerThread;
     std::atomic_long ticks;

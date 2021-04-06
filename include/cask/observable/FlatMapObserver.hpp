@@ -18,13 +18,13 @@ namespace cask::observable {
 template <class TI, class TO, class E>
 class FlatMapObserver final : public Observer<TI,E> {
 public:
-    FlatMapObserver(std::function<ObservableRef<TO,E>(TI)> predicate,
-                    std::shared_ptr<Observer<TO,E>> downstream);
+    FlatMapObserver(const std::function<ObservableRef<TO,E>(const TI&)>& predicate,
+                    const std::shared_ptr<Observer<TO,E>>& downstream);
     
 
-    Task<Ack,None> onNext(TI value);
-    Task<None,None> onError(E value);
-    Task<None,None> onComplete();
+    Task<Ack,None> onNext(const TI& value) override;
+    Task<None,None> onError(const E& value) override;
+    Task<None,None> onComplete() override;
 private:
     std::function<ObservableRef<TO,E>(TI)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
@@ -34,15 +34,15 @@ private:
 
 template <class TI, class TO, class E>
 FlatMapObserver<TI,TO,E>::FlatMapObserver(
-    std::function<ObservableRef<TO,E>(TI)> predicate,
-    std::shared_ptr<Observer<TO,E>> downstream)
+    const std::function<ObservableRef<TO,E>(const TI&)>& predicate,
+    const std::shared_ptr<Observer<TO,E>>& downstream)
     : predicate(predicate)
     , downstream(downstream)
     , completed(false)
 {}
 
 template <class TI, class TO, class E>
-Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(TI value) {
+Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(const TI& value) {
     return predicate(value)
         ->template mapBothTask<Ack,None>(
             [downstream = downstream](auto result) {
@@ -68,7 +68,7 @@ Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(TI value) {
 }
 
 template <class TI, class TO, class E>
-Task<None,None> FlatMapObserver<TI,TO,E>::onError(E error) {
+Task<None,None> FlatMapObserver<TI,TO,E>::onError(const E& error) {
     if(!completed.test_and_set()) {
         return downstream->onError(error);
     } else {

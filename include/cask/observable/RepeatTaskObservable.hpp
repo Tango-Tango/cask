@@ -18,19 +18,19 @@ namespace cask::observable {
 template <class T, class E>
 class RepeatTaskObservable final : public Observable<T,E> {
 public: 
-    explicit RepeatTaskObservable(Task<T,E> task);
-    CancelableRef subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const;
+    explicit RepeatTaskObservable(const Task<T,E>& task);
+    CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     Task<T,E> task;
 };
 
 template <class T, class E>
-RepeatTaskObservable<T,E>::RepeatTaskObservable(Task<T,E> task)
+RepeatTaskObservable<T,E>::RepeatTaskObservable(const Task<T,E>& task)
     : task(task)
 {}
 
 template <class T, class E>
-CancelableRef RepeatTaskObservable<T,E>::subscribe(std::shared_ptr<Scheduler> sched, std::shared_ptr<Observer<T,E>> observer) const {
+CancelableRef RepeatTaskObservable<T,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const {
     std::function<Task<Ack,None>(T)> pushToObserver =
         [observer = observer](T value) -> Task<Ack,None> {
             return observer->onNext(value);

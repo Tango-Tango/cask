@@ -20,24 +20,24 @@ template <class T, class E>
 class TakeWhileObserver final : public Observer<T,E> {
 public:
     TakeWhileObserver(
-        ObserverRef<T,E> downstream,
-        std::function<bool(T)> predicate,
+        const ObserverRef<T,E>& downstream,
+        const std::function<bool(const T&)>& predicate,
         bool inclusive
     );
-    Task<Ack,None> onNext(T value);
-    Task<None,None> onError(E error);
-    Task<None,None> onComplete();
+    Task<Ack,None> onNext(const T& value) override;
+    Task<None,None> onError(const E& error) override;
+    Task<None,None> onComplete() override;
 private:
     ObserverRef<T,E> downstream;
-    std::function<bool(T)> predicate;
+    std::function<bool(const T&)> predicate;
     bool inclusive;
     std::atomic_flag completed;
 };
 
 template <class T, class E>
 TakeWhileObserver<T,E>::TakeWhileObserver(
-    ObserverRef<T,E> downstream,
-    std::function<bool(T)> predicate,
+    const ObserverRef<T,E>& downstream,
+    const std::function<bool(const T&)>& predicate,
     bool inclusive
 )
     : downstream(downstream)
@@ -47,7 +47,7 @@ TakeWhileObserver<T,E>::TakeWhileObserver(
 {}
 
 template <class T, class E>
-Task<Ack,None> TakeWhileObserver<T,E>::onNext(T value) {
+Task<Ack,None> TakeWhileObserver<T,E>::onNext(const T& value) {
     if(predicate(value)) {
         return downstream->onNext(value);
     } else {
@@ -68,7 +68,7 @@ Task<Ack,None> TakeWhileObserver<T,E>::onNext(T value) {
 }
 
 template <class T, class E>
-Task<None,None> TakeWhileObserver<T,E>::onError(E error) {
+Task<None,None> TakeWhileObserver<T,E>::onError(const E& error) {
     if(!completed.test_and_set()) {
         downstream->onError(error);
     }

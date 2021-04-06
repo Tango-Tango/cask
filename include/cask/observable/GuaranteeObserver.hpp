@@ -19,10 +19,10 @@ namespace cask::observable {
 template <class T, class E>
 class GuaranteeObserver final : public Observer<T,E> {
 public:
-    GuaranteeObserver(std::shared_ptr<Observer<T,E>> downstream, const Task<None,None>& task);
-    Task<Ack,None> onNext(T value);
-    Task<None,None> onError(E error);
-    Task<None,None> onComplete();
+    GuaranteeObserver(const std::shared_ptr<Observer<T,E>>& downstream, const Task<None,None>& task);
+    Task<Ack,None> onNext(const T& value) override;
+    Task<None,None> onError(const E& error) override;
+    Task<None,None> onComplete() override;
     Task<None,None> onCancel();
 
 private:
@@ -33,19 +33,19 @@ private:
 };
 
 template <class T, class E>
-GuaranteeObserver<T,E>::GuaranteeObserver(std::shared_ptr<Observer<T,E>> downstream, const Task<None,None>& task)
+GuaranteeObserver<T,E>::GuaranteeObserver(const std::shared_ptr<Observer<T,E>>& downstream, const Task<None,None>& task)
     : downstream(downstream)
     , task(task)
     , completed(false)
 {}
 
 template <class T, class E>
-Task<Ack,None> GuaranteeObserver<T,E>::onNext(T value) {
+Task<Ack,None> GuaranteeObserver<T,E>::onNext(const T& value) {
     return downstream->onNext(value);
 }
 
 template <class T, class E>
-Task<None,None> GuaranteeObserver<T,E>::onError(E error) {
+Task<None,None> GuaranteeObserver<T,E>::onError(const E& error) {
     if(!completed.test_and_set()) {
         return downstream->onError(error)
             .template flatMap<None>([task = task](auto) {

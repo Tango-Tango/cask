@@ -19,25 +19,25 @@ namespace cask::observable {
 template <class T, class E>
 class TakeObserver final : public Observer<T,E> {
 public:
-    TakeObserver(unsigned int amount, std::weak_ptr<Promise<std::vector<T>,E>> promise);
-    Task<Ack,None> onNext(T value);
-    Task<None,None> onError(E error);
-    Task<None,None> onComplete();
+    TakeObserver(uint32_t amount, const std::weak_ptr<Promise<std::vector<T>,E>>& promise);
+    Task<Ack,None> onNext(const T& value) override;
+    Task<None,None> onError(const E& error) override;
+    Task<None,None> onComplete() override;
 private:
-    int remaining;
+    uint32_t remaining;
     std::vector<T> entries;
     std::weak_ptr<Promise<std::vector<T>,E>> promise;
 };
 
 template <class T, class E>
-TakeObserver<T,E>::TakeObserver(unsigned int amount, std::weak_ptr<Promise<std::vector<T>,E>> promise)
+TakeObserver<T,E>::TakeObserver(uint32_t amount, const std::weak_ptr<Promise<std::vector<T>,E>>& promise)
     : remaining(amount)
     , entries()
     , promise(promise)
 {}
 
 template <class T, class E>
-Task<Ack,None> TakeObserver<T,E>::onNext(T value) {
+Task<Ack,None> TakeObserver<T,E>::onNext(const T& value) {
     entries.push_back(value);
     remaining -= 1;
 
@@ -52,7 +52,7 @@ Task<Ack,None> TakeObserver<T,E>::onNext(T value) {
 }
 
 template <class T, class E>
-Task<None,None> TakeObserver<T,E>::onError(E error) {
+Task<None,None> TakeObserver<T,E>::onError(const E& error) {
     if(auto promiseLock = promise.lock()) {
         promiseLock->error(error);
     }
