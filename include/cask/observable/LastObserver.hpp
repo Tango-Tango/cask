@@ -20,18 +20,18 @@ namespace cask::observable {
 template <class T, class E>
 class LastObserver final : public Observer<T,E> {
 public:
-    explicit LastObserver(std::weak_ptr<Promise<std::optional<T>,E>> promise);
+    explicit LastObserver(const std::weak_ptr<Promise<std::optional<T>,E>>& promise);
 
-    Task<Ack,None> onNext(const T& value);
-    Task<None,None> onError(const E& error);
-    Task<None,None> onComplete();
+    Task<Ack,None> onNext(const T& value) override;
+    Task<None,None> onError(const E& error) override;
+    Task<None,None> onComplete() override;
 private:
     std::optional<T> lastValue;
     std::weak_ptr<Promise<std::optional<T>,E>> promise;
 };
 
 template <class T, class E>
-LastObserver<T,E>::LastObserver(std::weak_ptr<Promise<std::optional<T>,E>> promise)
+LastObserver<T,E>::LastObserver(const std::weak_ptr<Promise<std::optional<T>,E>>& promise)
     : lastValue()
     , promise(promise)
 {}

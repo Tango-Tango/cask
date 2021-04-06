@@ -19,17 +19,17 @@ template <class TI, class TO, class EI, class EO>
 class MapBothTaskObserver final : public Observer<TI,EI> {
 public:
     MapBothTaskObserver(
-        std::function<Task<TO,EO>(TI)> successPredicate,
-        std::function<Task<TO,EO>(EI)> errorPredicate,
-        std::shared_ptr<Observer<TO,EO>> downstream
+        const std::function<Task<TO,EO>(const TI&)>& successPredicate,
+        const std::function<Task<TO,EO>(const EI&)>& errorPredicate,
+        const std::shared_ptr<Observer<TO,EO>>& downstream
     );
 
-    Task<Ack,None> onNext(const TI& value);
-    Task<None,None> onError(const EI& error);
-    Task<None,None> onComplete();
+    Task<Ack,None> onNext(const TI& value) override;
+    Task<None,None> onError(const EI& error) override;
+    Task<None,None> onComplete() override;
 private:
-    std::function<Task<TO,EO>(TI)> successPredicate;
-    std::function<Task<TO,EO>(EI)> errorPredicate;
+    std::function<Task<TO,EO>(const TI&)> successPredicate;
+    std::function<Task<TO,EO>(const EI&)> errorPredicate;
     std::shared_ptr<Observer<TO,EO>> downstream;
     std::atomic_flag completed;
 };
@@ -37,9 +37,9 @@ private:
 
 template <class TI, class TO, class EI, class EO>
 MapBothTaskObserver<TI,TO,EI,EO>::MapBothTaskObserver(
-    std::function<Task<TO,EO>(TI)> successPredicate,
-    std::function<Task<TO,EO>(EI)> errorPredicate,
-    ObserverRef<TO,EO> downstream
+    const std::function<Task<TO,EO>(const TI&)>& successPredicate,
+    const std::function<Task<TO,EO>(const EI&)>& errorPredicate,
+    const ObserverRef<TO,EO>& downstream
 )
     : successPredicate(successPredicate)
     , errorPredicate(errorPredicate)

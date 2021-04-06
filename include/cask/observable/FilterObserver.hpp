@@ -18,18 +18,18 @@ namespace cask::observable {
 template <class T, class E>
 class FilterObserver final : public Observer<T,E> {
 public:
-    FilterObserver(std::function<bool(T)> predicate, std::shared_ptr<Observer<T,E>> downstream);
+    FilterObserver(const std::function<bool(const T&)>& predicate, const std::shared_ptr<Observer<T,E>>& downstream);
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
 private:
-    std::function<bool(T)> predicate;
+    std::function<bool(const T&)> predicate;
     std::shared_ptr<Observer<T,E>> downstream;
 };
 
 
 template <class T, class E>
-FilterObserver<T,E>::FilterObserver(std::function<bool(T)> predicate, std::shared_ptr<Observer<T,E>> downstream)
+FilterObserver<T,E>::FilterObserver(const std::function<bool(const T&)>& predicate, const std::shared_ptr<Observer<T,E>>& downstream)
     : predicate(predicate)
     , downstream(downstream)
 {}

@@ -18,18 +18,18 @@ namespace cask::observable {
 template <class TI, class TO, class E>
 class MapObserver final : public Observer<TI,E> {
 public:
-    MapObserver(std::function<TO(TI)> predicate, std::shared_ptr<Observer<TO,E>> downstream);
-    Task<Ack,None> onNext(const TI& value);
-    Task<None,None> onError(const E& error);
-    Task<None,None> onComplete();
+    MapObserver(const std::function<TO(const TI&)>& predicate, const std::shared_ptr<Observer<TO,E>>& downstream);
+    Task<Ack,None> onNext(const TI& value) override;
+    Task<None,None> onError(const E& error) override;
+    Task<None,None> onComplete() override;
 private:
-    std::function<TO(TI)> predicate;
+    std::function<TO(const TI&)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
 };
 
 
 template <class TI, class TO, class E>
-MapObserver<TI,TO,E>::MapObserver(std::function<TO(TI)> predicate, std::shared_ptr<Observer<TO,E>> downstream)
+MapObserver<TI,TO,E>::MapObserver(const std::function<TO(const TI&)>& predicate, const std::shared_ptr<Observer<TO,E>>& downstream)
     : predicate(predicate)
     , downstream(downstream)
 {}

@@ -19,18 +19,18 @@ namespace cask::observable {
 template <class T, class E>
 class TakeObserver final : public Observer<T,E> {
 public:
-    TakeObserver(unsigned int amount, std::weak_ptr<Promise<std::vector<T>,E>> promise);
-    Task<Ack,None> onNext(const T& value);
-    Task<None,None> onError(const E& error);
-    Task<None,None> onComplete();
+    TakeObserver(uint32_t amount, const std::weak_ptr<Promise<std::vector<T>,E>>& promise);
+    Task<Ack,None> onNext(const T& value) override;
+    Task<None,None> onError(const E& error) override;
+    Task<None,None> onComplete() override;
 private:
-    int remaining;
+    uint32_t remaining;
     std::vector<T> entries;
     std::weak_ptr<Promise<std::vector<T>,E>> promise;
 };
 
 template <class T, class E>
-TakeObserver<T,E>::TakeObserver(unsigned int amount, std::weak_ptr<Promise<std::vector<T>,E>> promise)
+TakeObserver<T,E>::TakeObserver(uint32_t amount, const std::weak_ptr<Promise<std::vector<T>,E>>& promise)
     : remaining(amount)
     , entries()
     , promise(promise)

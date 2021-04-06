@@ -18,18 +18,18 @@ namespace cask::observable {
 template <class TI, class TO, class E>
 class FlatMapObservable final : public Observable<TO,E> {
 public:
-    FlatMapObservable(std::shared_ptr<const Observable<TI,E>> upstream, std::function<ObservableRef<TO,E>(TI)> predicate);
-    CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const;
+    FlatMapObservable(const std::shared_ptr<const Observable<TI,E>>& upstream, const std::function<ObservableRef<TO,E>(const TI&)>& predicate);
+    CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const override;
 private:
     std::shared_ptr<const Observable<TI,E>> upstream;
-    std::function<ObservableRef<TO,E>(TI)> predicate;
+    std::function<ObservableRef<TO,E>(const TI&)> predicate;
 };
 
 
 template <class TI, class TO, class E>
 FlatMapObservable<TI,TO,E>::FlatMapObservable(
-    std::shared_ptr<const Observable<TI,E>> upstream,
-    std::function<ObservableRef<TO,E>(TI)> predicate
+    const std::shared_ptr<const Observable<TI,E>>& upstream,
+    const std::function<ObservableRef<TO,E>(const TI&)>& predicate
 )
     : upstream(upstream)
     , predicate(predicate)

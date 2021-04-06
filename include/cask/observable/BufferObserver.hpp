@@ -19,19 +19,19 @@ namespace cask::observable {
 template <class T, class E>
 class BufferObserver final : public Observer<T,E> {
 public:
-    BufferObserver(std::shared_ptr<Observer<BufferRef<T>,E>> downstream, unsigned int buffer_size);
+    BufferObserver(const std::shared_ptr<Observer<BufferRef<T>,E>>& downstream, uint32_t buffer_size);
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
 private:
     std::shared_ptr<Observer<BufferRef<T>,E>> downstream;
-    unsigned int buffer_size;
+    uint32_t buffer_size;
     BufferRef<T> buffer;
 };
 
 
 template <class T, class E>
-BufferObserver<T,E>::BufferObserver(std::shared_ptr<Observer<BufferRef<T>,E>> downstream, unsigned int buffer_size)
+BufferObserver<T,E>::BufferObserver(const std::shared_ptr<Observer<BufferRef<T>,E>>& downstream, uint32_t buffer_size)
     : downstream(downstream)
     , buffer_size(buffer_size)
     , buffer(std::make_shared<std::vector<T>>())
