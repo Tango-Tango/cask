@@ -12,7 +12,7 @@ public:
     Erased(Erased&& other) noexcept;
 
     template <class T>
-    explicit Erased(const T& value) noexcept;
+    Erased(const T& value) noexcept;
 
     Erased& operator=(const Erased& other) noexcept;
     Erased& operator=(Erased&& other) noexcept;

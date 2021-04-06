@@ -355,7 +355,7 @@ constexpr Task<T,E> Task<T,E>::defer(const std::function<Task<T,E>()>& predicate
                 if(isError) {
                     return trampoline::TrampolineOp::error(erased_task);
                 } else {
-                    auto task = std::any_cast<Task<T,E>>(erased_task);
+                    auto task = erased_task.template get<Task<T,E>>();
                     return task.op;
                 }
             }
@@ -367,18 +367,18 @@ template <class T, class E>
 constexpr Task<T,E> Task<T,E>::deferAction(const std::function<DeferredRef<T,E>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept {
     return Task<T,E>(
         trampoline::TrampolineOp::async([predicate](auto sched) {
-            auto promise = Promise<std::any,std::any>::create(sched);
+            auto promise = Promise<Erased,Erased>::create(sched);
             auto deferred = predicate(sched);
 
-            deferred->template chainDownstream<std::any,std::any>(promise, [](Either<T,E> result) {
+            deferred->template chainDownstream<Erased,Erased>(promise, [](Either<T,E> result) {
                 if(result.is_left()) {
-                    return Either<std::any,std::any>::left(result.get_left());
+                    return Either<Erased,Erased>::left(result.get_left());
                 } else {
-                    return Either<std::any,std::any>::right(result.get_right());
+                    return Either<Erased,Erased>::right(result.get_right());
                 }
             });
 
-            return Deferred<std::any,std::any>::forPromise(promise);
+            return Deferred<Erased,Erased>::forPromise(promise);
         })
     );
 }
@@ -387,18 +387,18 @@ template <class T, class E>
 constexpr Task<T,E> Task<T,E>::forPromise(const PromiseRef<T,E>& promise) noexcept {
     return Task<T,E>(
         trampoline::TrampolineOp::async([promise](auto sched) {
-            auto erasedPromise = Promise<std::any,std::any>::create(sched);
+            auto erasedPromise = Promise<Erased,Erased>::create(sched);
             auto deferred = Deferred<T,E>::forPromise(promise);
 
-            deferred->template chainDownstream<std::any,std::any>(erasedPromise, [](Either<T,E> result) {
+            deferred->template chainDownstream<Erased,Erased>(erasedPromise, [](Either<T,E> result) {
                 if(result.is_left()) {
-                    return Either<std::any,std::any>::left(result.get_left());
+                    return Either<Erased,Erased>::left(result.get_left());
                 } else {
-                    return Either<std::any,std::any>::right(result.get_right());
+                    return Either<Erased,Erased>::right(result.get_right());
                 }
             });
 
-            return Deferred<std::any,std::any>::forPromise(erasedPromise);
+            return Deferred<Erased,Erased>::forPromise(erasedPromise);
         })
     );
 }
@@ -407,8 +407,8 @@ template <class T, class E>
 constexpr Task<T,E> Task<T,E>::never() noexcept {
     return Task<T,E>(
         trampoline::TrampolineOp::async([](auto sched) constexpr {
-            auto promise = Promise<std::any,std::any>::create(sched);
-            return Deferred<std::any,std::any>::forPromise(promise);
+            auto promise = Promise<Erased,Erased>::create(sched);
+            return Deferred<Erased,Erased>::forPromise(promise);
         })
     );
 }
@@ -417,22 +417,22 @@ template <class T, class E>
 DeferredRef<T,E> Task<T,E>::run(const std::shared_ptr<Scheduler>& sched) const {
     auto result = trampoline::TrampolineRunLoop::execute(op,sched);
 
-    if(auto either = std::get_if<Either<std::any,std::any>>(&result)) {
+    if(auto either = std::get_if<Either<Erased,Erased>>(&result)) {
         if(either->is_left()) {
-            auto success = std::any_cast<T>(either->get_left());
+            auto success = either->get_left().template get<T>();
             return Deferred<T,E>::pure(success);
         } else {
-            auto error = std::any_cast<E>(either->get_right());
+            auto error = either->get_right().template get<E>();
             return Deferred<T,E>::raiseError(error);
         }
     } else {
-        auto deferred = std::get<DeferredRef<std::any,std::any>>(result);
+        auto deferred = std::get<DeferredRef<Erased,Erased>>(result);
         auto promise = Promise<T,E>::create(sched);
         deferred->template chainDownstream<T,E>(promise, [](auto result) mutable {
             if(result.is_left()) {
-                return Either<T,E>::left(std::any_cast<T>(result.get_left()));
+                return Either<T,E>::left(result.get_left().template get<T>());
             } else {
-                return Either<T,E>::right(std::any_cast<E>(result.get_right()));
+                return Either<T,E>::right(result.get_right().template get<E>());
             }
         });
         return Deferred<T,E>::forPromise(promise);
@@ -443,13 +443,13 @@ template <class T, class E>
 Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
     auto result = trampoline::TrampolineRunLoop::executeSync(op);
 
-    if(auto either = std::get_if<Either<std::any,std::any>>(&result)) {
+    if(auto either = std::get_if<Either<Erased,Erased>>(&result)) {
         if(either->is_left()) {
-            auto success = std::any_cast<T>(either->get_left());
+            auto success = either->get_left().template get<T>();
             auto syncResult = Either<T,E>::left(success);
             return Either<Either<T,E>,Task<T,E>>::left(syncResult);
         } else {
-            auto error = std::any_cast<E>(either->get_right());
+            auto error = either->get_right().template get<E>();
             auto syncResult = Either<T,E>::right(error);
             return Either<Either<T,E>,Task<T,E>>::left(syncResult);
         }
@@ -460,9 +460,9 @@ Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
             auto promise = Promise<T,E>::create(sched);
             deferred->template chainDownstream<T,E>(promise, [](auto result) mutable {
                 if(result.is_left()) {
-                    return Either<T,E>::left(std::any_cast<T>(result.get_left()));
+                    return Either<T,E>::left(result.get_left().template get<T>());
                 } else {
-                    return Either<T,E>::right(std::any_cast<E>(result.get_right()));
+                    return Either<T,E>::right(result.get_right().template get<E>());
                 }
             });
             return Deferred<T,E>::forPromise(promise);
@@ -491,7 +491,7 @@ constexpr Task<T2,E> Task<T,E>::map(const std::function<T2(const T&)>& predicate
                 if(isError) {
                     return trampoline::TrampolineOp::error(erased_input);
                 } else {
-                    auto input = std::any_cast<T>(erased_input);
+                    auto input = erased_input.template get<T>();
                     return trampoline::TrampolineOp::value(predicate(input));
                 }
             } catch(E& error) {
@@ -508,7 +508,7 @@ constexpr Task<T,E2> Task<T,E>::mapError(const std::function<E2(const E&)>& pred
         op->flatMap([predicate](auto erased_input, auto isError) {
             try {
                 if(isError) {
-                    auto input = std::any_cast<E>(erased_input);
+                    auto input = erased_input.template get<E>();
                     return trampoline::TrampolineOp::error(predicate(input));
                 } else {
                     return trampoline::TrampolineOp::value(erased_input);
@@ -530,7 +530,7 @@ constexpr Task<T2,E> Task<T,E>::flatMap(const std::function<Task<T2,E>(const T&)
                 if(isError) {
                     return trampoline::TrampolineOp::error(erased_input);
                 } else {
-                    auto input = std::any_cast<T>(erased_input);
+                    auto input = erased_input.template get<T>();
                     auto resultTask = predicate(input);
                     return resultTask.op;
                 }
@@ -548,7 +548,7 @@ constexpr Task<T,E2> Task<T,E>::flatMapError(const std::function<Task<T,E2>(cons
         op->flatMap([predicate](auto erased_input, auto isError) {
             try {
                 if(isError) {
-                    auto input = std::any_cast<E>(erased_input);
+                    auto input = erased_input.template get<E>();
                     auto resultTask = predicate(input);
                     return resultTask.op;
                 } else {
@@ -575,11 +575,11 @@ constexpr Task<T2,E2> Task<T,E>::flatMapBoth(
             op->flatMap([successPredicate, errorPredicate](auto erased_input, auto isError) {
                 try {
                     if(isError) {
-                        auto input = std::any_cast<E>(erased_input);
+                        auto input = erased_input.template get<E>();
                         auto resultTask = errorPredicate(input);
                         return resultTask.op;
                     } else {
-                        auto input = std::any_cast<T>(erased_input);
+                        auto input = erased_input.template get<T>();
                         auto resultTask = successPredicate(input);
                         return resultTask.op;
                     }
@@ -594,11 +594,11 @@ constexpr Task<T2,E2> Task<T,E>::flatMapBoth(
             op->flatMap([successPredicate, errorPredicate](auto erased_input, auto isError) {
                 try {
                     if(isError) {
-                        auto input = std::any_cast<E>(erased_input);
+                        auto input = erased_input.template get<E>();
                         auto resultTask = errorPredicate(input);
                         return resultTask.op;
                     } else {
-                        auto input = std::any_cast<T>(erased_input);
+                        auto input = erased_input.template get<T>();
                         auto resultTask = successPredicate(input);
                         return resultTask.op;
                     }
@@ -632,7 +632,7 @@ constexpr Task<T,E> Task<T,E>::onError(const std::function<void(const E&)>& hand
         op->flatMap([handler](auto input, auto isError) {
             try {
                 if(isError) {
-                    auto error = std::any_cast<E>(input);
+                    auto error = input.template get<E>();
                     handler(error);
                     return trampoline::TrampolineOp::error(input);
                 } else {
@@ -650,10 +650,10 @@ constexpr Task<Either<T,E>,E> Task<T,E>::materialize() const noexcept {
     return Task<Either<T,E>,E>(
         op->flatMap([](auto input, auto isError) constexpr {
             if(isError) {
-                auto error = std::any_cast<E>(input);
+                auto error = input.template get<E>();
                 return trampoline::TrampolineOp::value(Either<T,E>::right(error));
             } else {
-                auto value = std::any_cast<T>(input);
+                auto value = input.template get<T>();
                 return trampoline::TrampolineOp::value(Either<T,E>::left(value));
             }
         })
@@ -670,7 +670,7 @@ constexpr Task<T2,E> Task<T,E>::dematerialize() const noexcept {
             if(isError) {
                 return trampoline::TrampolineOp::error(input);
             } else {
-                auto value = std::any_cast<Either<T2,E>>(input);
+                auto value = input.template get<Either<T2,E>>();
                 if(value.is_left()) {
                     return trampoline::TrampolineOp::value(value.get_left());
                 } else {
@@ -685,21 +685,21 @@ template <class T, class E>
 constexpr Task<T,E> Task<T,E>::delay(uint32_t milliseconds) const noexcept {
     return Task<T,E>(
         trampoline::TrampolineOp::async([milliseconds, self = *this](auto sched) constexpr {
-            auto promise = Promise<std::any,std::any>::create(sched);
+            auto promise = Promise<Erased,Erased>::create(sched);
 
             sched->submitAfter(milliseconds, [sched, self, promise]() constexpr {
                 auto deferred = self.run(sched);
 
-                deferred->template chainDownstream<std::any,std::any>(promise, [](auto value) {
+                deferred->template chainDownstream<Erased,Erased>(promise, [](auto value) {
                     if(value.is_left()) {
-                        return Either<std::any,std::any>::left(value.get_left());
+                        return Either<Erased,Erased>::left(value.get_left());
                     } else {
-                        return Either<std::any,std::any>::right(value.get_right());
+                        return Either<Erased,Erased>::right(value.get_right());
                     }
                 });
             });
 
-            return Deferred<std::any,std::any>::forPromise(promise);
+            return Deferred<Erased,Erased>::forPromise(promise);
         })
     );
 }
@@ -710,7 +710,7 @@ constexpr Task<T,E> Task<T,E>::recover(const std::function<T(const E&)>& predica
         op->flatMap([predicate](auto erased_input, auto isError) {
             try {
                 if(isError) {
-                    auto input = std::any_cast<E>(erased_input);
+                    auto input = erased_input.template get<E>();
                     return trampoline::TrampolineOp::value(predicate(input));
                 } else {
                     return trampoline::TrampolineOp::value(erased_input);
@@ -738,32 +738,32 @@ template <class T2>
 constexpr Task<Either<T,T2>,E> Task<T,E>::raceWith(const Task<T2,E>& other) const noexcept {
     return Task<Either<T,T2>,E>(
         trampoline::TrampolineOp::async([left = *this, right = other](auto sched) constexpr {
-            auto promise = Promise<std::any,std::any>::create(sched);
+            auto promise = Promise<Erased,Erased>::create(sched);
 
             auto leftDeferred = left.run(sched);
             auto rightDeferred = right.run(sched);
 
-            leftDeferred->template chainDownstream<std::any,std::any>(promise, [](auto result) {
+            leftDeferred->template chainDownstream<Erased,Erased>(promise, [](auto result) {
                 if(result.is_left()) {
-                    return Either<std::any,std::any>::left(
+                    return Either<Erased,Erased>::left(
                         Either<T,T2>::left(result.get_left())
                     );
                 } else {
-                    return Either<std::any,std::any>::right(result.get_right());
+                    return Either<Erased,Erased>::right(result.get_right());
                 }
             });
 
-            rightDeferred->template chainDownstream<std::any,std::any>(promise, [](auto result) {
+            rightDeferred->template chainDownstream<Erased,Erased>(promise, [](auto result) {
                 if(result.is_left()) {
-                    return Either<std::any,std::any>::left(
+                    return Either<Erased,Erased>::left(
                         Either<T,T2>::right(result.get_left())
                     );
                 } else {
-                    return Either<std::any,std::any>::right(result.get_right());
+                    return Either<Erased,Erased>::right(result.get_right());
                 }
             });
 
-            return Deferred<std::any,std::any>::forPromise(promise);
+            return Deferred<Erased,Erased>::forPromise(promise);
         })
     );
 }

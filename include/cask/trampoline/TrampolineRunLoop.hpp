@@ -11,8 +11,8 @@
 namespace cask::trampoline {
 
 using TrampolineResult = std::variant<
-    Either<std::any,std::any>,
-    DeferredRef<std::any,std::any>
+    Either<Erased,Erased>,
+    DeferredRef<Erased,Erased>
 >;
 
 using OpResult = Either<
@@ -26,7 +26,7 @@ using AsyncBoundary = std::tuple<
 >;
 
 using TrampolineSyncResult = std::variant<
-    Either<std::any,std::any>,
+    Either<Erased,Erased>,
     AsyncBoundary
 >;
 
@@ -66,7 +66,7 @@ public:
      * @param sched The scheduler to execute the asynchronous operation on.
      * @return The result of the asynchronous evaluation.
      */
-    static DeferredRef<std::any,std::any> executeAsyncBoundary(const AsyncBoundary& boundary, const std::shared_ptr<Scheduler>& sched);
+    static DeferredRef<Erased,Erased> executeAsyncBoundary(const AsyncBoundary& boundary, const std::shared_ptr<Scheduler>& sched);
 };
 
 }

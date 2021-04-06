@@ -101,25 +101,25 @@ TrampolineOp& TrampolineOp::operator=(const TrampolineOp& other) {
     return *this;
 }
 
-std::shared_ptr<TrampolineOp> TrampolineOp::value(const std::any& v) noexcept {
-    auto constant = new ConstantData(Either<std::any,std::any>::left(v));
+std::shared_ptr<TrampolineOp> TrampolineOp::value(const Erased& v) noexcept {
+    auto constant = new ConstantData(Either<Erased,Erased>::left(v));
     return std::make_shared<TrampolineOp>(VALUE, constant);
 }
 
-std::shared_ptr<TrampolineOp> TrampolineOp::value(std::any&& v) noexcept {
-    auto constant = new ConstantData(Either<std::any,std::any>::left(v));
+std::shared_ptr<TrampolineOp> TrampolineOp::value(Erased&& v) noexcept {
+    auto constant = new ConstantData(Either<Erased,Erased>::left(v));
     return std::make_shared<TrampolineOp>(VALUE, constant);
 }
 
-std::shared_ptr<TrampolineOp> TrampolineOp::error(const std::any& e) noexcept {
-    return std::make_shared<TrampolineOp>(ERROR, new ConstantData(Either<std::any,std::any>::right(e)));
+std::shared_ptr<TrampolineOp> TrampolineOp::error(const Erased& e) noexcept {
+    return std::make_shared<TrampolineOp>(ERROR, new ConstantData(Either<Erased,Erased>::right(e)));
 }
 
-std::shared_ptr<TrampolineOp> TrampolineOp::async(const std::function<DeferredRef<std::any,std::any>(std::shared_ptr<Scheduler>)>& predicate) noexcept {
+std::shared_ptr<TrampolineOp> TrampolineOp::async(const std::function<DeferredRef<Erased,Erased>(std::shared_ptr<Scheduler>)>& predicate) noexcept {
     return std::make_shared<TrampolineOp>(ASYNC, new AsyncData(predicate));
 }
 
-std::shared_ptr<TrampolineOp> TrampolineOp::thunk(const std::function<std::any()>& thunk) noexcept {
+std::shared_ptr<TrampolineOp> TrampolineOp::thunk(const std::function<Erased()>& thunk) noexcept {
     return std::make_shared<TrampolineOp>(THUNK, new ThunkData(thunk));
 }
 

@@ -20,7 +20,7 @@ TrampolineResult TrampolineRunLoop::execute(
     if(auto boundary = std::get_if<AsyncBoundary>(&result)) {
         return executeAsyncBoundary(*boundary, sched);
     } else {
-        return std::get<Either<std::any,std::any>>(result);
+        return std::get<Either<Erased,Erased>>(result);
     }
 }
 
@@ -28,8 +28,8 @@ TrampolineSyncResult TrampolineRunLoop::executeSync(
     const std::shared_ptr<const TrampolineOp>& initialOp
 ) {
     std::shared_ptr<const TrampolineOp> op = initialOp;
-    std::any value;
-    std::any error;
+    Erased value;
+    Erased error;
     TrampolineOp::FlatMapPredicate nextOp;
 
     while(true) {
@@ -74,9 +74,9 @@ TrampolineSyncResult TrampolineRunLoop::executeSync(
 
         if(!nextOp) {
             if(error.has_value()) {
-                return Either<std::any,std::any>::right(error);
+                return Either<Erased,Erased>::right(error);
             } else {
-                return Either<std::any,std::any>::left(value);
+                return Either<Erased,Erased>::left(value);
             }
         } else if(op == nullptr) {
             if(error.has_value()) {
@@ -90,7 +90,7 @@ TrampolineSyncResult TrampolineRunLoop::executeSync(
     }
 }
 
-DeferredRef<std::any,std::any> TrampolineRunLoop::executeAsyncBoundary(
+DeferredRef<Erased,Erased> TrampolineRunLoop::executeAsyncBoundary(
     const AsyncBoundary& boundary,
     const std::shared_ptr<Scheduler>& sched
 ) {
@@ -98,14 +98,14 @@ DeferredRef<std::any,std::any> TrampolineRunLoop::executeAsyncBoundary(
     const TrampolineOp::FlatMapPredicate& nextOp = std::get<1>(boundary);
 
     const TrampolineOp::AsyncData* async = op->data.asyncData;
-    auto promise = Promise<std::any,std::any>::create(sched);
+    auto promise = Promise<Erased,Erased>::create(sched);
     auto deferred = (*async)(sched);
 
     if(nextOp) {
-        deferred->template chainDownstreamAsync<std::any,std::any>(
+        deferred->template chainDownstreamAsync<Erased,Erased>(
             promise,
             [nextOp, sched](auto value) {
-                std::any nextInput;
+                Erased nextInput;
 
                 if(value.is_left()) {
                     nextInput = value.get_left();
@@ -115,24 +115,24 @@ DeferredRef<std::any,std::any> TrampolineRunLoop::executeAsyncBoundary(
 
                 auto result = TrampolineRunLoop::execute(nextOp(nextInput, value.is_right()), sched);
 
-                if(auto syncResult = std::get_if<Either<std::any,std::any>>(&result)) {
+                if(auto syncResult = std::get_if<Either<Erased,Erased>>(&result)) {
                     if(syncResult->is_left()) {
-                        return Deferred<std::any,std::any>::pure(syncResult->get_left());
+                        return Deferred<Erased,Erased>::pure(syncResult->get_left());
                     } else {
-                        return Deferred<std::any,std::any>::raiseError(syncResult->get_right());
+                        return Deferred<Erased,Erased>::raiseError(syncResult->get_right());
                     }
                 } else {
-                    return std::get<DeferredRef<std::any,std::any>>(result);
+                    return std::get<DeferredRef<Erased,Erased>>(result);
                 }
             }
         );
     } else {
-        deferred->template chainDownstream<std::any,std::any>(
+        deferred->template chainDownstream<Erased,Erased>(
             promise,
             [](auto result) { return result; }
         );
     }
-    return Deferred<std::any,std::any>::forPromise(promise);
+    return Deferred<Erased,Erased>::forPromise(promise);
 }
 
 } // namespace cask::trampoline
