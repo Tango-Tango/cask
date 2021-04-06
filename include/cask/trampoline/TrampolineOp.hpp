@@ -40,7 +40,7 @@ enum OpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK};
 class TrampolineOp : public std::enable_shared_from_this<TrampolineOp> {
 public:
     using ConstantData = Either<std::any,std::any>;
-    using AsyncData = std::function<DeferredRef<std::any,std::any>(std::shared_ptr<Scheduler>)>;
+    using AsyncData = std::function<DeferredRef<std::any,std::any>(const std::shared_ptr<Scheduler>&)>;
     using ThunkData = std::function<std::any()>;
     using FlatMapInput = std::shared_ptr<TrampolineOp>;
     using FlatMapPredicate = std::function<std::shared_ptr<TrampolineOp>(const std::any&, bool)>;

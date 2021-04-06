@@ -97,7 +97,7 @@ public:
      * @param predicate The method to defer evalution to.
      * @return A task wrapping the given deferal function.
      */
-    constexpr static Task<T,E> deferAction(const std::function<DeferredRef<T,E>(std::shared_ptr<Scheduler>)>& predicate) noexcept;
+    constexpr static Task<T,E> deferAction(const std::function<DeferredRef<T,E>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept;
 
     /**
      * Create a task which wraps the given already created promise. The given
@@ -150,7 +150,7 @@ public:
      * @return A new `Task` representing the new output value.
      */
     template <class T2>
-    constexpr Task<T2,E> map(const std::function<T2(T)>& predicate) const noexcept;
+    constexpr Task<T2,E> map(const std::function<T2(const T&)>& predicate) const noexcept;
 
     /**
      * Transform the failed result of this task to a new error type.
@@ -159,7 +159,7 @@ public:
      * @return A new `Task` representing the new transformed error value.
      */
     template <class E2>
-    constexpr Task<T,E2> mapError(const std::function<E2(E)>& predicate) const noexcept;
+    constexpr Task<T,E2> mapError(const std::function<E2(const E&)>& predicate) const noexcept;
 
     /**
      * Transform the result of this task by appying the given function
@@ -174,7 +174,7 @@ public:
      * @return A new `Task` representing the new output value;
      */
     template <class T2>
-    constexpr Task<T2,E> flatMap(const std::function<Task<T2,E>(T)>& predicate) const noexcept;
+    constexpr Task<T2,E> flatMap(const std::function<Task<T2,E>(const T&)>& predicate) const noexcept;
 
     /**
      * Transform the error result of this task by appying the given function
@@ -188,7 +188,7 @@ public:
      * @return A new `Task` representing the new output value;
      */
     template <class E2>
-    constexpr Task<T,E2> flatMapError(const std::function<Task<T,E2>(E)>& predicate) const noexcept;
+    constexpr Task<T,E2> flatMapError(const std::function<Task<T,E2>(const E&)>& predicate) const noexcept;
 
     /**
      * Transform both the error and success types of this task using the given
@@ -203,8 +203,8 @@ public:
      */
     template <class T2, class E2>
     constexpr Task<T2,E2> flatMapBoth(
-        const std::function<Task<T2,E2>(T)>& successPredicate,
-        const std::function<Task<T2,E2>(E)>& errorPredicate
+        const std::function<Task<T2,E2>(const T&)>& successPredicate,
+        const std::function<Task<T2,E2>(const E&)>& errorPredicate
     ) const noexcept;
 
     /**
@@ -221,7 +221,7 @@ public:
      * 
      * @return A new `Task` which runs the given handler on errors.
      */
-    constexpr Task<T,E> onError(const std::function<void(E)>& handler) const noexcept;
+    constexpr Task<T,E> onError(const std::function<void(const E&)>& handler) const noexcept;
 
     /**
      * Materialize both values and errors into the success type so that they
@@ -263,7 +263,7 @@ public:
      * @param predicate The recovery method.
      * @return A new `Task` that will recover from errors.
      */
-    constexpr Task<T,E> recover(const std::function<T(E)>& predicate) const noexcept;
+    constexpr Task<T,E> recover(const std::function<T(const E&)>& predicate) const noexcept;
 
     /**
      * Restarts this task until the given predicate function returns true.
@@ -272,7 +272,7 @@ public:
      *                  task should be restarted.
      * @return A new `Task` which restarts as needed.
      */
-    constexpr Task<T,E> restartUntil(const std::function<bool(T)>& predicate) const noexcept;
+    constexpr Task<T,E> restartUntil(const std::function<bool(const T&)>& predicate) const noexcept;
 
     /**
      * Runs this task and the given other task concurrently and provides
@@ -364,7 +364,7 @@ constexpr Task<T,E> Task<T,E>::defer(const std::function<Task<T,E>()>& predicate
 }
 
 template <class T, class E>
-constexpr Task<T,E> Task<T,E>::deferAction(const std::function<DeferredRef<T,E>(std::shared_ptr<Scheduler>)>& predicate) noexcept {
+constexpr Task<T,E> Task<T,E>::deferAction(const std::function<DeferredRef<T,E>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept {
     return Task<T,E>(
         trampoline::TrampolineOp::async([predicate](auto sched) {
             auto promise = Promise<std::any,std::any>::create(sched);
@@ -484,7 +484,7 @@ constexpr Task<T,E> Task<T,E>::asyncBoundary() const noexcept {
 
 template <class T, class E>
 template <class T2>
-constexpr Task<T2,E> Task<T,E>::map(const std::function<T2(T)>& predicate) const noexcept {
+constexpr Task<T2,E> Task<T,E>::map(const std::function<T2(const T&)>& predicate) const noexcept {
     return Task<T2,E>(
         op->flatMap([predicate](auto erased_input, auto isError) {
             try {
@@ -503,7 +503,7 @@ constexpr Task<T2,E> Task<T,E>::map(const std::function<T2(T)>& predicate) const
 
 template <class T, class E>
 template <class E2>
-constexpr Task<T,E2> Task<T,E>::mapError(const std::function<E2(E)>& predicate) const noexcept {
+constexpr Task<T,E2> Task<T,E>::mapError(const std::function<E2(const E&)>& predicate) const noexcept {
     return Task<T,E2>(
         op->flatMap([predicate](auto erased_input, auto isError) {
             try {
@@ -523,7 +523,7 @@ constexpr Task<T,E2> Task<T,E>::mapError(const std::function<E2(E)>& predicate) 
 
 template <class T, class E>
 template <class T2>
-constexpr Task<T2,E> Task<T,E>::flatMap(const std::function<Task<T2,E>(T)>& predicate) const noexcept {
+constexpr Task<T2,E> Task<T,E>::flatMap(const std::function<Task<T2,E>(const T&)>& predicate) const noexcept {
     return Task<T2,E>(
         op->flatMap([predicate](auto erased_input, auto isError) {
             try {
@@ -543,7 +543,7 @@ constexpr Task<T2,E> Task<T,E>::flatMap(const std::function<Task<T2,E>(T)>& pred
 
 template <class T, class E>
 template <class E2>
-constexpr Task<T,E2> Task<T,E>::flatMapError(const std::function<Task<T,E2>(E)>& predicate) const noexcept {
+constexpr Task<T,E2> Task<T,E>::flatMapError(const std::function<Task<T,E2>(const E&)>& predicate) const noexcept {
     return Task<T,E2>(
         op->flatMap([predicate](auto erased_input, auto isError) {
             try {
@@ -567,8 +567,8 @@ constexpr Task<T,E2> Task<T,E>::flatMapError(const std::function<Task<T,E2>(E)>&
 template <class T, class E>
 template <class T2, class E2>
 constexpr Task<T2,E2> Task<T,E>::flatMapBoth(
-    const std::function<Task<T2,E2>(T)>& successPredicate,
-    const std::function<Task<T2,E2>(E)>& errorPredicate
+    const std::function<Task<T2,E2>(const T&)>& successPredicate,
+    const std::function<Task<T2,E2>(const E&)>& errorPredicate
 ) const noexcept {
     if constexpr (std::is_same<E,E2>::value) {
         return Task<T2,E2>(
@@ -627,7 +627,7 @@ constexpr Task<E,T> Task<T,E>::failed() const noexcept {
 }
 
 template <class T, class E>
-constexpr Task<T,E> Task<T,E>::onError(const std::function<void(E)>& handler) const noexcept {
+constexpr Task<T,E> Task<T,E>::onError(const std::function<void(const E&)>& handler) const noexcept {
     return Task<T,E>(
         op->flatMap([handler](auto input, auto isError) {
             try {
@@ -705,7 +705,7 @@ constexpr Task<T,E> Task<T,E>::delay(uint32_t milliseconds) const noexcept {
 }
 
 template <class T, class E>
-constexpr Task<T,E> Task<T,E>::recover(const std::function<T(E)>& predicate) const noexcept {
+constexpr Task<T,E> Task<T,E>::recover(const std::function<T(const E&)>& predicate) const noexcept {
     return Task<T,E>(
         op->flatMap([predicate](auto erased_input, auto isError) {
             try {
@@ -723,7 +723,7 @@ constexpr Task<T,E> Task<T,E>::recover(const std::function<T(E)>& predicate) con
 }
 
 template <class T, class E>
-constexpr Task<T,E> Task<T,E>::restartUntil(const std::function<bool(T)>& predicate) const noexcept {
+constexpr Task<T,E> Task<T,E>::restartUntil(const std::function<bool(const T&)>& predicate) const noexcept {
     return flatMap<T>([self = *this, predicate](auto value) constexpr {
         if(predicate(value)) {
             return Task<T,E>::pure(value);
