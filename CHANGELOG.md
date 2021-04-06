@@ -3,6 +3,11 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 5.0
+
+- Update the `Task` and `Observable` APIs to explicitly use const refernces in
+  as many places as possible to reduce overhead.
+
 ## 4.0
 
 - Update `MVar` to remove the use of `std::mutex` and use `Ref` instead. In
