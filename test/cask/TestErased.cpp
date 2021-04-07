@@ -91,3 +91,11 @@ TEST(Erased, MoveAssigns) {
     EXPECT_TRUE(second.has_value());
     EXPECT_EQ(second.get<int>(), 123);
 }
+
+TEST(Erased, ThrowsEmptyGet) {
+    try {
+        Erased foo;
+        foo.get<int>();
+        FAIL() << "expected method to throw";
+    } catch(std::runtime_error&) {}
+}
