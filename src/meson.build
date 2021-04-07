@@ -1,5 +1,4 @@
 cask_sources = [
-    'cask/Erased.cpp',
     'cask/Scheduler.cpp',
     'cask/TrampolineOp.cpp',
     'cask/TrampolineRunLoop.cpp'
