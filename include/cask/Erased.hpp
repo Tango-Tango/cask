@@ -30,23 +30,23 @@ public:
     ~Erased();
 private:
     void* data;
-    std::function<void(void*)> deleter;
-    std::function<void*(void*)> copier;
+    void (*deleter)(void*);
+    void* (*copier)(void*);
 };
 
 template <class T>
 Erased::Erased(const T& value) noexcept
     : data(new T(value))
-    , deleter([](auto ptr) { delete static_cast<T*>(ptr);})
-    , copier([](auto ptr) { return new T(*(static_cast<T*>(ptr))); })
+    , deleter([](void* ptr) -> void { delete static_cast<T*>(ptr);})
+    , copier([](void* ptr) -> void* { return new T(*(static_cast<T*>(ptr))); })
 {}
 
 template <class T>
 Erased& Erased::operator=(const T& value) noexcept {
     reset();
     data = new T(value);
-    deleter = [](auto ptr) { delete static_cast<T*>(ptr);};
-    copier = [](auto ptr) { return new T(*(static_cast<T*>(ptr))); };
+    deleter = [](void* ptr) -> void { delete static_cast<T*>(ptr);};
+    copier = [](void* ptr) -> void* { return new T(*(static_cast<T*>(ptr))); };
     return *this;
 }
 
