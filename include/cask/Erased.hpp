@@ -8,6 +8,19 @@
 
 namespace cask {
 
+/**
+ * A holder for a type-erased value. This type can hold any other type and will
+ * properly construct/destruct the value based on its real type. In many ways it
+ * is similiar to `std::any` except it is _far_ less safe. Rather than checking
+ * and validating type information at runtime, this type assumes that the caller
+ * _really_ knows what they are doing. In the context of cask, it is used by
+ * `Task` since its template layer validates these types at compile time.
+ * 
+ * Does the idea of a type blowing up on you because you don't pass correct
+ * type arguments to it later scare you? Good. Don't use this. It serves a very
+ * specific purpose for cask - and beyond that it has behavior that might not
+ * even be considered a good idea.
+ */
 class Erased {
 public:
     Erased() noexcept;
@@ -35,11 +48,31 @@ public:
               std::enable_if_t<!std::is_same<T2,Erased>::value, bool> = true>
     Erased& operator=(T&& value) noexcept;
 
+    /**
+     * Check if this instance is currently holding a value.
+     * 
+     * @return true iff this instance is currently holding a value.
+     */
     bool has_value() const noexcept;
 
+    /**
+     * Get the value held by this instance - casting it to the
+     * proper type. The behavior of casting to the wrong type
+     * is undefined (it's a blind cast under the hood) so be
+     * _sure_ that this type is correct. This method throws
+     * an exception if the user attempts to obtain a value but
+     * no value is available.
+     * 
+     * @return The casted value.
+     */
     template <typename T>
     T& get() const;
 
+    /**
+     * If this instance is currently holding a value then free it.
+     * Afterwards this instance will not hold a value. If the instance
+     * is already not holding a value - then nothing is done.
+     */
     void reset() noexcept;
 
     ~Erased();
