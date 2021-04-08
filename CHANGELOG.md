@@ -3,6 +3,20 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 6.0
+
+- Add the `Erased` type which acts as the "running with scissors" equivalent
+  to `std::any`. It avoids checking type id information during casting which
+  speeds up the `get` operation - but also means it is rather unsafe. It expects
+  that a higher level entity (e.g. `Task`) is capturing this type safety on
+  its behalf.
+- Update `TrampolineOp` and `TrampolineRunLoop` to use `Erased` rather than
+  `std::any`. While this doesn't effect consumers directly (it is hidden
+  behind the type-safe `Task` and `Observable` APIs) in most cases - 
+  it is a breaking API change to that portion of cask. The performance of
+  type erasure has a _significant_ impact on the performance of cask and this
+  change allows us to optimize this behavior as needed for cask itself.
+
 ## 5.0
 
 - Update the `Task` and `Observable` APIs to explicitly use const refernces in

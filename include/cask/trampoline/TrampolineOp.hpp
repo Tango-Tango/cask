@@ -6,7 +6,6 @@
 #ifndef _CASK_TRAMPOLINE_OP_H_
 #define _CASK_TRAMPOLINE_OP_H_
 
-#include <any>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -15,6 +14,7 @@
 #include "../Deferred.hpp"
 #include "../None.hpp"
 #include "../Either.hpp"
+#include "../Erased.hpp"
 
 namespace cask::trampoline {
 
@@ -39,11 +39,11 @@ enum OpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK};
  */
 class TrampolineOp : public std::enable_shared_from_this<TrampolineOp> {
 public:
-    using ConstantData = Either<std::any,std::any>;
-    using AsyncData = std::function<DeferredRef<std::any,std::any>(const std::shared_ptr<Scheduler>&)>;
-    using ThunkData = std::function<std::any()>;
+    using ConstantData = Either<Erased,Erased>;
+    using AsyncData = std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>;
+    using ThunkData = std::function<Erased()>;
     using FlatMapInput = std::shared_ptr<TrampolineOp>;
-    using FlatMapPredicate = std::function<std::shared_ptr<TrampolineOp>(const std::any&, bool)>;
+    using FlatMapPredicate = std::function<std::shared_ptr<TrampolineOp>(const Erased&, bool)>;
     using FlatMapData = std::pair<FlatMapInput,FlatMapPredicate>; 
 
     /**
@@ -52,11 +52,11 @@ public:
      */
     OpType opType;
 
-    static std::shared_ptr<TrampolineOp> value(const std::any& v) noexcept;
-    static std::shared_ptr<TrampolineOp> value(std::any&& v) noexcept;
-    static std::shared_ptr<TrampolineOp> error(const std::any& e) noexcept;
-    static std::shared_ptr<TrampolineOp> async(const std::function<DeferredRef<std::any,std::any>(std::shared_ptr<Scheduler>)>& predicate) noexcept;
-    static std::shared_ptr<TrampolineOp> thunk(const std::function<std::any()>& thunk) noexcept;
+    static std::shared_ptr<TrampolineOp> value(const Erased& v) noexcept;
+    static std::shared_ptr<TrampolineOp> value(Erased&& v) noexcept;
+    static std::shared_ptr<TrampolineOp> error(const Erased& e) noexcept;
+    static std::shared_ptr<TrampolineOp> async(const std::function<DeferredRef<Erased,Erased>(std::shared_ptr<Scheduler>)>& predicate) noexcept;
+    static std::shared_ptr<TrampolineOp> thunk(const std::function<Erased()>& thunk) noexcept;
 
     /**
      * Create a new operation which represents the flat map of this operation
