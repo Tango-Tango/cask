@@ -34,7 +34,7 @@ TEST(TaskMapBoth, ValuesSameTypeReturnTypeDifferent) {
         Task<int, std::string>::pure(3),
         Task<int, std::string>::pure(5),
         [](int a, int b) -> float {
-            return a * b * 1.5;
+            return float(a * b * 1.5);
         },
         Scheduler::global()
     )
@@ -52,7 +52,7 @@ TEST(TaskMapBoth, ValuesDifferentType) {
         Task<float, std::string>::pure(1.5f),
         Task<int, std::string>::pure(3),
         [](float a, int b) -> float {
-            return a * b;
+            return float(a * b);
         },
         Scheduler::global()
     )
