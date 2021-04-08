@@ -116,6 +116,24 @@ public:
     constexpr static Task<T,E> never() noexcept;
 
     /**
+     * Constructs a task which will run the given tasks in parallel, and then
+     * apply the given mapping function on their results.
+     * 
+     * @param taskA
+     * @param taskB
+     * @param handler
+     * @result A task which will process the given tasks in parallel, then apply
+     *         the given mapping function on their results.
+     */
+    template <class TA, class TB>
+    static Task<T, E> mapBoth(
+        const Task<TA, E> taskA, 
+        const Task<TB, E> taskB,
+        std::function<T(const TA&, const TB&)> handler,
+        const std::shared_ptr<Scheduler>& scheduler
+    ) noexcept;
+
+    /**
      * Trigger execution of this task on the given scheduler. Results
      * of the run can be observed via the returned `Deferred`
      * instance.
@@ -411,6 +429,25 @@ constexpr Task<T,E> Task<T,E>::never() noexcept {
             return Deferred<Erased,Erased>::forPromise(promise);
         })
     );
+}
+
+template <class T, class E>
+template <class TA, class TB>
+Task<T, E> Task<T, E>::mapBoth(
+    const Task<TA, E> taskA, 
+    const Task<TB, E> taskB,
+    std::function<T(const TA&, const TB&)> handler,
+    const std::shared_ptr<Scheduler>& sched
+) noexcept {
+    auto deferredA = taskA.run(sched);
+    auto deferredB = taskB.run(sched);
+    try {
+        auto resultA = deferredA->await();
+        auto resultB = deferredB->await();
+        return Task<T, E>::pure(handler(resultA, resultB));
+    } catch(E& error) {
+        return Task<T, E>::raiseError(error);
+    }
 }
 
 template <class T, class E>
