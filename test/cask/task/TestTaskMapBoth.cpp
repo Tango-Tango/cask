@@ -34,7 +34,7 @@ TEST(TaskMapBoth, ValuesSameTypeReturnTypeDifferent) {
         Task<int, std::string>::pure(3),
         Task<int, std::string>::pure(5),
         [](int a, int b) -> float {
-            return float(a * b * 1.5);
+            return static_cast<float>(a * b * 1.5);
         },
         Scheduler::global()
     )
@@ -52,7 +52,7 @@ TEST(TaskMapBoth, ValuesDifferentType) {
         Task<float, std::string>::pure(1.5f),
         Task<int, std::string>::pure(3),
         [](float a, int b) -> float {
-            return float(a * b);
+            return static_cast<float>(a) * b;
         },
         Scheduler::global()
     )
@@ -71,7 +71,7 @@ TEST(TaskMapBoth, AllDifferentTypes) {
         Task<int, std::string>::pure(3),
         [](float a, int b) -> std::string {
             // The output of the product is converted to int so the output string has a reliable length
-            return std::to_string(int(a * b));
+            return std::to_string(static_cast<int>(static_cast<float>(a) * b));
         },
         Scheduler::global()
     )
