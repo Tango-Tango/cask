@@ -3,6 +3,13 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 6.1
+
+- Add the `mapBoth` operator to `Task` so that two tasks can be joined together
+  and executed in parallel. This currently forces an async boundary by using
+  deferreds and awaiting the results before passing them down to the handler
+  function provided.
+
 ## 6.0
 
 - Add the `Erased` type which acts as the "running with scissors" equivalent
