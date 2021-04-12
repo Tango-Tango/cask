@@ -3,6 +3,15 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 7.0
+
+- Update the `List` API to properly communicate const guarantees.
+- Update all `List` operations to be stack safe. Previously, some operations
+  (such as `append`) occurred on the stack and could cause stack overflows
+  if they were executed on large lists.
+- Add the `size()` operation to list which allows users to check the size of
+  the list without counting the elements.
+
 ## 6.0
 
 - Add the `Erased` type which acts as the "running with scissors" equivalent

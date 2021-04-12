@@ -18,12 +18,13 @@ class Nil final : public List<T>, public std::enable_shared_from_this<Nil<T>> {
 public:
     static ListRef<T> create();
 
-    ListRef<T> prepend(const T& elem) override;
-    ListRef<T> append(const T& elem) override;
+    ListRef<T> prepend(const T& elem) const override;
+    ListRef<T> append(const T& elem) const override;
     bool is_empty() const override;
+    std::size_t size() const override;
     std::optional<T> head() const override;
-    ListRef<T> tail() override;
-    ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) override;
+    ListRef<T> tail() const override;
+    ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) const override;
 };
 
 }
@@ -38,12 +39,12 @@ ListRef<T> Nil<T>::create() {
 }
 
 template <class T>
-ListRef<T> Nil<T>::prepend(const T& elem) {
+ListRef<T> Nil<T>::prepend(const T& elem) const {
     return ListEntry<T>::create(elem, this->shared_from_this());
 }
 
 template <class T>
-ListRef<T> Nil<T>::append(const T& elem) {
+ListRef<T> Nil<T>::append(const T& elem) const {
     return ListEntry<T>::create(elem, this->shared_from_this());
 }
 
@@ -53,17 +54,22 @@ bool Nil<T>::is_empty() const {
 }
 
 template <class T>
+std::size_t Nil<T>::size() const {
+    return 0;
+}
+
+template <class T>
 std::optional<T> Nil<T>::head() const {
     return {};
 }
 
 template <class T>
-ListRef<T> Nil<T>::tail() {
-    return this->shared_from_this();
+ListRef<T> Nil<T>::tail() const {
+    return std::make_shared<Nil<T>>();
 }
 
 template <class T>
-ListRef<T> Nil<T>::dropWhile(const std::function<bool(const T&)>&) {
+ListRef<T> Nil<T>::dropWhile(const std::function<bool(const T&)>&) const {
     return this->shared_from_this();
 }
 
