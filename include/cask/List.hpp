@@ -14,7 +14,7 @@ template <class T>
 class List;
 
 template <class T>
-using ListRef = std::shared_ptr<List<T>>;
+using ListRef = std::shared_ptr<const List<T>>;
 
 /**
  * A simple immutable and persistent list supporting constant time prepend and
@@ -36,7 +36,7 @@ public:
      * 
      * @return The list with the item prepended.
      */
-    virtual ListRef<T> prepend(const T& elem) = 0;
+    virtual ListRef<T> prepend(const T& elem) const = 0;
 
     /**
      * Append a value to this list. Executes in O(n)
@@ -44,7 +44,7 @@ public:
      * 
      * @return The list with the value appended.
      */
-    virtual ListRef<T> append(const T& elem) = 0;
+    virtual ListRef<T> append(const T& elem) const = 0;
 
     /**
      * Check if this list is empty. Executes in O(1)
@@ -53,6 +53,15 @@ public:
      * @return true iff this list is empty.
      */
     virtual bool is_empty() const = 0;
+
+    /**
+     * Retrieve the size of this list. The size is
+     * memoized and checking it executes in O(1) time.
+     * 
+     * @return The number of elements contained in
+     *         this list.
+     */
+    virtual std::size_t size() const = 0;
 
     /**
      * Retrieve the head value of the list. Executes in
@@ -72,7 +81,7 @@ public:
      *         then the empty list will be returned as the
      *         tail.
      */
-    virtual ListRef<T> tail() = 0;
+    virtual ListRef<T> tail() const = 0;
 
     /**
      * Drop elements from the head of the list until the given
@@ -83,7 +92,7 @@ public:
      * @return A list with the head elements matching the predicate
      *         dropped.
      */ 
-    virtual ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) = 0;
+    virtual ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) const = 0;
 
     virtual ~List() = default;
 };
