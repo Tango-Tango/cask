@@ -43,12 +43,6 @@ jobs:
     - name: Generate Coverage Reports
       if: ${{ matrix.target == 'debug' }}
       run: ninja coverage -C build_${{ matrix.target }}
-    - name: Upload Coverage Results to Codecov
-      if: ${{ matrix.target == 'debug' }}
-      uses: codecov/codecov-action@v1
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        fail_ci_if_error: true
   
   build-mac:
     name: Mac Build and Test
