@@ -179,3 +179,31 @@ TEST(MVar, ReadManyTimes) {
         EXPECT_EQ(deferred->await(), 123);
     }
 }
+
+TEST(MVar, TryPutEmpty) {
+    auto mvar = MVar<int,std::string>::empty(Scheduler::global());
+
+    ASSERT_TRUE(mvar->tryPut(1));
+    ASSERT_FALSE(mvar->tryPut(2));
+
+    auto firstTake = mvar->take().run(Scheduler::global())->await();
+    EXPECT_EQ(firstTake, 1);
+}
+
+TEST(MVar, TryPutPendingTakes) {
+    auto mvar = MVar<int,std::string>::empty(Scheduler::global());
+
+    auto firstTake = mvar->take().run(Scheduler::global());
+    auto secondTake = mvar->take().run(Scheduler::global());
+    auto thirdTake = mvar->take().run(Scheduler::global());
+
+    ASSERT_TRUE(mvar->tryPut(1));
+    ASSERT_TRUE(mvar->tryPut(2));
+    ASSERT_TRUE(mvar->tryPut(3));
+    ASSERT_TRUE(mvar->tryPut(4));
+    ASSERT_FALSE(mvar->tryPut(5));
+
+    EXPECT_EQ(firstTake->await(), 1);
+    EXPECT_EQ(secondTake->await(), 2);
+    EXPECT_EQ(thirdTake->await(), 3);
+}

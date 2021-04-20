@@ -61,6 +61,8 @@ public:
      */
     Task<None,E> put(const T& value);
 
+    bool tryPut(const T& value);
+
     /**
      * Attempt to take a value from the MVar. If the MVar is
      * currently empty then the caller be queued and forced
@@ -115,6 +117,30 @@ Task<None,E> MVar<T,E>::put(const T& value) {
         .template flatMap<None>([](auto task) {
             return task;
         });
+}
+
+template <class T, class E>
+bool MVar<T,E>::tryPut(const T& value) {
+    using IntermediateResult = std::tuple<bool,std::function<void()>>;
+
+    auto result = stateRef->template modify<IntermediateResult>([value](auto state) {
+        auto result = state.tryPut(value);
+        auto nextState = std::get<0>(result);
+        auto completed = std::get<1>(result);
+        auto thunk = std::get<2>(result);
+        return std::make_tuple(nextState, std::make_tuple(completed, thunk));
+    })
+    .template map<bool>([](IntermediateResult result) {
+        auto completed = std::get<0>(result);
+        auto thunk = std::get<1>(result);
+        thunk();
+        return completed;
+    })
+    .runSync();
+
+    // The operation above is guaranteed to run synchronously and without error
+    // so  we just need to unwrap the result here.
+    return result.get_left().get_left();
 }
 
 template <class T, class E>
