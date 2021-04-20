@@ -19,32 +19,26 @@ template <class T, class E = std::any>
 using QueueRef = std::shared_ptr<Queue<T,E>>;
 
 /**
- * An Queue is a simple mailbox that can be used to:
- *   1. Hold some state by using the put and take methods to coordinate access
- *      in the same manner that locking and unlocking a mutex would
- *   2. Coordinate between two proceses, with backpressure, where one producer
- *      process inserts items with `put` and a consume process takes items with `take`.
- *
- * Queue can be used to manage both mutable and immutable structures - though when using
- * mutable structures (e.g. from the STL) take care not to allow a reference to the
- * structure to be used outside of a take / modify / put cycle.
+ * A Queue is a concurrent queue which implements asynchronous semantic blocking for puts and takes. It
+ * can be used to coordinate between two proceses, with backpressure, where one producer process inserts
+ * items with `put` and a consume process takes items with `take`.
  */
 template <class T, class E = std::any>
 class Queue {
 public:
     /**
-     * Create an Queue that currently holds no data.
+     * Create an empty queue.
      *
      * @param sched The scheduler on which Queue will schedule
      *              any asynchronous puts or takes.
+     * @param max_size The maximum size to bound the queue to.
      * @return An empty Queue reference.
      */
     static QueueRef<T,E> empty(const std::shared_ptr<Scheduler>& sched, uint32_t max_size);
 
     /**
-     * Attempt to store the given value in the Queue. If the Queue
-     * is already holding a value the put will be queued and
-     * the caller forced to asynchonously await.
+     * Enqueue the given value. If the queue is full then the put
+     * will be queued and the caller forced to asynchonously await.
      *
      * @param value The value to put into the Queue.
      * @return A task that completes when the value has been stored.
@@ -52,17 +46,17 @@ public:
     Task<None,E> put(const T& value);
 
      /**
-     * Attempt to store the given value in the Queue. If the Queue
-     * is already holding a value the put will fail.
+     * Attempt to enqueue the given value. If the queue is
+     * currently full then the put will fail.
      *
      * @param value The value to put into the Queue.
-     * @return True iff the value was stored in the Queue or
+     * @return True iff the value was stored in the queue or
      *         pushed to an observer via a queued take.
      */
     bool tryPut(const T& value);
 
     /**
-     * Attempt to take a value from the Queue. If the Queue is
+     * Attempt to take a value from the Queue. If the queue is
      * currently empty then the caller be queued and forced
      * to asynchronously await for a value to become available.
      *
