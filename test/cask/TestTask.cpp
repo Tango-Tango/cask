@@ -252,27 +252,6 @@ TEST(Task, EvalRestartUntilAsync) {
     EXPECT_EQ(value, 10);
 }
 
-TEST(Task, PureRaceWithAsync) {
-    auto sched = Scheduler::global();
-    auto task = Task<int,None>::pure(123).raceWith(Task<float,None>::never());
-    auto result = task.run(sched)->await();
-    EXPECT_EQ(result.get_left(), 123);
-}
-
-TEST(Task, EvalRaceWith) {
-    auto sched = Scheduler::global();
-    auto task = Task<int,None>::eval([](){return 123;}).raceWith(Task<float,None>::never());
-    auto result = task.run(sched)->await();
-    EXPECT_EQ(result.get_left(), 123);
-}
-
-TEST(Task, NeverRaceWith) {
-    auto sched = Scheduler::global();
-    auto task = Task<float,None>::never().raceWith(Task<int,None>::pure(123));
-    auto result = task.run(sched)->await();
-    EXPECT_EQ(result.get_right(), 123);
-}
-
 TEST(Task, RecurseWithoutExploding) {
     auto sched = Scheduler::global();
 

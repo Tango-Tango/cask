@@ -743,7 +743,14 @@ constexpr Task<Either<T,T2>,E> Task<T,E>::raceWith(const Task<T2,E>& other) cons
             auto leftDeferred = left.run(sched);
             auto rightDeferred = right.run(sched);
 
-            leftDeferred->template chainDownstream<Erased,Erased>(promise, [](auto result) {
+            auto leftDeferredWeak = std::weak_ptr<Deferred<T,E>>(leftDeferred);
+            auto rightDeferredWeak = std::weak_ptr<Deferred<T2,E>>(rightDeferred);
+
+            leftDeferred->template chainDownstream<Erased,Erased>(promise, [rightDeferredWeak](auto result) {
+                if(auto rightDeferred = rightDeferredWeak.lock()) {
+                    rightDeferred->cancel();
+                }
+
                 if(result.is_left()) {
                     return Either<Erased,Erased>::left(
                         Either<T,T2>::left(result.get_left())
@@ -753,7 +760,11 @@ constexpr Task<Either<T,T2>,E> Task<T,E>::raceWith(const Task<T2,E>& other) cons
                 }
             });
 
-            rightDeferred->template chainDownstream<Erased,Erased>(promise, [](auto result) {
+            rightDeferred->template chainDownstream<Erased,Erased>(promise, [leftDeferredWeak](auto result) {
+                if(auto leftDeferred = leftDeferredWeak.lock()) {
+                    leftDeferred->cancel();
+                }
+
                 if(result.is_left()) {
                     return Either<Erased,Erased>::left(
                         Either<T,T2>::right(result.get_left())
