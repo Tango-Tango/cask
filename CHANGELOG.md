@@ -3,6 +3,11 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 7.2
+
+- Add the `Queue` type as a generalizaton of `MVar` but for mailboxes
+  of a size larger than 1.
+
 ## 7.1
 
 - Add the `tryPut` operation to MVar to allow for a synchronous put which is
