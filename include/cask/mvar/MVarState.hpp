@@ -27,8 +27,13 @@ public:
     ListRef<PendingPut> pendingPuts;
     ListRef<PromiseRef<T,E>> pendingTakes;
 
+    std::tuple<MVarState<T,E>,bool,std::function<void()>> tryPut(const T& value) const;
+
     std::tuple<MVarState<T,E>,Task<None,E>> put(const T& value) const;
+
     std::tuple<MVarState<T,E>,Task<T,E>> take() const;
+
+    
     
     MVarState(const std::shared_ptr<Scheduler>& sched);
     MVarState(const std::shared_ptr<Scheduler>& sched, const T& initialValue);
@@ -69,7 +74,7 @@ MVarState<T,E>::MVarState(std::shared_ptr<Scheduler>&& sched, std::optional<T>&&
 {}
 
 template <class T, class E>
-std::tuple<MVarState<T,E>,Task<None,E>> MVarState<T,E>::put(const T& value) const {
+std::tuple<MVarState<T,E>,bool,std::function<void()>> MVarState<T,E>::tryPut(const T& value) const {
     auto filteredTakes = pendingTakes->dropWhile([](auto promise) {
         return promise->isCancelled();
     });
@@ -78,24 +83,44 @@ std::tuple<MVarState<T,E>,Task<None,E>> MVarState<T,E>::put(const T& value) cons
         auto takePromise = *(filteredTakes->head());
         return std::make_tuple(
             MVarState(sched, valueOpt, pendingPuts, filteredTakes->tail()),
-            Task<None,E>::eval([takePromise, value] {
-                takePromise->success(value);
-                return None();
-            })
+            true,
+            [takePromise, value]{takePromise->success(value);}
         );
     } else if(!valueOpt.has_value()) {
         return std::make_tuple(
             MVarState(sched, value, pendingPuts, filteredTakes),
-            Task<None,E>::none()
+            true,
+            []{}
         );
     } else {
-        auto promise = Promise<None,E>::create(sched);
+        return std::make_tuple(
+            MVarState(sched, valueOpt, pendingPuts, filteredTakes),
+            false,
+            []{}
+        );
+    }
+}
+
+template <class T, class E>
+std::tuple<MVarState<T,E>,Task<None,E>> MVarState<T,E>::put(const T& value) const {
+    auto result = tryPut(value);
+    auto nextState = std::get<0>(result);
+    auto completed = std::get<1>(result);
+    auto thunk = std::get<2>(result);
+
+    if(!completed) {
+        auto promise = Promise<None,E>::create(nextState.sched);
         auto pending = std::make_tuple(promise, value);
 
         return std::make_tuple(
-            MVarState(sched, valueOpt, pendingPuts->append(pending), filteredTakes),
+            MVarState(nextState.sched, nextState.valueOpt, nextState.pendingPuts->append(pending), nextState.pendingTakes),
             Task<None,E>::forPromise(promise)
         );
+    } else {
+        return std::make_tuple(nextState, Task<None,E>::eval([thunk] {
+            thunk();
+            return None();
+        }));
     }
 }
 
