@@ -103,7 +103,10 @@ std::tuple<MVarState<T,E>,bool,std::function<void()>> MVarState<T,E>::tryPut(con
 
 template <class T, class E>
 std::tuple<MVarState<T,E>,Task<None,E>> MVarState<T,E>::put(const T& value) const {
-    auto [nextState, completed, thunk] = tryPut(value);
+    auto result = tryPut(value);
+    auto nextState = std::get<0>(result);
+    auto completed = std::get<1>(result);
+    auto thunk = std::get<2>(result);
 
     if(!completed) {
         auto promise = Promise<None,E>::create(nextState.sched);
