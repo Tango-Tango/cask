@@ -61,6 +61,14 @@ public:
      */
     Task<None,E> put(const T& value);
 
+     /**
+     * Attempt to store the given value in the MVar. If the MVar
+     * is already holding a value the put will fail.
+     *
+     * @param value The value to put into the MVar.
+     * @return True iff the value was stored in the MVar or
+     *         pushed to an observer via a queued take.
+     */
     bool tryPut(const T& value);
 
     /**

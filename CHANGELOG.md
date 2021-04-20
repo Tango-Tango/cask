@@ -3,6 +3,12 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 7.1
+
+- Add the `tryPut` operation to MVar to allow for a synchronous put which is
+  useful when trying to push data into a cask application from another
+  async framework.
+
 ## 7.0
 
 - Update the `List` API to properly communicate const guarantees.
