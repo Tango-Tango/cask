@@ -3,8 +3,23 @@ name: Build, Test, and Release
 on:
   push:
     branches: [ master ]
+    paths:
+      - "src/**"
+      - "include/**"
+      - "meson.build"
+      - "VERSION"
   pull_request:
     branches: [ master ]
+    paths:
+    - "src/**"
+    - "include/**"
+    - "test/**"
+    - ".github/workflows/**"
+    - "subprojects/**"
+    - "meson.build"
+    - "VERSION"
+    - "automatic_release.py"
+    - "regenerate_env.sh"
 
 jobs:
   build-linux:
