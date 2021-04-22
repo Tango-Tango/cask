@@ -2,16 +2,17 @@
 
 <img align="right" width="150em" src="assets/cask.png"/>
 
-A library for building asynchronous and event-driving programs in C++ using concepts
+A library for building asynchronous and event-driven programs in C++ using concepts
 stolen from RX and functional programming. It exposes the `Task` and `Observable` types
-for modeling these types of programs. These types are lazily-evaluated, high-performance,
-asynchronous, composable, and testable.
+for modeling these types of programs. These types are lazily-evaluated, asynchronous,
+composable, and testable.
 
 Programs built using cask are naturally cooperative - running on an event loop specifically
-built for cask. They are also easy to reason about with concepts like backpressure and
-data immutability being considered from the beginning. Rather than composing asychronous
-programs using callbacks `Task` and `Observable` provide monadic operations for composing them
-such as `map`, `flatMap`, `filter`, and all of their friends.
+built for cask. Even when given only a single thread cask can handle executing many concurrent
+operations. They are also easy to reason about with concepts like backpressure and data
+immutability being considered from the beginning. Rather than composing asychronous programs
+using callbacks `Task` and `Observable` provide monadic operations for composing them such as
+`map`, `flatMap`, `filter`, and all of their friends.
 
 Because of the underlying functional programming ideas implemented in cask - programs built
 using it are also fundamentally testable without any complex frameworks. Tasks and Observables
