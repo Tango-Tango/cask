@@ -86,18 +86,28 @@ void Scheduler::run() {
 }
 
 void Scheduler::timer() {
+    const static std::chrono::milliseconds sleep_time(10);
+
     while(running) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        int64_t currentTick = ticks.fetch_add(1);
+        auto before = std::chrono::high_resolution_clock::now();
+        std::this_thread::sleep_for(sleep_time);
+        auto after = std::chrono::high_resolution_clock::now();
+        
+        auto delta = after - before;
+        auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
+
+        int64_t currentTick = ticks.fetch_add(milliseconds);
 
         {
             std::lock_guard guard(timerMutex);
-            auto tasks = timers.find(currentTick);
-            if(tasks != timers.end()) {
-                for(auto& task: tasks->second) {
-                    submit(task);
+            for(int64_t i = currentTick - milliseconds; i <= currentTick; i++) {
+                auto tasks = timers.find(i);
+                if(tasks != timers.end()) {
+                    for(auto& task: tasks->second) {
+                        submit(task);
+                    }
+                    timers.erase(i);
                 }
-                timers.erase(currentTick);
             }
         }
     }
