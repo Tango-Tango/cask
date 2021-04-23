@@ -74,12 +74,21 @@ public:
      * @param task The task the submit after the wait time has elapsed.
      */
     void submitAfter(int64_t milliseconds, const std::function<void()>& task);
+
+    /**
+     * Check if the scheduler is currently idle - meaning all threads are
+     * currently waiting for tasks to execute.
+     * 
+     * @return true if the scheduler is idle.
+     */
+    bool isIdle() const;
 private:
     bool running;
 
     std::mutex readyQueueMutex;
     std::condition_variable dataInQueue;
     std::queue<std::function<void()>> readyQueue;
+    std::atomic_size_t idleThreads;
     std::mutex timerMutex;
     std::map<int64_t,std::vector<std::function<void()>>> timers;
     std::vector<std::thread> runThreads;

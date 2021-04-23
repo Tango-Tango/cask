@@ -10,6 +10,8 @@ in this file. This project follows [semantic versioning](https://semver.org/).
   schedule the timer thread on exact scheduled boundaries.
 - Add `Scheduler::submitBulk` as an optimization for clients which wawnt to
   submit several items to the scheduler in a single operation. 
+- Add `Scheduler::isIdle` to allow users to check if the scheduler is currently
+  idle (that is - not executing tasks and nothing in the ready queue).
 
 ## 7.2
 

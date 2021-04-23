@@ -19,6 +19,7 @@ Scheduler::Scheduler(int poolSize)
     , readyQueueMutex()
     , dataInQueue()
     , readyQueue()
+    , idleThreads(poolSize)
     , timerMutex()
     , timers()
     , runThreads()
@@ -75,13 +76,30 @@ void Scheduler::submitAfter(int64_t milliseconds, const std::function<void()>& t
     }
 }
 
+bool Scheduler::isIdle() const {
+    return idleThreads.load() == runThreads.size() && readyQueue.empty();
+}
+
 void Scheduler::run() {
     std::unique_lock<std::mutex> readyQueueLock(readyQueueMutex, std::defer_lock);
     std::chrono::milliseconds max_wait_time(10);
     std::function<void()> task;
+    bool idling = true;
+
     while(running) {
         readyQueueLock.lock();
+
+        if(!idling && readyQueue.empty()) {
+            idling = true;
+            idleThreads++;
+        }
+
         if(dataInQueue.wait_for(readyQueueLock, max_wait_time, [this](){return !readyQueue.empty(); })) {
+            if(idling) {
+                idling = false;
+                idleThreads--;
+            }
+            
             task = readyQueue.front();
             readyQueue.pop();
             readyQueueLock.unlock();
