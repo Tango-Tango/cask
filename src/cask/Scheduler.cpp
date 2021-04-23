@@ -23,6 +23,7 @@ Scheduler::Scheduler(int poolSize)
     , timers()
     , runThreads()
     , timerThread()
+    , ticks(0)
 {
     for(int i =0; i < poolSize; i++) {
         std::thread poolThread(std::bind(&Scheduler::run, this));
@@ -54,17 +55,23 @@ void Scheduler::submit(const std::function<void()>& task) {
     dataInQueue.notify_one();
 }
 
+void Scheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
+    std::lock_guard guard(readyQueueMutex);
+    for(auto& task: tasks) {
+        readyQueue.emplace(task);
+        dataInQueue.notify_one();
+    }
+}
+
 void Scheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
-    int64_t executionTick = ticks.load() + milliseconds;
-    {
-        std::lock_guard guard(timerMutex);
-        auto tasks = timers.find(executionTick);
-        if(tasks == timers.end()) {
-            std::vector<std::function<void()>> taskVector = {task};
-            timers[executionTick] = taskVector;
-        } else {
-            tasks->second.push_back(task);
-        }
+    std::lock_guard guard(timerMutex);
+    int64_t executionTick = ticks + milliseconds;
+    auto tasks = timers.find(executionTick);
+    if(tasks == timers.end()) {
+        std::vector<std::function<void()>> taskVector = {task};
+        timers[executionTick] = taskVector;
+    } else {
+        tasks->second.push_back(task);
     }
 }
 
@@ -96,16 +103,16 @@ void Scheduler::timer() {
         auto delta = after - before;
         auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
 
-        int64_t currentTick = ticks.fetch_add(milliseconds);
-
         {
             std::lock_guard guard(timerMutex);
-            for(int64_t i = currentTick - milliseconds; i <= currentTick; i++) {
+
+            int64_t previous_ticks = ticks;
+            ticks += milliseconds;
+
+            for(int64_t i = previous_ticks; i <= ticks; i++) {
                 auto tasks = timers.find(i);
                 if(tasks != timers.end()) {
-                    for(auto& task: tasks->second) {
-                        submit(task);
-                    }
+                    submitBulk(tasks->second);
                     timers.erase(i);
                 }
             }

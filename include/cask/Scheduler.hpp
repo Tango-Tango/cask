@@ -56,6 +56,16 @@ public:
     void submit(const std::function<void()>& task);
 
     /**
+     * Submit several tasks at once to the the thread pool. The order
+     * these tasks will be taken up and executed is undefined. Each
+     * task will execute after an indeterminite amount of time as
+     * resource free to perform the individual task.
+     * 
+     * @param tasks The vector of tasks to submit in-bulk.
+     */
+    void submitBulk(const std::vector<std::function<void()>>& tasks);
+
+    /**
      * Submit a task to the pool after _at least_ the given amount
      * of time has passed.
      * 
@@ -74,7 +84,7 @@ private:
     std::map<int64_t,std::vector<std::function<void()>>> timers;
     std::vector<std::thread> runThreads;
     std::thread timerThread;
-    std::atomic_long ticks;
+    int64_t ticks;
 
     void run();
     void timer();
