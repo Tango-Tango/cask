@@ -8,6 +8,8 @@ in this file. This project follows [semantic versioning](https://semver.org/).
 - Make `Scheduler` evaluate timers far less often (every 10ms rather than 1ms).
   Enhance the timer handler to better deal with scew where the OS does not
   schedule the timer thread on exact scheduled boundaries.
+- Add `Scheduler::submitBulk` as an optimization for clients which wawnt to
+  submit several items to the scheduler in a single operation. 
 
 ## 7.2
 
