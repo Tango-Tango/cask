@@ -59,6 +59,7 @@ TEST_P(SchedulerTest, SubmitBulk) {
     std::atomic_int num_executed(0);
     std::vector<std::function<void()>> tasks;
 
+    tasks.reserve(num_tasks);
     for(int i = 0; i < num_tasks; i++) {
         tasks.push_back([&num_executed] {
             num_executed++;
