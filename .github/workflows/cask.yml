@@ -4,22 +4,17 @@ on:
   push:
     branches: [ master ]
     paths:
-      - "src/**"
-      - "include/**"
-      - "meson.build"
-      - "VERSION"
+    - 'src/**'
+    - 'include/**'
+    - 'meson.build'
+    - 'VERSION'
   pull_request:
     branches: [ master ]
-    paths:
-    - "src/**"
-    - "include/**"
-    - "test/**"
-    - ".github/workflows/**"
-    - "subprojects/**"
-    - "meson.build"
-    - "VERSION"
-    - "automatic_release.py"
-    - "regenerate_env.sh"
+    paths-ignore:
+    - '*.md'
+    - '*.txt'
+    - '.gitignore'
+    - 'assets/**'
 
 jobs:
   build-linux:
