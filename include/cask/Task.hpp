@@ -307,19 +307,6 @@ public:
     constexpr Task<T,E> guarantee(const Task<T2, E>& task) const noexcept;
 
     /**
-     * Timeout this task after the given interval if it does not complete
-     * and provide the given error as the result. The task that timed out
-     * will be cancelled.
-     * 
-     * @param milliseconds The number of of milliseconds to wait before
-     *        timing out the task.
-     * @param error The error to provide in the event that a timeout occurs.
-     * @result A task which will either provide the original result value
-     *         or the timeout error if a timeout occurs.
-     */
-    constexpr Task<T,E> timeout(uint32_t milliseconds, const E& error) const noexcept;
-
-    /**
      * Construct a task which wraps the given trampoline operations. This
      * should not be called directly and, instead, users should use provided
      * operators to build these operations automatically.
@@ -808,15 +795,6 @@ constexpr Task<T,E> Task<T,E>::guarantee(const Task<T2, E>& task) const noexcept
     return materialize()
     .template sideEffect<T2>(task)
     .template dematerialize<T>();
-}
-
-template <class T, class E>
-constexpr Task<T,E> Task<T,E>::timeout(uint32_t milliseconds, const E& error) const noexcept {
-    auto timeoutTask = Task<T,E>::raiseError(error).delay(milliseconds);
-
-    return raceWith(timeoutTask).template map<T>([](auto result) {
-        return result.get_left();
-    });
 }
 
 template <class T, class E>

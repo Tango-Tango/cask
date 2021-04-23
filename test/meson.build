@@ -42,7 +42,6 @@ if not meson.is_subproject()
         'cask/task/TestTaskPure.cpp',
         'cask/task/TestTaskRace.cpp',
         'cask/task/TestTaskRaiseError.cpp',
-        'cask/task/TestTaskTimeout.cpp',
         'main.cpp'
     ]
 
