@@ -3,6 +3,11 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 7.4
+
+- Add the `Task::timeout` method to make it easy to time-bound asynchronous operations
+  with safe cancelling behavior.
+
 ## 7.3
 
 - Make `Scheduler` evaluate timers far less often (every 10ms rather than 1ms).

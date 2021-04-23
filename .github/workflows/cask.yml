@@ -56,7 +56,7 @@ jobs:
   
   build-mac:
     name: Mac Build and Test
-    runs-on: macos-10.15
+    runs-on: [self-hosted, macOS, M1]
     if: github.actor != 'engineering-at-tangotango'
 
     strategy:
@@ -71,10 +71,6 @@ jobs:
         token: ${{ secrets.AUTOMATION_USER_TOKEN }}
       env:
         AUTOMATION_USER_TOKEN: secrets.AUTOMATION_USER_TOKEN
-    - name: Install Brew Development Dependencies
-      run: brew install ninja
-    - name: Install Python Development Dependencies
-      run: sudo python3 -m pip install meson==0.57.0
     - name: Run the Pre-Build Release Stage
       run: |
         git config user.name engineering-at-tangotango
