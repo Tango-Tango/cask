@@ -243,6 +243,10 @@ public:
      */
     ObservableRef<T,E> filter(const std::function<bool(const T&)>& predicate) const;
 
+    Task<None,E> foreach(const std::function<void(const T&)>& predicate) const;
+
+    Task<None,E> foreachTask(const std::function<Task<None,E>(const T&)>& predicate) const;
+
     /**
      * Emit the last value of this stream seen. Note that if the stream of
      * values is infinite this task will never complete.
@@ -326,6 +330,8 @@ public:
 #include "observable/EvalObservable.hpp"
 #include "observable/FilterObservable.hpp"
 #include "observable/FlatMapObservable.hpp"
+#include "observable/ForeachObserver.hpp"
+#include "observable/ForeachTaskObserver.hpp"
 #include "observable/GuaranteeObservable.hpp"
 #include "observable/LastObserver.hpp"
 #include "observable/MapObservable.hpp"
@@ -444,6 +450,38 @@ template <class T, class E>
 ObservableRef<T,E> Observable<T,E>::filter(const std::function<bool(const T&)>& predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::FilterObservable<T,E>>(self, predicate);
+}
+
+template <class T, class E>
+Task<None,E> Observable<T,E>::foreach(const std::function<void(const T&)>& predicate) const {
+    auto self = this->shared_from_this();
+    return Task<None,E>::deferAction([self = self, predicate](auto sched) {
+        auto promise = Promise<None,E>::create(sched);
+        auto observer = std::make_shared<observable::ForeachObserver<T,E>>(promise, predicate);
+        auto subscription = self->subscribe(sched, observer);
+
+        promise->onCancel([subscription]() {
+            subscription->cancel();
+        });
+
+        return Deferred<None,E>::forPromise(promise);
+    });
+}
+
+template <class T, class E>
+Task<None,E> Observable<T,E>::foreachTask(const std::function<Task<None,E>(const T&)>& predicate) const {
+    auto self = this->shared_from_this();
+    return Task<None,E>::deferAction([self = self, predicate](auto sched) {
+        auto promise = Promise<None,E>::create(sched);
+        auto observer = std::make_shared<observable::ForeachTaskObserver<T,E>>(promise, predicate);
+        auto subscription = self->subscribe(sched, observer);
+
+        promise->onCancel([subscription]() {
+            subscription->cancel();
+        });
+
+        return Deferred<None,E>::forPromise(promise);
+    });
 }
 
 template <class T, class E>
