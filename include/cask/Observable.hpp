@@ -243,8 +243,23 @@ public:
      */
     ObservableRef<T,E> filter(const std::function<bool(const T&)>& predicate) const;
 
+    /**
+     * Run the given predicate for every element contained with the observable.
+     * 
+     * @param predicate The method to execute for every element.
+     * @return A task which completes when the given predicate has been
+     *         executed for every element of the observable.
+     */
     Task<None,E> foreach(const std::function<void(const T&)>& predicate) const;
 
+    /**
+     * Run the given predicate for every element contained with the observable. The
+     * predicate returns a task who may complete either synchronously or asynchronously.
+     * 
+     * @param predicate The method to execute for every element.
+     * @return A task which completes when the given predicate has been
+     *         executed for every element of the observable.
+     */
     Task<None,E> foreachTask(const std::function<Task<None,E>(const T&)>& predicate) const;
 
     /**
