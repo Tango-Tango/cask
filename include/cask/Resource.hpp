@@ -91,7 +91,11 @@ template <class T, class E>
 constexpr Resource<T,E> Resource<T,E>::make(const Task<T,E> &acquire, ReleaseFunction release) noexcept {
     return Resource<T,E>(
         acquire.template map<AllocatedResource>([release](T thing) {
-            return std::tuple<T,ReleaseTask>(thing, release(thing));
+            auto deferredRelease = ReleaseTask::defer([thing, release] {
+                return release(thing);
+            });
+
+            return std::tuple<T,ReleaseTask>(thing, deferredRelease);
         })
     );
 }

@@ -9,6 +9,7 @@
 using cask::Task;
 using cask::Resource;
 using cask::None;
+using cask::Scheduler;
 
 TEST(Resource,BasicUsage) {
     auto resource = Resource<int>::make(
@@ -51,6 +52,29 @@ TEST(Resource,CallsAcquireRelease) {
     EXPECT_EQ(result.run(sched)->await(), 184.5);
     EXPECT_EQ(calls, 2);
     EXPECT_EQ(openResourceCount, 0);
+}
+
+TEST(Resource,ReleasesAfterUsage) {
+    bool released = false;
+
+    auto resource = Resource<int>::make(
+        Task<int>::pure(123),
+        [&released](int){
+            released = true;
+            return Task<int>::none();
+        }
+    );
+
+    auto sched = std::make_shared<cask::Scheduler>();
+    auto releasedBeforeUse = resource
+        .template use<bool>([&released](int) {
+            return Task<bool>::pure(released);
+        })
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_FALSE(releasedBeforeUse);
+    EXPECT_TRUE(released);
 }
 
 TEST(Resource,CallsReleaseOnError) {
