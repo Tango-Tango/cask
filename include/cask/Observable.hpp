@@ -132,6 +132,29 @@ public:
     virtual CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const = 0;
 
     /**
+     * Subscribe to the observer - beginning computation of the stream. Ongoing
+     * computation may be cancled by using the returned cancelation handle. This
+     * method is provided as a convenience for subscribers who may not want to
+     * implement the entire `Observer` interface and would rather pass lambdas
+     * for each of the handler methods. Please look at the contract documented
+     * as part of `Observer` for details on how these methods are called.
+     * 
+     * @param sched The scheduler to use for execution pipeline steps.
+     * @param onNext The onNext event handler.
+     * @param onError The onError event handler. By default does nothing.
+     * @param onComplete The onComplete event handler. By default does nothing.
+     * @param onCancel Provide an error for upstream cancelations. By default does nothing.
+     * @return The handle which may be used to cancel computation on the stream.
+     */
+    virtual CancelableRef subscribeHandlers(
+        const std::shared_ptr<Scheduler>& sched,
+        const std::function<Task<Ack,None>(const T&)>& onNext,
+        const std::function<Task<None,None>(const E&)>& onError = [](auto) { return Task<None,None>::none(); },
+        const std::function<Task<None,None>()>& onComplete = [] { return Task<None,None>::none(); },
+        const std::function<void()>& onCancel = [] {}
+    );
+
+    /**
      * Buffer input up to the given size and emit the buffer downstream. At
      * stream close a buffer will be emitted containing whatever has been
      * accumulated since the last time a buffer was emitted downstream.
@@ -214,6 +237,19 @@ public:
      */
     template <class T2>
     ObservableRef<T2,E> flatMap(const std::function<ObservableRef<T2,E>(const T&)>& predicate) const;
+
+    /**
+     * For each element in stream emit a possible infinite series of elements
+     * downstream. Upstream events will not be be backpressured. When an upstream
+     * event occurs the downstream subscription will be canceled, the predicate will
+     * be called to generate a new observable, and that observable will be subscribed.
+     *
+     * @param predicate The function to apply to each element of the stream and
+     *                  which emits a new stream of events downstream.
+     * @return An observable which applies the given transform to each element of the stream.
+     */
+    template <class T2>
+    ObservableRef<T2,E> switchMap(const std::function<ObservableRef<T2,E>(const T&)>& predicate) const;
 
     /**
      * Given a nested observable (an observable who emits other observables)
@@ -339,6 +375,7 @@ public:
 }
 
 #include "observable/BufferObservable.hpp"
+#include "observable/CallbackObserver.hpp"
 #include "observable/DeferObservable.hpp"
 #include "observable/DeferTaskObservable.hpp"
 #include "observable/EmptyObservable.hpp"
@@ -354,6 +391,7 @@ public:
 #include "observable/MapTaskObservable.hpp"
 #include "observable/MapBothTaskObservable.hpp"
 #include "observable/RepeatTaskObservable.hpp"
+#include "observable/SwitchMapObservable.hpp"
 #include "observable/TakeObserver.hpp"
 #include "observable/TakeWhileObservable.hpp"
 #include "observable/VectorObservable.hpp"
@@ -410,6 +448,27 @@ ObservableRef<T,E> Observable<T,E>::fromVector(const std::vector<T>& vector) {
 }
 
 template <class T, class E>
+CancelableRef Observable<T,E>::subscribeHandlers(
+    const std::shared_ptr<Scheduler>& sched,
+    const std::function<Task<Ack,None>(const T&)>& onNext,
+    const std::function<Task<None,None>(const E&)>& onError,
+    const std::function<Task<None,None>()>& onComplete,
+    const std::function<void()>& onCancel
+) {
+    auto observer = std::make_shared<observable::CallbackObserver<T,E>>(
+        onNext, onError, onComplete
+    );
+
+    auto subscription = subscribe(sched, observer);
+
+    subscription->onCancel([onCancel] {
+        return onCancel();
+    });
+
+    return subscription;
+}
+
+template <class T, class E>
 std::shared_ptr<Observable<BufferRef<T>,E>> Observable<T,E>::buffer(uint32_t size) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::BufferObservable<T,E>>(self, size);
@@ -451,6 +510,13 @@ template <class T2>
 ObservableRef<T2,E> Observable<T,E>::flatMap(const std::function<ObservableRef<T2,E>(const T&)>& predicate) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::FlatMapObservable<T,T2,E>>(self, predicate);
+}
+
+template <class T, class E>
+template <class T2>
+ObservableRef<T2,E> Observable<T,E>::switchMap(const std::function<ObservableRef<T2,E>(const T&)>& predicate) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::SwitchMapObservable<T,T2,E>>(self, predicate);
 }
 
 template <class T, class E>

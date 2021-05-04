@@ -28,12 +28,14 @@ public:
 private:
     std::optional<T> lastValue;
     std::weak_ptr<Promise<std::optional<T>,E>> promise;
+    std::atomic_flag completed;
 };
 
 template <class T, class E>
 LastObserver<T,E>::LastObserver(const std::weak_ptr<Promise<std::optional<T>,E>>& promise)
     : lastValue()
     , promise(promise)
+    , completed(false)
 {}
 
 template <class T, class E>
@@ -44,8 +46,10 @@ Task<Ack, None> LastObserver<T,E>::onNext(const T& value) {
 
 template <class T, class E>
 Task<None,None> LastObserver<T,E>::onError(const E& error) {
-    if(auto promiseLock = promise.lock()) {
-        promiseLock->error(error);
+    if(!completed.test_and_set()) {
+        if(auto promiseLock = promise.lock()) {
+            promiseLock->error(error);
+        }
     }
 
     return Task<None,None>::none();
@@ -53,8 +57,10 @@ Task<None,None> LastObserver<T,E>::onError(const E& error) {
 
 template <class T, class E>
 Task<None,None>  LastObserver<T,E>::onComplete() {
-    if(auto promiseLock = promise.lock()) {
-        promiseLock->success(lastValue);
+    if(!completed.test_and_set()) {
+        if(auto promiseLock = promise.lock()) {
+            promiseLock->success(lastValue);
+        }
     }
 
     return Task<None,None>::none();

@@ -3,6 +3,10 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 7.6
+
+- Add the `Observable::switchMap` method.
+
 ## 7.5
 
 - Add the `Observable::foreach` and `Observable::foreachTask` methods.
