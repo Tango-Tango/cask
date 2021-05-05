@@ -10,6 +10,7 @@
 using cask::Observable;
 using cask::Scheduler;
 using cask::Task;
+using cask::None;
 
 TEST(ObservableTakeWhile, Error) {
     auto result = Observable<int,float>::raiseError(1.23)
@@ -80,4 +81,45 @@ TEST(ObservableTakeWhile, CompletesOnlyOnce) {
         ->await();
 
     EXPECT_FALSE(result.has_value());
+}
+
+TEST(ObservableTakeWhile, RunsCompletionTask) {
+    auto shutdown_counter = 0;
+
+    auto result = Observable<int>::pure(123)
+        ->takeWhile([](auto) {
+            return false;
+        })
+        ->guarantee(Task<None,None>::eval([&shutdown_counter] {
+            shutdown_counter++;
+            return None();
+
+        }))
+        ->take(100)
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_EQ(result.size(), 0);
+    EXPECT_EQ(shutdown_counter, 1);
+}
+
+TEST(ObservableTakeWhile, RunsErrorTask) {
+    auto shutdown_counter = 0;
+
+    auto result = Observable<int,std::string>::raiseError("broke")
+        ->takeWhile([](auto) {
+            return false;
+        })
+        ->guarantee(Task<None,None>::eval([&shutdown_counter] {
+            shutdown_counter++;
+            return None();
+
+        }))
+        ->take(100)
+        .failed()
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_EQ(result, "broke");
+    EXPECT_EQ(shutdown_counter, 1);
 }

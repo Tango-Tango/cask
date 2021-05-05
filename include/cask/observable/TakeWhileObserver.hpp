@@ -70,19 +70,19 @@ Task<Ack,None> TakeWhileObserver<T,E>::onNext(const T& value) {
 template <class T, class E>
 Task<None,None> TakeWhileObserver<T,E>::onError(const E& error) {
     if(!completed.test_and_set()) {
-        downstream->onError(error);
+        return downstream->onError(error);
+    } else {
+        return Task<None,None>::none();
     }
-
-    return Task<None,None>::none();
 }
 
 template <class T, class E>
 Task<None,None> TakeWhileObserver<T,E>::onComplete() {
     if(!completed.test_and_set()) {
-        downstream->onComplete();
+        return downstream->onComplete();
+    } else {
+        return Task<None,None>::none();
     }
-
-    return Task<None,None>::none();
 }
 
 }
