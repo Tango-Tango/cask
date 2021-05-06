@@ -50,7 +50,7 @@ SwitchMapObserver<TI,TO,E>::SwitchMapObserver(
     , downstream(downstream)
     , sched(sched)
     , upstream_complete(std::make_shared<std::atomic_bool>(false))
-    , downstream_complete(std::make_shared<std::atomic_bool>(false))
+    , downstream_complete(std::make_shared<std::atomic_bool>(true))
     , error_encountered(std::make_shared<std::atomic_bool>(false))
     , stopped(std::make_shared<std::atomic_bool>(false))
     , running_id(std::make_shared<std::atomic_int>(0))

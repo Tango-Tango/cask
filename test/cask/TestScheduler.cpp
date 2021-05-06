@@ -96,7 +96,7 @@ TEST_P(SchedulerTest, SubmitAfter) {
     auto delta = after - before;
     auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
 
-    EXPECT_GT(milliseconds, 25);
+    EXPECT_GE(milliseconds, 25);
     
     awaitIdle();
 }
