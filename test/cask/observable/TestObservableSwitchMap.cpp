@@ -39,6 +39,20 @@ void awaitIdle() {
     FAIL() << "Expected scheduler to return to idle within 60 seconds.";
 }
 
+TEST(ObservableSwitchMap, Empty) {
+    auto sched = Scheduler::global();
+    auto result = Observable<int>::empty()
+        ->switchMap<float>([](auto value) {
+            return Observable<float>::pure(value * 1.5);
+        })
+        ->last()
+        .run(sched)
+        ->await();
+
+    EXPECT_TRUE(!result.has_value());
+    awaitIdle();
+}
+
 TEST(ObservableSwitchMap, Pure) {
     auto sched = Scheduler::global();
     auto result = Observable<int>::pure(123)
