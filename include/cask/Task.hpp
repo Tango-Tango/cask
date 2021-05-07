@@ -319,8 +319,6 @@ public:
      */
     constexpr Task<T,E> timeout(uint32_t milliseconds, const E& error) const noexcept;
 
-    constexpr Task<T,E> doOnCancel(const Task<None,None>& task) const noexcept;
-
     /**
      * Construct a task which wraps the given trampoline operations. This
      * should not be called directly and, instead, users should use provided
