@@ -805,9 +805,19 @@ constexpr Task<T,E> Task<T,E>::sideEffect(const Task<T2, E>& task) const noexcep
 template <class T, class E>
 template <class T2>
 constexpr Task<T,E> Task<T,E>::guarantee(const Task<T2, E>& task) const noexcept {
-    return materialize()
-    .template sideEffect<T2>(task)
-    .template dematerialize<T>();
+    return Task<T,E>::deferAction([self = *this, task](auto sched) {
+        auto deferred = self
+            .materialize()
+            .template sideEffect<T2>(task)
+            .template dematerialize<T>()
+            .run(sched);
+
+        deferred->onCancel([task, sched]{
+            task.run(sched)->await();
+        });
+
+        return deferred;
+    });
 }
 
 template <class T, class E>
