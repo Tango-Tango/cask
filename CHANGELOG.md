@@ -7,7 +7,7 @@ in this file. This project follows [semantic versioning](https://semver.org/).
 
 - Make the `Scheduler` a virtual interface that may be implemented in several ways.
 - Move the current `Scheduler` implementation into the `ThreadPoolScheduler`.
-- Add the `TestBenchScheduler` as a scheduler implementation that allows test
+- Add the `BenchScheduler` as a scheduler implementation that allows test
   benches to do things like manually advance time.
 
 ## 7.6
