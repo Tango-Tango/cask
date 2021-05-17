@@ -6,6 +6,7 @@
 #ifndef _CASK_LIST_H_
 #define _CASK_LIST_H_
 
+#include <optional>
 #include <memory>
 
 namespace cask {
