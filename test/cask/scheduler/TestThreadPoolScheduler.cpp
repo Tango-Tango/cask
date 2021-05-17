@@ -5,17 +5,17 @@
 
 #include <atomic>
 #include "gtest/gtest.h"
-#include "cask/Scheduler.hpp"
+#include "cask/scheduler/ThreadPoolScheduler.hpp"
 
-using cask::Scheduler;
+using cask::scheduler::ThreadPoolScheduler;
 
 const static std::chrono::milliseconds sleep_time(1);
 
-class SchedulerTest : public ::testing::TestWithParam<int> {
+class ThreadPoolSchedulerTest : public ::testing::TestWithParam<int> {
 protected:
 
     void SetUp() override {
-        sched = std::make_shared<Scheduler>(GetParam());
+        sched = std::make_shared<ThreadPoolScheduler>(GetParam());
     }
 
     void awaitIdle() {
@@ -32,14 +32,14 @@ protected:
         FAIL() << "Expected scheduler to return to idle within 1 second.";
     }
     
-    std::shared_ptr<Scheduler> sched;
+    std::shared_ptr<ThreadPoolScheduler> sched;
 };
 
-TEST_P(SchedulerTest, IdlesAtStart) {
+TEST_P(ThreadPoolSchedulerTest, IdlesAtStart) {
     EXPECT_TRUE(sched->isIdle());
 }
 
-TEST_P(SchedulerTest, SubmitSingle) {
+TEST_P(ThreadPoolSchedulerTest, SubmitSingle) {
     std::mutex mutex;
     mutex.lock();
 
@@ -52,7 +52,7 @@ TEST_P(SchedulerTest, SubmitSingle) {
     awaitIdle();
 }
 
-TEST_P(SchedulerTest, SubmitBulk) {
+TEST_P(ThreadPoolSchedulerTest, SubmitBulk) {
     const static int num_tasks = 100;
     int num_exec_retries = 1000;
 
@@ -82,7 +82,7 @@ TEST_P(SchedulerTest, SubmitBulk) {
     awaitIdle();
 }
 
-TEST_P(SchedulerTest, SubmitAfter) {
+TEST_P(ThreadPoolSchedulerTest, SubmitAfter) {
     std::mutex mutex;
     mutex.lock();
 
@@ -101,4 +101,4 @@ TEST_P(SchedulerTest, SubmitAfter) {
     awaitIdle();
 }
 
-INSTANTIATE_TEST_SUITE_P(Scheduler, SchedulerTest, ::testing::Values(1, 2, 4, 16));
+INSTANTIATE_TEST_SUITE_P(Scheduler, ThreadPoolSchedulerTest, ::testing::Values(1, 2, 4, 16));
