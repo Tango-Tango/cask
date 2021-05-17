@@ -19,7 +19,7 @@ TEST(Resource,BasicUsage) {
         }
     );
 
-    auto sched = std::make_shared<cask::Scheduler>();
+    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](int value) {
         return Task<float>::pure(value * 1.5);
     });
@@ -44,7 +44,7 @@ TEST(Resource,CallsAcquireRelease) {
         }
     );
 
-    auto sched = std::make_shared<cask::Scheduler>();
+    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](int value) {
         return Task<float>::pure(value * 1.5);
     });
@@ -65,7 +65,7 @@ TEST(Resource,ReleasesAfterUsage) {
         }
     );
 
-    auto sched = std::make_shared<cask::Scheduler>();
+    auto sched = Scheduler::global();
     auto releasedBeforeUse = resource
         .template use<bool>([&released](int) {
             return Task<bool>::pure(released);
@@ -94,7 +94,7 @@ TEST(Resource,CallsReleaseOnError) {
         }
     );
 
-    auto sched = std::make_shared<cask::Scheduler>();
+    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](int) {
         return Task<float, std::string>::raiseError("something went wrong");
     });
@@ -116,7 +116,7 @@ TEST(Resource,ReleaseRaisesError) {
         }
     );
 
-    auto sched = std::make_shared<cask::Scheduler>();
+    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](int value) {
         return Task<float,std::string>::pure(value * 1.5);
     });
@@ -133,7 +133,7 @@ TEST(Resource,AcquireRaisesError) {
         }
     );
 
-    auto sched = std::make_shared<cask::Scheduler>();
+    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](int value) {
         return Task<float, std::string>::pure(value * 1.5);
     });
@@ -153,7 +153,7 @@ TEST(Resource, Map) {
         return value * 1.5;
     });
 
-    auto sched = std::make_shared<cask::Scheduler>();
+    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](float value) {
         return Task<float>::pure(value);
     });
@@ -172,7 +172,7 @@ TEST(Resource, MapAcquireError) {
         return value * 1.5;
     });
 
-    auto sched = std::make_shared<cask::Scheduler>();
+    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](float value) {
         return Task<float,float>::pure(value);
     });
@@ -192,7 +192,7 @@ TEST(Resource, MapReleaseError) {
         return value * 1.5;
     });
 
-    auto sched = std::make_shared<cask::Scheduler>();
+    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](float value) {
         return Task<float,float>::pure(value);
     });
@@ -231,7 +231,7 @@ TEST(Resource, FlatMapAcquiresAndReleasesBoth) {
         );
     });
 
-    auto sched = std::make_shared<cask::Scheduler>();
+    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](float value) {
         return Task<float>::pure(value);
     });

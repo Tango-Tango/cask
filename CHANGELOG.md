@@ -3,6 +3,13 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 8.0
+
+- Make the `Scheduler` a virtual interface that may be implemented in several ways.
+- Move the current `Scheduler` implementation into the `ThreadPoolScheduler`.
+- Add the `BenchScheduler` as a scheduler implementation that allows test
+  benches to do things like manually advance time.
+
 ## 7.6
 
 - Add the `Observable::switchMap` method.

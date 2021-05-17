@@ -6,17 +6,14 @@
 #ifndef _CASK_SCHEDULER_H_
 #define _CASK_SCHEDULER_H_
 
-#include <atomic>
-#include <condition_variable>
 #include <functional>
-#include <map>
-#include <mutex>
-#include <optional>
-#include <thread>
+#include <memory>
 #include <vector>
-#include <queue>
 
 namespace cask {
+
+class Scheduler;
+using SchedulerRef = std::shared_ptr<Scheduler>;
 
 /**
  * A Scheduler represents a thread pool upon which asynchronous operations
@@ -29,22 +26,7 @@ public:
      *
      * @return The default globally available scheduler instance.
      */
-    static std::shared_ptr<Scheduler> global();
-
-    /**
-     * Construct a scheduler optionally configuring the maximum number of threads
-     * to use.
-     * 
-     * @param poolSize The number of threads to use - defaults to matching
-     *                 the number of hardware threads available in the system.
-     */
-    Scheduler(int poolSize = std::thread::hardware_concurrency());
-
-    /**
-     * Destruct the scheduler. Destruction waits for all running and timer
-     * threads to stop before finishing.
-     */
-    ~Scheduler();
+    static SchedulerRef global();
 
     /**
      * Submit a task for execution in the thread pool. This task will
@@ -53,7 +35,7 @@ public:
      * 
      * @param task The task to submit for execution.
      */
-    void submit(const std::function<void()>& task);
+    virtual void submit(const std::function<void()>& task) = 0;
 
     /**
      * Submit several tasks at once to the the thread pool. The order
@@ -63,7 +45,7 @@ public:
      * 
      * @param tasks The vector of tasks to submit in-bulk.
      */
-    void submitBulk(const std::vector<std::function<void()>>& tasks);
+    virtual void submitBulk(const std::vector<std::function<void()>>& tasks) = 0;
 
     /**
      * Submit a task to the pool after _at least_ the given amount
@@ -73,7 +55,7 @@ public:
      *                     submitting to the pool
      * @param task The task the submit after the wait time has elapsed.
      */
-    void submitAfter(int64_t milliseconds, const std::function<void()>& task);
+    virtual void submitAfter(int64_t milliseconds, const std::function<void()>& task) = 0;
 
     /**
      * Check if the scheduler is currently idle - meaning all threads are
@@ -81,22 +63,9 @@ public:
      * 
      * @return true if the scheduler is idle.
      */
-    bool isIdle() const;
-private:
-    bool running;
+    virtual bool isIdle() const = 0;
 
-    std::mutex readyQueueMutex;
-    std::condition_variable dataInQueue;
-    std::queue<std::function<void()>> readyQueue;
-    std::atomic_size_t idleThreads;
-    std::mutex timerMutex;
-    std::map<int64_t,std::vector<std::function<void()>>> timers;
-    std::vector<std::thread> runThreads;
-    std::thread timerThread;
-    int64_t ticks;
-
-    void run();
-    void timer();
+    virtual ~Scheduler() = default;
 };
 
 }
