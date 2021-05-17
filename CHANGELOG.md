@@ -3,6 +3,13 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 9.0
+
+- Allow scheduled timers to be canceled by returning a `Cancelable` from
+  `Scheduler::submitAfter`.
+- Update `Task::timeout` and `Task::delay` to properly cancel timers when
+  the task is canceled to prevent them from leaking.
+
 ## 8.0
 
 - Make the `Scheduler` a virtual interface that may be implemented in several ways.

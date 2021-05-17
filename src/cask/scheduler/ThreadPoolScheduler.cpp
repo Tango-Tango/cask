@@ -44,30 +44,41 @@ ThreadPoolScheduler::~ThreadPoolScheduler() {
 
 void ThreadPoolScheduler::submit(const std::function<void()>& task) {
     {
-        std::lock_guard guard(readyQueueMutex);
+        std::lock_guard<std::mutex> guard(readyQueueMutex);
         readyQueue.emplace(task);
     }
     dataInQueue.notify_one();
 }
 
 void ThreadPoolScheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
-    std::lock_guard guard(readyQueueMutex);
+    std::lock_guard<std::mutex> guard(readyQueueMutex);
     for(auto& task: tasks) {
         readyQueue.emplace(task);
         dataInQueue.notify_one();
     }
 }
 
-void ThreadPoolScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
-    std::lock_guard guard(timerMutex);
+CancelableRef ThreadPoolScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
+    std::lock_guard<std::mutex> guard(timerMutex);
     int64_t executionTick = ticks + milliseconds;
+
+    auto id = next_id++;
     auto tasks = timers.find(executionTick);
+    auto entry = std::make_tuple(id, task);
+    auto cancelable = std::make_shared<CancelableTimer>(
+        this->shared_from_this(),
+        executionTick,
+        id
+    );
+
     if(tasks == timers.end()) {
-        std::vector<std::function<void()>> taskVector = {task};
+        std::vector<TimerEntry> taskVector = {entry};
         timers[executionTick] = taskVector;
     } else {
-        tasks->second.push_back(task);
+        tasks->second.push_back(entry);
     }
+
+    return cancelable;
 }
 
 bool ThreadPoolScheduler::isIdle() const {
@@ -116,7 +127,7 @@ void ThreadPoolScheduler::timer() {
         auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
 
         {
-            std::lock_guard guard(timerMutex);
+            std::lock_guard<std::mutex> guard(timerMutex);
 
             int64_t previous_ticks = ticks;
             ticks += milliseconds;
@@ -124,11 +135,76 @@ void ThreadPoolScheduler::timer() {
             for(int64_t i = previous_ticks; i <= ticks; i++) {
                 auto tasks = timers.find(i);
                 if(tasks != timers.end()) {
-                    submitBulk(tasks->second);
+                    std::vector<std::function<void()>> submittedTasks;
+                    auto entries = tasks->second;
+
+                    submittedTasks.reserve(entries.size());
+
+                    for(auto& entry : entries) {
+                        submittedTasks.emplace_back(std::get<1>(entry));
+                    }
+
+                    submitBulk(submittedTasks);
                     timers.erase(i);
                 }
             }
         }
+    }
+}
+
+ThreadPoolScheduler::CancelableTimer::CancelableTimer(
+    const std::shared_ptr<ThreadPoolScheduler>& parent,
+    int64_t time_slot,
+    int64_t id
+)   : parent(parent)
+    , time_slot(time_slot)
+    , id(id)
+    , callbacks()
+    , callback_mutex()
+    , canceled(false)
+{}
+
+void ThreadPoolScheduler::CancelableTimer::cancel() {
+    if(canceled) {
+        return;
+    } else {
+        std::lock_guard<std::mutex> parent_guard(parent->timerMutex);
+        std::lock_guard<std::mutex> self_guard(callback_mutex);
+        auto tasks = parent->timers.find(time_slot);
+        if(tasks != parent->timers.end()) {
+            std::vector<TimerEntry> filteredEntries;
+            auto entries = tasks->second;
+
+            for(auto& entry : entries) {
+                auto entry_id = std::get<0>(entry);
+                if(entry_id != id) {
+                    filteredEntries.emplace_back(entry);
+                } else {
+                    canceled = true;
+                }
+            }
+
+            if(filteredEntries.size() > 0) {
+                parent->timers[time_slot] = filteredEntries;
+            } else {
+                parent->timers.erase(time_slot);
+            }
+        }
+    }
+
+    if(canceled) {
+        for(auto& cb : callbacks) {
+            cb();
+        }
+    }
+}
+
+void ThreadPoolScheduler::CancelableTimer::onCancel(const std::function<void()>& callback) {
+    if(canceled) {
+        callback();
+    } else {
+        std::lock_guard<std::mutex> guard(callback_mutex);
+        callbacks.emplace_back(callback);
     }
 }
 

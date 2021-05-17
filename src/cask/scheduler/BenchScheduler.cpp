@@ -56,7 +56,7 @@ void BenchScheduler::advance_time(int64_t milliseconds) {
     std::vector<TimerEntry> new_timers;
     for(auto& entry : timers) {
         if(std::get<0>(entry) <= current_time) {
-            ready_queue.emplace(std::get<1>(entry));
+            ready_queue.emplace(std::get<2>(entry));
         } else {
             new_timers.emplace_back(entry);
         }
@@ -77,15 +77,70 @@ void BenchScheduler::submitBulk(const std::vector<std::function<void()>>& tasks)
     }
 }
 
-void BenchScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
+CancelableRef BenchScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
     std::lock_guard<std::mutex> guard(scheduler_mutex);
     int64_t scheduled_time = current_time + milliseconds;
-    timers.emplace_back(scheduled_time, task);
+    int64_t id = next_id++;
+
+    auto cancelable = std::make_shared<BenchCancelableTimer>(
+        this->shared_from_this(),
+        id
+    );
+
+    timers.emplace_back(scheduled_time, id, task);
+
+    return cancelable;
 }
 
 bool BenchScheduler::isIdle() const {
     std::lock_guard<std::mutex> guard(scheduler_mutex);
     return timers.empty() && ready_queue.empty();
+}
+
+BenchScheduler::BenchCancelableTimer::BenchCancelableTimer(
+    const std::shared_ptr<BenchScheduler>& parent,
+    int64_t id
+)   : parent(parent)
+    , id(id)
+    , callbacks()
+    , callback_mutex()
+    , canceled(false)
+{}
+
+void BenchScheduler::BenchCancelableTimer::cancel() {
+    if(canceled) {
+        return;
+    } else {
+        std::lock_guard<std::mutex> self_guard(callback_mutex);
+        std::lock_guard<std::mutex> parent_guard(parent->scheduler_mutex);
+        std::vector<TimerEntry> filteredEntries;
+
+        for(auto& entry : parent->timers) {
+            auto entry_id = std::get<1>(entry);
+            if(entry_id != id) {
+                filteredEntries.emplace_back(entry);
+            } else {
+                canceled = true;
+            }
+        }
+
+        parent->timers = filteredEntries;
+    }
+
+    if(canceled) {
+        for(auto& cb : callbacks) {
+            cb();
+        }
+    }
+}
+
+void BenchScheduler::BenchCancelableTimer::onCancel(const std::function<void()>& callback) {
+    if(canceled) {
+        callback();
+    } else {
+        std::lock_guard<std::mutex> guard(callback_mutex);
+        callbacks.emplace_back(callback);
+    }
 }
 
 } // namespace cask::scheduler

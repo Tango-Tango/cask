@@ -7,6 +7,7 @@
 #define _CASK_TEST_BENCH_SCHEDULER_H_
 
 #include "../Scheduler.hpp"
+#include <memory>
 #include <mutex>
 #include <tuple>
 #include <vector>
@@ -37,7 +38,7 @@ namespace cask::scheduler {
  * control (e.g. because the unit under test has timers). In such a case
  * this scheduler implementation can be very handy.
  */
-class BenchScheduler final : public Scheduler {
+class BenchScheduler final : public Scheduler, public std::enable_shared_from_this<BenchScheduler> {
 public:
     BenchScheduler();
 
@@ -88,16 +89,34 @@ public:
 
     void submit(const std::function<void()>& task) override;
     void submitBulk(const std::vector<std::function<void()>>& tasks) override;
-    void submitAfter(int64_t milliseconds, const std::function<void()>& task) override;
+    CancelableRef submitAfter(int64_t milliseconds, const std::function<void()>& task) override;
     bool isIdle() const override;
 
 private:
-    using TimerEntry = std::tuple<int64_t, std::function<void()>>;
+    using TimerEntry = std::tuple<int64_t, int64_t, std::function<void()>>;
 
     int64_t current_time;
+    int64_t next_id;
     std::queue<std::function<void()>> ready_queue;
     std::vector<TimerEntry> timers;
     mutable std::mutex scheduler_mutex;
+
+    class BenchCancelableTimer final : public Cancelable {
+    public:
+        BenchCancelableTimer(
+            const std::shared_ptr<BenchScheduler>& parent,
+            int64_t id
+        );
+
+        void cancel() override;
+        void onCancel(const std::function<void()>& callback) override;
+    private:
+        std::shared_ptr<BenchScheduler> parent;
+        int64_t id;
+        std::vector<std::function<void()>> callbacks;
+        std::mutex callback_mutex;
+        bool canceled;
+    };
 };
 
 }

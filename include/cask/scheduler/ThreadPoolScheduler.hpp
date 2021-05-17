@@ -18,7 +18,7 @@
 
 namespace cask::scheduler {
 
-class ThreadPoolScheduler final : public Scheduler {
+class ThreadPoolScheduler final : public Scheduler, public std::enable_shared_from_this<ThreadPoolScheduler> {
 public:
     /**
      * Construct a scheduler optionally configuring the maximum number of threads
@@ -37,9 +37,11 @@ public:
 
     void submit(const std::function<void()>& task) override;
     void submitBulk(const std::vector<std::function<void()>>& tasks) override;
-    void submitAfter(int64_t milliseconds, const std::function<void()>& task) override;
+    CancelableRef submitAfter(int64_t milliseconds, const std::function<void()>& task) override;
     bool isIdle() const override;
 private:
+    using TimerEntry = std::tuple<int64_t, std::function<void()>>;
+
     bool running;
 
     std::mutex readyQueueMutex;
@@ -47,13 +49,33 @@ private:
     std::queue<std::function<void()>> readyQueue;
     std::atomic_size_t idleThreads;
     std::mutex timerMutex;
-    std::map<int64_t,std::vector<std::function<void()>>> timers;
+    std::map<int64_t,std::vector<TimerEntry>> timers;
     std::vector<std::thread> runThreads;
     std::thread timerThread;
     int64_t ticks;
+    int64_t next_id;
 
     void run();
     void timer();
+
+    class CancelableTimer final : public Cancelable {
+    public:
+        CancelableTimer(
+            const std::shared_ptr<ThreadPoolScheduler>& parent,
+            int64_t time_slot,
+            int64_t id
+        );
+
+        void cancel() override;
+        void onCancel(const std::function<void()>& callback) override;
+    private:
+        std::shared_ptr<ThreadPoolScheduler> parent;
+        int64_t time_slot;
+        int64_t id;
+        std::vector<std::function<void()>> callbacks;
+        std::mutex callback_mutex;
+        bool canceled;
+    };
 };
 
 }

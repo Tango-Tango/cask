@@ -5,10 +5,12 @@
 
 #include "gtest/gtest.h"
 #include "cask/Task.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::None;
 using cask::Task;
 using cask::Scheduler;
+using cask::scheduler::BenchScheduler;
 
 TEST(TaskTimeout, DoesntTimeoutValue) {
     auto result = Task<int,std::string>::pure(123)
@@ -37,4 +39,18 @@ TEST(TaskTimeout, TimesOut) {
         ->await();
     
     EXPECT_EQ(result, "timeout");
+}
+
+TEST(TaskTimeout, Cancels) {
+    auto sched = std::make_shared<BenchScheduler>();
+
+    auto deferred = Task<int, std::string>::never()
+        .timeout(1, "timeout")
+        .run(sched);
+
+    sched->run_ready_tasks();
+    EXPECT_EQ(sched->num_timers(), 1);
+
+    deferred->cancel();
+    EXPECT_EQ(sched->num_timers(), 0);
 }

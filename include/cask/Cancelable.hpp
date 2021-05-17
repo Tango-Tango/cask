@@ -36,7 +36,7 @@ public:
      *
      * @param callback The callback to run if this promise is canceled.
      */
-    virtual void onCancel(std::function<void()>) = 0;
+    virtual void onCancel(const std::function<void()>&) = 0;
 
     virtual ~Cancelable() {};
 };
@@ -44,7 +44,7 @@ public:
 class IgnoreCancelation final : public Cancelable {
 public:
     void cancel() override {}
-    void onCancel(std::function<void()>) override {}
+    void onCancel(const std::function<void()>&) override {}
 };
 
 }
