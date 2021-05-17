@@ -88,7 +88,7 @@ public:
      */
     bool isCancelled() const;
 
-    void onCancel(std::function<void()> callback) override;
+    void onCancel(const std::function<void()>& callback) override;
     void cancel() override;
 private:
     friend deferred::PromiseDeferred<T,E>;
@@ -198,7 +198,7 @@ std::optional<Either<T,E>> Promise<T,E>::get() const {
 }
 
 template <class T, class E>
-void Promise<T,E>::onCancel(std::function<void()> callback) {
+void Promise<T,E>::onCancel(const std::function<void()>& callback) {
     bool runNow = false;
 
     {

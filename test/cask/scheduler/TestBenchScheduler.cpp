@@ -9,72 +9,72 @@
 using cask::scheduler::BenchScheduler;
 
 TEST(BenchScheduler, ConstructsEmpty) {
-    BenchScheduler sched;
-    EXPECT_EQ(sched.num_task_ready(), 0);
-    EXPECT_EQ(sched.num_timers(), 0);
-    EXPECT_FALSE(sched.run_one_task());
-    EXPECT_EQ(sched.run_ready_tasks(), 0);
-    EXPECT_TRUE(sched.isIdle());
+    auto sched = std::make_shared<BenchScheduler>();
+    EXPECT_EQ(sched->num_task_ready(), 0);
+    EXPECT_EQ(sched->num_timers(), 0);
+    EXPECT_FALSE(sched->run_one_task());
+    EXPECT_EQ(sched->run_ready_tasks(), 0);
+    EXPECT_TRUE(sched->isIdle());
 }
 
 TEST(BenchScheduler, SubmitAndRunOne) {
-    BenchScheduler sched;
+    auto sched = std::make_shared<BenchScheduler>();
 
     int counter = 0;
-    sched.submit([&counter] { counter++; });
+    sched->submit([&counter] { counter++; });
 
-    EXPECT_EQ(sched.num_task_ready(), 1);
-    EXPECT_FALSE(sched.isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 1);
+    EXPECT_FALSE(sched->isIdle());
     EXPECT_EQ(counter, 0);
     
-    EXPECT_TRUE(sched.run_one_task());
-    EXPECT_FALSE(sched.run_one_task());
+    EXPECT_TRUE(sched->run_one_task());
+    EXPECT_FALSE(sched->run_one_task());
 
-    EXPECT_TRUE(sched.isIdle());
-    EXPECT_EQ(sched.num_task_ready(), 0);
+    EXPECT_TRUE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 0);
     EXPECT_EQ(counter, 1);
 }
 
 TEST(BenchScheduler, SubmitAndRunReady) {
-    BenchScheduler sched;
+    auto sched = std::make_shared<BenchScheduler>();
 
     int counter = 0;
-    sched.submit([&counter] { counter++; });
+    sched->submit([&counter] { counter++; });
 
-    EXPECT_EQ(sched.num_task_ready(), 1);
-    EXPECT_FALSE(sched.isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 1);
+    EXPECT_FALSE(sched->isIdle());
     EXPECT_EQ(counter, 0);
 
-    EXPECT_EQ(sched.run_ready_tasks(), 1);
-    EXPECT_EQ(sched.run_ready_tasks(), 0);
+    EXPECT_EQ(sched->run_ready_tasks(), 1);
+    EXPECT_EQ(sched->run_ready_tasks(), 0);
 
-    EXPECT_TRUE(sched.isIdle());
-    EXPECT_EQ(sched.num_task_ready(), 0);
+    EXPECT_TRUE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 0);
     EXPECT_EQ(counter, 1);
 }
 
 TEST(BenchScheduler, SubmitAndRunMultipleReady) {
-    BenchScheduler sched;
+    auto sched = std::make_shared<BenchScheduler>();
 
     int counter = 0;
-    sched.submit([&counter] { counter++; });
-    sched.submit([&counter] { counter++; });
-    sched.submit([&counter] { counter++; });
+    sched->submit([&counter] { counter++; });
+    sched->submit([&counter] { counter++; });
+    sched->submit([&counter] { counter++; });
 
-    EXPECT_FALSE(sched.isIdle());
-    EXPECT_EQ(sched.num_task_ready(), 3);
+    EXPECT_FALSE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 3);
     EXPECT_EQ(counter, 0);
 
-    EXPECT_EQ(sched.run_ready_tasks(), 3);
-    EXPECT_EQ(sched.run_ready_tasks(), 0);
+    EXPECT_EQ(sched->run_ready_tasks(), 3);
+    EXPECT_EQ(sched->run_ready_tasks(), 0);
 
-    EXPECT_TRUE(sched.isIdle());
-    EXPECT_EQ(sched.num_task_ready(), 0);
+    EXPECT_TRUE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 0);
     EXPECT_EQ(counter, 3);
 }
 
 TEST(BenchScheduler, SubmitBulk) {
-    BenchScheduler sched;
+    auto sched = std::make_shared<BenchScheduler>();
 
     int counter = 0;
     std::vector<std::function<void()>> tasks = {
@@ -83,47 +83,150 @@ TEST(BenchScheduler, SubmitBulk) {
         [&counter] { counter++; }
     };
 
-    sched.submitBulk(tasks);
+    sched->submitBulk(tasks);
 
-    EXPECT_FALSE(sched.isIdle());
-    EXPECT_EQ(sched.num_task_ready(), 3);
+    EXPECT_FALSE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 3);
     EXPECT_EQ(counter, 0);
 
-    EXPECT_EQ(sched.run_ready_tasks(), 3);
-    EXPECT_EQ(sched.run_ready_tasks(), 0);
+    EXPECT_EQ(sched->run_ready_tasks(), 3);
+    EXPECT_EQ(sched->run_ready_tasks(), 0);
 
-    EXPECT_TRUE(sched.isIdle());
-    EXPECT_EQ(sched.num_task_ready(), 0);
+    EXPECT_TRUE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 0);
     EXPECT_EQ(counter, 3);
 }
 
 TEST(BenchScheduler, SubmitAfterAndAdvanceTime) {
-    BenchScheduler sched;
+    auto sched = std::make_shared<BenchScheduler>();
 
     int counter = 0;
-    sched.submitAfter(10, [&counter] { counter++; });
+    sched->submitAfter(10, [&counter] { counter++; });
 
-    EXPECT_FALSE(sched.isIdle());
-    EXPECT_EQ(sched.num_task_ready(), 0);
-    EXPECT_EQ(sched.num_timers(), 1);
-    EXPECT_FALSE(sched.run_one_task());
+    EXPECT_FALSE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 0);
+    EXPECT_EQ(sched->num_timers(), 1);
+    EXPECT_FALSE(sched->run_one_task());
     EXPECT_EQ(counter, 0);
 
-    sched.advance_time(9);
+    sched->advance_time(9);
 
-    EXPECT_FALSE(sched.isIdle());
-    EXPECT_EQ(sched.num_task_ready(), 0);
-    EXPECT_EQ(sched.num_timers(), 1);
-    EXPECT_FALSE(sched.run_one_task());
+    EXPECT_FALSE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 0);
+    EXPECT_EQ(sched->num_timers(), 1);
+    EXPECT_FALSE(sched->run_one_task());
     EXPECT_EQ(counter, 0);
 
-    sched.advance_time(1);
+    sched->advance_time(1);
 
-    EXPECT_FALSE(sched.isIdle());
-    EXPECT_EQ(sched.num_task_ready(), 1);
-    EXPECT_EQ(sched.num_timers(), 0);
-    EXPECT_TRUE(sched.run_one_task());
-    EXPECT_TRUE(sched.isIdle());
+    EXPECT_FALSE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 1);
+    EXPECT_EQ(sched->num_timers(), 0);
+    EXPECT_TRUE(sched->run_one_task());
+    EXPECT_TRUE(sched->isIdle());
     EXPECT_EQ(counter, 1);
 }
 
+TEST(BenchScheduler, SubmitAfterAndCancel) {
+    auto sched = std::make_shared<BenchScheduler>();
+
+    int timer_counter = 0;
+    int cancel_counter = 0;
+
+    auto handle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
+    handle->onCancel([&cancel_counter] { cancel_counter++; });
+
+    EXPECT_FALSE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 0);
+    EXPECT_EQ(sched->num_timers(), 1);
+
+    handle->cancel();
+
+    EXPECT_TRUE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 0);
+    EXPECT_EQ(sched->num_timers(), 0);
+    EXPECT_EQ(timer_counter, 0);
+    EXPECT_EQ(cancel_counter, 1);
+}
+
+TEST(BenchScheduler, SubmitAfterMultipleTimersCancelOne) {
+    auto sched = std::make_shared<BenchScheduler>();
+
+    int timer_counter = 0;
+    int cancel_counter = 0;
+
+    auto firstHandle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
+    firstHandle->onCancel([&cancel_counter] { cancel_counter++; });
+
+    auto secondHandle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
+    secondHandle->onCancel([&cancel_counter] { cancel_counter++; });
+
+    firstHandle->cancel();
+    EXPECT_EQ(timer_counter, 0);
+    EXPECT_EQ(cancel_counter, 1);
+
+    sched->advance_time(10);
+    sched->run_ready_tasks();
+    EXPECT_EQ(timer_counter, 1);
+    EXPECT_EQ(cancel_counter, 1);
+}
+
+TEST(BenchScheduler, SubmitAfterMultipleCancels) {
+    auto sched = std::make_shared<BenchScheduler>();
+
+    int timer_counter = 0;
+    int cancel_counter = 0;
+
+    auto handle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
+    handle->onCancel([&cancel_counter] { cancel_counter++; });
+    handle->cancel();
+    handle->cancel();
+    handle->cancel();
+
+    EXPECT_TRUE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 0);
+    EXPECT_EQ(sched->num_timers(), 0);
+    EXPECT_EQ(timer_counter, 0);
+    EXPECT_EQ(cancel_counter, 1);
+}
+
+TEST(BenchScheduler, CancelsAfterTimerFires) {
+    auto sched = std::make_shared<BenchScheduler>();
+
+    int timer_counter = 0;
+    int cancel_counter = 0;
+
+    auto handle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
+    handle->onCancel([&cancel_counter] { cancel_counter++; });
+
+    sched->advance_time(10);
+    handle->cancel();
+
+    EXPECT_FALSE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 1);
+    EXPECT_EQ(sched->num_timers(), 0);
+    EXPECT_EQ(cancel_counter, 0);
+    EXPECT_EQ(timer_counter, 0);
+
+    sched->run_ready_tasks();
+    EXPECT_TRUE(sched->isIdle());
+    EXPECT_EQ(cancel_counter, 0);
+    EXPECT_EQ(timer_counter, 1);
+}
+
+TEST(BenchScheduler, RegistersCallbackAfterCanceled) {
+    auto sched = std::make_shared<BenchScheduler>();
+
+    int timer_counter = 0;
+    int cancel_counter = 0;
+
+    auto handle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
+    handle->cancel();
+    handle->onCancel([&cancel_counter] { cancel_counter++; });
+
+    EXPECT_TRUE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 0);
+    EXPECT_EQ(sched->num_timers(), 0);
+    EXPECT_EQ(timer_counter, 0);
+    EXPECT_EQ(cancel_counter, 1);
+}

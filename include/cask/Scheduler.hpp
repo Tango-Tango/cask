@@ -10,6 +10,8 @@
 #include <memory>
 #include <vector>
 
+#include "Cancelable.hpp"
+
 namespace cask {
 
 class Scheduler;
@@ -55,7 +57,7 @@ public:
      *                     submitting to the pool
      * @param task The task the submit after the wait time has elapsed.
      */
-    virtual void submitAfter(int64_t milliseconds, const std::function<void()>& task) = 0;
+    virtual CancelableRef submitAfter(int64_t milliseconds, const std::function<void()>& task) = 0;
 
     /**
      * Check if the scheduler is currently idle - meaning all threads are

@@ -700,7 +700,7 @@ constexpr Task<T,E> Task<T,E>::delay(uint32_t milliseconds) const noexcept {
         trampoline::TrampolineOp::async([milliseconds, self = *this](auto sched) constexpr {
             auto promise = Promise<Erased,Erased>::create(sched);
 
-            sched->submitAfter(milliseconds, [sched, self, promise]() constexpr {
+            auto cancelable = sched->submitAfter(milliseconds, [sched, self, promise]() constexpr {
                 auto deferred = self.run(sched);
 
                 deferred->template chainDownstream<Erased,Erased>(promise, [](auto value) {
@@ -710,6 +710,10 @@ constexpr Task<T,E> Task<T,E>::delay(uint32_t milliseconds) const noexcept {
                         return Either<Erased,Erased>::right(value.get_right());
                     }
                 });
+            });
+
+            promise->onCancel([cancelable] {
+                cancelable->cancel();
             });
 
             return Deferred<Erased,Erased>::forPromise(promise);

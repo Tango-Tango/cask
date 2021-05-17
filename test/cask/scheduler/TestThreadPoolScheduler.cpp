@@ -101,4 +101,43 @@ TEST_P(ThreadPoolSchedulerTest, SubmitAfter) {
     awaitIdle();
 }
 
+TEST_P(ThreadPoolSchedulerTest, SubmitAfterCancel) {
+    std::mutex mutex;
+    mutex.lock();
+
+    int cancel_counter = 0;
+    auto firstHandle = sched->submitAfter(25, []{});
+    auto secondHandle = sched->submitAfter(25, [&mutex] { mutex.unlock(); });
+
+    firstHandle->onCancel([&cancel_counter]{ cancel_counter++; });
+    secondHandle->onCancel([&cancel_counter]{ cancel_counter++; });
+
+    firstHandle->cancel();
+    firstHandle->cancel();
+    firstHandle->cancel();
+
+    mutex.lock();
+
+    EXPECT_EQ(cancel_counter, 1);
+    awaitIdle();
+}
+
+TEST_P(ThreadPoolSchedulerTest, RegistersCallbackAfterCancelled) {
+    std::mutex mutex;
+    mutex.lock();
+
+    int cancel_counter = 0;
+    auto firstHandle = sched->submitAfter(25, []{});
+    auto secondHandle = sched->submitAfter(25, [&mutex] { mutex.unlock(); });
+
+    firstHandle->cancel();
+    firstHandle->onCancel([&cancel_counter]{ cancel_counter++; });
+    secondHandle->onCancel([&cancel_counter]{ cancel_counter++; });
+
+    mutex.lock();
+
+    EXPECT_EQ(cancel_counter, 1);
+    awaitIdle();
+}
+
 INSTANTIATE_TEST_SUITE_P(Scheduler, ThreadPoolSchedulerTest, ::testing::Values(1, 2, 4, 16));

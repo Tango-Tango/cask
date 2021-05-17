@@ -28,7 +28,7 @@ public:
     void onComplete(std::function<void(Either<T,E>)> callback) override;
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;
-    void onCancel(std::function<void()> callback) override;
+    void onCancel(const std::function<void()>& callback) override;
     void cancel() override;
     T await() override;
 
@@ -67,7 +67,7 @@ void PromiseDeferred<T,E>::onError(std::function<void(E)> callback) {
 }
 
 template <class T, class E>
-void PromiseDeferred<T,E>::onCancel(std::function<void()> callback) {
+void PromiseDeferred<T,E>::onCancel(const std::function<void()>& callback) {
     promise->onCancel(callback);
 }
 
