@@ -36,6 +36,7 @@ if not meson.is_subproject()
         'cask/observable/TestObservableTakeWhile.cpp',
         'cask/observable/TestObservableTakeWhileInclusive.cpp',
         'cask/scheduler/TestBenchScheduler.cpp',
+        'cask/scheduler/TestSingleThreadScheduler.cpp',
         'cask/scheduler/TestThreadPoolScheduler.cpp',
         'cask/task/TestTaskAssignment.cpp',
         'cask/task/TestTaskDefer.cpp',
