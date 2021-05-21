@@ -47,6 +47,7 @@ private:
 
     std::condition_variable dataInQueue;
 
+    mutable std::atomic_size_t readyQueueSize;
     mutable std::atomic_flag readyQueueLock;
     std::queue<std::function<void()>> readyQueue;
     std::mutex timerMutex;

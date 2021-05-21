@@ -14,6 +14,7 @@ SingleThreadScheduler::SingleThreadScheduler()
     : running(true)
     , idle(true)
     , dataInQueue()
+    , readyQueueSize(0)
     , readyQueueLock(ATOMIC_FLAG_INIT)
     , readyQueue()
     , timerMutex()
@@ -41,6 +42,7 @@ SingleThreadScheduler::~SingleThreadScheduler() {
 void SingleThreadScheduler::submit(const std::function<void()>& task) {
     while(readyQueueLock.test_and_set());
     readyQueue.emplace(task);
+    readyQueueSize.fetch_add(1);
     readyQueueLock.clear();
 }
 
@@ -49,6 +51,7 @@ void SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>&
     for(auto& task: tasks) {
         readyQueue.emplace(task);
     }
+    readyQueueSize.fetch_add(tasks.size());
     readyQueueLock.clear();
 }
 
@@ -76,28 +79,40 @@ CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std
 }
 
 bool SingleThreadScheduler::isIdle() const {
-    while(readyQueueLock.test_and_set());
-    auto result = idle && readyQueue.empty();
-    readyQueueLock.clear();
-    return result;
+    return idle && readyQueueSize.load() == 0;
 }
 
 void SingleThreadScheduler::run() {
     std::function<void()> task;
 
+    bool yielding = false;
+    auto poll_start_time = std::chrono::high_resolution_clock::now();
+
     while(running) {
-        while(readyQueueLock.test_and_set());
-        if(readyQueue.empty()) {
+        if(readyQueueSize.load() == 0) {
             idle = true;
-            readyQueueLock.clear();
-            std::this_thread::sleep_for(0ms);
+
+            if(yielding) {
+                std::this_thread::yield();
+            } else {
+                auto current_time = std::chrono::high_resolution_clock::now();
+                auto elapsed = poll_start_time - current_time;
+                if(elapsed > 1ms) {
+                    yielding = true;
+                    std::this_thread::yield();
+                }
+            }
         } else {
             idle = false;
+            yielding = false;
+            while(readyQueueLock.test_and_set());
             task = readyQueue.front();
             readyQueue.pop();
+            readyQueueSize.fetch_sub(1);
             readyQueueLock.clear();
             task();
         }
+        
     }
 }
 
