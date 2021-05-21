@@ -52,6 +52,8 @@ private:
 
     std::condition_variable dataInQueue;
 
+    mutable std::mutex idlingThreadMutex;
+    mutable std::condition_variable idlingThread;
     mutable std::atomic_size_t readyQueueSize;
     mutable std::atomic_flag readyQueueLock;
     std::queue<std::function<void()>> readyQueue;

@@ -44,6 +44,7 @@ void SingleThreadScheduler::submit(const std::function<void()>& task) {
     readyQueue.emplace(task);
     readyQueueSize.fetch_add(1);
     readyQueueLock.clear();
+    idlingThread.notify_one();
 }
 
 void SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
@@ -53,6 +54,7 @@ void SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>&
     }
     readyQueueSize.fetch_add(tasks.size());
     readyQueueLock.clear();
+    idlingThread.notify_one();
 }
 
 CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
@@ -85,26 +87,13 @@ bool SingleThreadScheduler::isIdle() const {
 void SingleThreadScheduler::run() {
     std::function<void()> task;
 
-    bool yielding = false;
-    auto poll_start_time = std::chrono::high_resolution_clock::now();
-
     while(running) {
         if(readyQueueSize.load() == 0) {
             idle = true;
-
-            if(yielding) {
-                std::this_thread::yield();
-            } else {
-                auto current_time = std::chrono::high_resolution_clock::now();
-                auto elapsed = poll_start_time - current_time;
-                if(elapsed > 1ms) {
-                    yielding = true;
-                    std::this_thread::yield();
-                }
-            }
+            std::unique_lock<std::mutex> lock(idlingThreadMutex);
+            idlingThread.wait_for(lock, 10ms, [this]{ return readyQueueSize.load() != 0; });
         } else {
             idle = false;
-            yielding = false;
             while(readyQueueLock.test_and_set());
             task = readyQueue.front();
             readyQueue.pop();
