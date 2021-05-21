@@ -324,14 +324,14 @@ public:
      * should not be called directly and, instead, users should use provided
      * operators to build these operations automatically.
      */
-    constexpr explicit Task(const std::shared_ptr<trampoline::TrampolineOp>& op) noexcept;
-    constexpr explicit Task(std::shared_ptr<trampoline::TrampolineOp>&& op) noexcept;
+    constexpr explicit Task(const std::shared_ptr<const trampoline::TrampolineOp>& op) noexcept;
+    constexpr explicit Task(std::shared_ptr<const trampoline::TrampolineOp>&& op) noexcept;
     constexpr Task(const Task<T,E>& other) noexcept;
     constexpr Task(Task<T,E>&& other) noexcept;
     constexpr Task<T,E>& operator=(const Task<T,E>& other) noexcept;
     constexpr Task<T,E>& operator=(Task<T,E>&& other) noexcept;
 
-    std::shared_ptr<trampoline::TrampolineOp> op;
+    std::shared_ptr<const trampoline::TrampolineOp> op;
 };
 
 template <class T, class E>
@@ -486,13 +486,13 @@ Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
 
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::asyncBoundary() const noexcept {
-    return Task<None,E>::deferAction([](auto sched) {
-        auto promise = Promise<None,E>::create(sched);
-        promise->success(None());
-        return Deferred<None,E>::forPromise(promise);
-    }).template flatMap<T>([self = *this](auto) {
-        return self;
-    });
+    return Task<T,E>(
+        trampoline::TrampolineOp::async([op = op](auto) {
+            return Deferred<Erased,Erased>::pure(Erased());
+        })->flatMap([op = op](auto, auto) {
+            return op;
+        })
+    );
 }
 
 template <class T, class E>
@@ -834,12 +834,12 @@ constexpr Task<T,E> Task<T,E>::timeout(uint32_t milliseconds, const E& error) co
 }
 
 template <class T, class E>
-constexpr Task<T,E>::Task(const std::shared_ptr<trampoline::TrampolineOp>& op) noexcept
+constexpr Task<T,E>::Task(const std::shared_ptr<const trampoline::TrampolineOp>& op) noexcept
     : op(op)
 {}
 
 template <class T, class E>
-constexpr Task<T,E>::Task(std::shared_ptr<trampoline::TrampolineOp>&& op) noexcept
+constexpr Task<T,E>::Task(std::shared_ptr<const trampoline::TrampolineOp>&& op) noexcept
     : op(std::move(op))
 {}
 

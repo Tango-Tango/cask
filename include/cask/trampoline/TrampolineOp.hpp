@@ -42,8 +42,8 @@ public:
     using ConstantData = Either<Erased,Erased>;
     using AsyncData = std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>;
     using ThunkData = std::function<Erased()>;
-    using FlatMapInput = std::shared_ptr<TrampolineOp>;
-    using FlatMapPredicate = std::function<std::shared_ptr<TrampolineOp>(const Erased&, bool)>;
+    using FlatMapInput = std::shared_ptr<const TrampolineOp>;
+    using FlatMapPredicate = std::function<std::shared_ptr<const TrampolineOp>(const Erased&, bool)>;
     using FlatMapData = std::pair<FlatMapInput,FlatMapPredicate>; 
 
     /**
@@ -52,11 +52,11 @@ public:
      */
     OpType opType;
 
-    static std::shared_ptr<TrampolineOp> value(const Erased& v) noexcept;
-    static std::shared_ptr<TrampolineOp> value(Erased&& v) noexcept;
-    static std::shared_ptr<TrampolineOp> error(const Erased& e) noexcept;
-    static std::shared_ptr<TrampolineOp> async(const std::function<DeferredRef<Erased,Erased>(std::shared_ptr<Scheduler>)>& predicate) noexcept;
-    static std::shared_ptr<TrampolineOp> thunk(const std::function<Erased()>& thunk) noexcept;
+    static std::shared_ptr<const TrampolineOp> value(const Erased& v) noexcept;
+    static std::shared_ptr<const TrampolineOp> value(Erased&& v) noexcept;
+    static std::shared_ptr<const TrampolineOp> error(const Erased& e) noexcept;
+    static std::shared_ptr<const TrampolineOp> async(const std::function<DeferredRef<Erased,Erased>(std::shared_ptr<Scheduler>)>& predicate) noexcept;
+    static std::shared_ptr<const TrampolineOp> thunk(const std::function<Erased()>& thunk) noexcept;
 
     /**
      * Create a new operation which represents the flat map of this operation
@@ -66,7 +66,7 @@ public:
      * @param predicate The method which maps the input value to a new operation.
      * @return A new operation which transforms the intput to the given output operation.
      */
-    std::shared_ptr<TrampolineOp> flatMap(const FlatMapPredicate& predicate) noexcept;
+    std::shared_ptr<const TrampolineOp> flatMap(const FlatMapPredicate& predicate) const noexcept;
 
     /**
      * Construct a trampoline op of the given type. Should be called by

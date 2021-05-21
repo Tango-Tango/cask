@@ -3,6 +3,7 @@ cask_sources = [
     'cask/TrampolineOp.cpp',
     'cask/TrampolineRunLoop.cpp',
     'cask/scheduler/BenchScheduler.cpp',
+    'cask/scheduler/SingleThreadScheduler.cpp',
     'cask/scheduler/ThreadPoolScheduler.cpp'
 ]
 
