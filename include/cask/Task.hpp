@@ -487,8 +487,10 @@ Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::asyncBoundary() const noexcept {
     return Task<T,E>(
-        trampoline::TrampolineOp::async([op = op](auto) {
-            return Deferred<Erased,Erased>::pure(Erased());
+        trampoline::TrampolineOp::async([op = op](auto sched) {
+            auto promise = Promise<Erased,Erased>::create(sched);
+            promise->success(Erased());
+            return Deferred<Erased,Erased>::forPromise(promise);
         })->flatMap([op = op](auto, auto) {
             return op;
         })
