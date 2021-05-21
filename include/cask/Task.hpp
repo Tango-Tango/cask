@@ -486,13 +486,13 @@ Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
 
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::asyncBoundary() const noexcept {
-    return Task<None,E>::deferAction([](auto sched) {
-        auto promise = Promise<None,E>::create(sched);
-        promise->success(None());
-        return Deferred<None,E>::forPromise(promise);
-    }).template flatMap<T>([self = *this](auto) {
-        return self;
-    });
+    return Task<T,E>(
+        trampoline::TrampolineOp::async([op = op](auto) {
+            return Deferred<Erased,Erased>::pure(Erased());
+        })->flatMap([op = op](auto, auto) {
+            return op;
+        })
+    );
 }
 
 template <class T, class E>
