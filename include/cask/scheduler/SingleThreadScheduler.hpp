@@ -18,14 +18,19 @@
 
 namespace cask::scheduler {
     
+/**
+ * The single thread scheduler only utilizes a single thread for processing submitted
+ * work. It uses simpler lock-free protections where possible to protect its internal
+ * structures. The result is a scheduler that is more optimized for applications where
+ * the need for computational span across cores is not as strong. The benefit is greater
+ * cache coherency and less time interacting with the OS for things like mutexes resulting
+ * in faster handling of asynchrounous boundaries. This comes at the expensive of some amount
+ * of fairness (because of spinlocks) and the inability to spread load across multiple cores.
+ */
 class SingleThreadScheduler final : public Scheduler, public std::enable_shared_from_this<SingleThreadScheduler> {
 public:
     /**
-     * Construct a scheduler optionally configuring the maximum number of threads
-     * to use.
-     * 
-     * @param poolSize The number of threads to use - defaults to matching
-     *                 the number of hardware threads available in the system.
+     * Construct a single threaded scheduler.
      */
     SingleThreadScheduler();
 

@@ -3,6 +3,13 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 1.0
+
+- Add the `SingleThreadScheduler` as a more optimized scheduler that runs on
+  a single thread.
+- Adjust `TrampolineOp` and its methods to return a `const TrampolineOp` in
+  more situations - making composing certain kinds of operations easier.
+
 ## 9.0
 
 - Allow scheduled timers to be canceled by returning a `Cancelable` from
