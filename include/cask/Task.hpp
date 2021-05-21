@@ -324,14 +324,14 @@ public:
      * should not be called directly and, instead, users should use provided
      * operators to build these operations automatically.
      */
-    constexpr explicit Task(const std::shared_ptr<trampoline::TrampolineOp>& op) noexcept;
-    constexpr explicit Task(std::shared_ptr<trampoline::TrampolineOp>&& op) noexcept;
+    constexpr explicit Task(const std::shared_ptr<const trampoline::TrampolineOp>& op) noexcept;
+    constexpr explicit Task(std::shared_ptr<const trampoline::TrampolineOp>&& op) noexcept;
     constexpr Task(const Task<T,E>& other) noexcept;
     constexpr Task(Task<T,E>&& other) noexcept;
     constexpr Task<T,E>& operator=(const Task<T,E>& other) noexcept;
     constexpr Task<T,E>& operator=(Task<T,E>&& other) noexcept;
 
-    std::shared_ptr<trampoline::TrampolineOp> op;
+    std::shared_ptr<const trampoline::TrampolineOp> op;
 };
 
 template <class T, class E>
@@ -439,7 +439,7 @@ DeferredRef<T,E> Task<T,E>::run(const std::shared_ptr<Scheduler>& sched) const {
             return Deferred<T,E>::raiseError(error);
         }
     } else {
-        auto deferred = std::get<DeferredRef<Erased,Erased>>(result);
+        auto& deferred = std::get<DeferredRef<Erased,Erased>>(result);
         auto promise = Promise<T,E>::create(sched);
         deferred->template chainDownstream<T,E>(promise, [](auto result) mutable {
             if(result.is_left()) {
@@ -467,20 +467,11 @@ Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
             return Either<Either<T,E>,Task<T,E>>::left(syncResult);
         }
     } else {
-        auto boundary = std::get<trampoline::AsyncBoundary>(result);
-        auto asyncTask = Task<T,E>::deferAction([boundary](auto sched) {
-            auto deferred = trampoline::TrampolineRunLoop::executeAsyncBoundary(boundary, sched);
-            auto promise = Promise<T,E>::create(sched);
-            deferred->template chainDownstream<T,E>(promise, [](auto result) mutable {
-                if(result.is_left()) {
-                    return Either<T,E>::left(result.get_left().template get<T>());
-                } else {
-                    return Either<T,E>::right(result.get_right().template get<E>());
-                }
-            });
-            return Deferred<T,E>::forPromise(promise);
-        });
-        return Either<Either<T,E>,Task<T,E>>::right(asyncTask);
+        trampoline::AsyncBoundary& boundary = std::get<trampoline::AsyncBoundary>(result);
+        std::shared_ptr<const trampoline::TrampolineOp>& asyncOp = std::get<0>(boundary);
+        trampoline::TrampolineOp::FlatMapPredicate& predicate = std::get<1>(boundary);
+        auto task = Task<T,E>(asyncOp->flatMap(predicate));
+        return Either<Either<T,E>,Task<T,E>>::right(task);
     }
 }
 
@@ -834,12 +825,12 @@ constexpr Task<T,E> Task<T,E>::timeout(uint32_t milliseconds, const E& error) co
 }
 
 template <class T, class E>
-constexpr Task<T,E>::Task(const std::shared_ptr<trampoline::TrampolineOp>& op) noexcept
+constexpr Task<T,E>::Task(const std::shared_ptr<const trampoline::TrampolineOp>& op) noexcept
     : op(op)
 {}
 
 template <class T, class E>
-constexpr Task<T,E>::Task(std::shared_ptr<trampoline::TrampolineOp>&& op) noexcept
+constexpr Task<T,E>::Task(std::shared_ptr<const trampoline::TrampolineOp>&& op) noexcept
     : op(std::move(op))
 {}
 
