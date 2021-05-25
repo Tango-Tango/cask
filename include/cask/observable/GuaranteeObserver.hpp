@@ -41,7 +41,15 @@ GuaranteeObserver<T,E>::GuaranteeObserver(const std::shared_ptr<Observer<T,E>>& 
 
 template <class T, class E>
 Task<Ack,None> GuaranteeObserver<T,E>::onNext(const T& value) {
-    return downstream->onNext(value);
+    return downstream->onNext(value).template flatMap<Ack>([this](auto ack) {
+        if(ack == cask::Stop && !completed.test_and_set()) {
+            return task.template map<Ack>([](auto) {
+                return cask::Stop;
+            });
+        } else {
+            return Task<Ack,None>::pure(ack);
+        }
+    });
 }
 
 template <class T, class E>
