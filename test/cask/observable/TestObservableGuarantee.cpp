@@ -40,7 +40,7 @@ TEST(ObservableGuarantee, RunsOnCompletion) {
     EXPECT_EQ(run_count, 1);
 }
 
-TEST(ObservableGuarantee, RunsOnDownstreamStop) {
+TEST(ObservableGuarantee, RunsOnUpstreamComplete) {
     int run_count = 0;
     auto task = Task<None,None>::eval([&run_count]() {
         run_count++;
@@ -54,6 +54,23 @@ TEST(ObservableGuarantee, RunsOnDownstreamStop) {
         ->await();
 
     EXPECT_EQ(*result, 123);
+    EXPECT_EQ(run_count, 1);
+}
+
+TEST(ObservableGuarantee, RunsOnDownstreamStop) {
+    int run_count = 0;
+    auto task = Task<None,None>::eval([&run_count]() {
+        run_count++;
+        return None();
+    });
+
+    Observable<int,float>::repeatTask(Task<int,float>::pure(123))
+        ->guarantee(task)
+        ->takeWhile([](auto value) { return value != 123; })
+        ->completed()
+        .run(Scheduler::global())
+        ->await();
+
     EXPECT_EQ(run_count, 1);
 }
 
