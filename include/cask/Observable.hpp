@@ -152,7 +152,18 @@ public:
         const std::function<Task<None,None>(const E&)>& onError = [](auto) { return Task<None,None>::none(); },
         const std::function<Task<None,None>()>& onComplete = [] { return Task<None,None>::none(); },
         const std::function<void()>& onCancel = [] {}
-    );
+    ) const;
+
+    /**
+     * Append another observable to the end of this one. If the original observable completes
+     * with error or never completes the the appened observable will never be subscribed - so
+     * ordering and backpressure are preserved.
+     * 
+     * @param other The observable to append to this one.
+     * @return A new observable which emits events from this observable first and then, on completion,
+     *         subscribes to and emits events from the next one.
+     */
+    ObservableRef<T,E> appendAll(const ObservableRef<T,E>& other) const;
 
     /**
      * Buffer input up to the given size and emit the buffer downstream. At
@@ -374,6 +385,7 @@ public:
 
 }
 
+#include "observable/AppendAllObservable.hpp"
 #include "observable/BufferObservable.hpp"
 #include "observable/CallbackObserver.hpp"
 #include "observable/DeferObservable.hpp"
@@ -454,7 +466,7 @@ CancelableRef Observable<T,E>::subscribeHandlers(
     const std::function<Task<None,None>(const E&)>& onError,
     const std::function<Task<None,None>()>& onComplete,
     const std::function<void()>& onCancel
-) {
+) const {
     auto observer = std::make_shared<observable::CallbackObserver<T,E>>(
         onNext, onError, onComplete
     );
@@ -466,6 +478,12 @@ CancelableRef Observable<T,E>::subscribeHandlers(
     });
 
     return subscription;
+}
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::appendAll(const ObservableRef<T,E>& other) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::AppendAllObservable<T,E>>(self, other);
 }
 
 template <class T, class E>

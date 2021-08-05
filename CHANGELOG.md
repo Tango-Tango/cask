@@ -3,6 +3,9 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 10.1
+- Add the `appendAll` operator to `Observable`.
+
 ## 10.0
 
 - Add the `SingleThreadScheduler` as a more optimized scheduler that runs on
