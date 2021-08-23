@@ -140,4 +140,59 @@ TEST_P(ThreadPoolSchedulerTest, RegistersCallbackAfterCancelled) {
     awaitIdle();
 }
 
+TEST_P(ThreadPoolSchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
+    bool shutdown = false;
+    std::mutex mutex;
+    mutex.lock();
+
+    auto before = std::chrono::high_resolution_clock::now();
+    auto cancelable = sched->submitAfter(25, [&mutex] {
+        mutex.unlock();
+    });
+
+    cancelable->onShutdown([&shutdown] {
+        shutdown = true;
+    });
+
+    mutex.lock();
+    auto after = std::chrono::high_resolution_clock::now();
+
+    auto delta = after - before;
+    auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
+
+    EXPECT_GE(milliseconds, 25);
+    EXPECT_TRUE(shutdown);
+    
+    awaitIdle();
+}
+
+TEST_P(ThreadPoolSchedulerTest, RunsShutdownImmediatelyCallbackIfTimerAlreadyFired) {
+    bool shutdown = false;
+    std::mutex mutex;
+    mutex.lock();
+
+    auto before = std::chrono::high_resolution_clock::now();
+    auto cancelable = sched->submitAfter(25, [&mutex] {
+        mutex.unlock();
+    });
+
+    mutex.lock();
+    auto after = std::chrono::high_resolution_clock::now();
+
+    auto delta = after - before;
+    auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
+
+    EXPECT_GE(milliseconds, 25);
+    EXPECT_FALSE(shutdown);
+
+    cancelable->onShutdown([&shutdown] {
+        shutdown = true;
+    });
+
+    EXPECT_TRUE(shutdown);
+    
+    awaitIdle();
+}
+
+
 INSTANTIATE_TEST_SUITE_P(Scheduler, ThreadPoolSchedulerTest, ::testing::Values(1, 2, 4, 16));

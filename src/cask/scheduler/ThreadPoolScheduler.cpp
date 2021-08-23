@@ -208,8 +208,39 @@ void ThreadPoolScheduler::CancelableTimer::onCancel(const std::function<void()>&
     }
 }
 
-void ThreadPoolScheduler::CancelableTimer::onShutdown(const std::function<void()>&) {
-    // Not implemented yet for timers
+void ThreadPoolScheduler::CancelableTimer::onShutdown(const std::function<void()>& shutdownCallback) {
+    bool found = false;
+
+    {
+        std::lock_guard<std::mutex> parent_guard(parent->timerMutex);
+        std::lock_guard<std::mutex> self_guard(callback_mutex);
+        auto tasks = parent->timers.find(time_slot);
+
+        if(tasks != parent->timers.end()) {
+            std::vector<TimerEntry> newEntries;
+            auto entries = tasks->second;
+
+            for(auto& entry : entries) {
+                auto entryId = std::get<0>(entry);
+                auto entryCallback = std::get<1>(entry);
+                if(entryId != id) {
+                    newEntries.emplace_back(entry);
+                } else {
+                    found = true;
+                    newEntries.emplace_back(entryId, [entryCallback, shutdownCallback]() {
+                        entryCallback();
+                        shutdownCallback();
+                    });
+                }
+            }
+
+            parent->timers[time_slot] = newEntries;
+        }
+    }
+
+    if(!found) {
+        shutdownCallback();
+    }
 }
 
 } // namespace cask::scheduler
