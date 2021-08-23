@@ -614,23 +614,8 @@ Task<std::vector<T>,E> Observable<T,E>::take(uint32_t amount) const {
             auto promise = Promise<std::vector<T>,E>::create(sched);
             auto observer = std::shared_ptr<Observer<T,E>>(new observable::TakeObserver<T,E>(amount, promise));
             auto subscription = self->subscribe(sched, observer);
-
-            promise->onCancel([subscription]() {
-                subscription->cancel();
-            });
-
-            auto subscriptionDeferredTask = Task<None,None>::deferAction([subscription](auto sched) {
-                return Deferred<None,None>::forCancelable(subscription, sched);
-            });
-            auto resultTask = Task<std::vector<T>,E>::forPromise(promise);
-
-            auto composedTask = subscriptionDeferredTask
-                .template flatMapBoth<std::vector<T>, E>(
-                    [resultTask](auto) { return resultTask; },
-                    [resultTask](auto) { return resultTask; }
-                );
-
-            return composedTask.run(sched);
+            auto completionTask = Task<std::vector<T>,E>::forCancelableAndPromise(subscription, promise);
+            return completionTask.run(sched);
         });
     }
 }

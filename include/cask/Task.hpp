@@ -108,6 +108,8 @@ public:
      */
     constexpr static Task<T,E> forPromise(const PromiseRef<T,E>& promise) noexcept;
 
+    static Task<T,E> forCancelableAndPromise(const CancelableRef& cancelable, const PromiseRef<T,E>& promise) noexcept;
+
     /**
      * Creates a task that will never finish evaluation.
      *  
@@ -335,6 +337,38 @@ public:
 };
 
 template <class T, class E>
+constexpr Task<T,E>::Task(const std::shared_ptr<const trampoline::TrampolineOp>& op) noexcept
+    : op(op)
+{}
+
+template <class T, class E>
+constexpr Task<T,E>::Task(std::shared_ptr<const trampoline::TrampolineOp>&& op) noexcept
+    : op(std::move(op))
+{}
+
+template <class T, class E>
+constexpr Task<T,E>::Task(const Task<T,E>& other) noexcept
+    : op(other.op)
+{}
+
+template <class T, class E>
+constexpr Task<T,E>::Task(Task<T,E>&& other) noexcept
+    : op(std::move(other.op))
+{}
+
+template <class T, class E>
+constexpr Task<T,E>& Task<T,E>::operator=(const Task<T,E>& other) noexcept{
+    this->op = other.op;
+    return *this;
+}
+
+template <class T, class E>
+constexpr Task<T,E>& Task<T,E>::operator=(Task<T,E>&& other) noexcept{
+    this->op = std::move(other.op);
+    return *this;
+}
+
+template <class T, class E>
 constexpr Task<T,E> Task<T,E>::pure(const T& value) noexcept {
     return Task<T,E>(
         trampoline::TrampolineOp::value(value)
@@ -414,6 +448,27 @@ constexpr Task<T,E> Task<T,E>::forPromise(const PromiseRef<T,E>& promise) noexce
             return Deferred<Erased,Erased>::forPromise(erasedPromise);
         })
     );
+}
+
+template <class T, class E>
+Task<T,E> Task<T,E>::forCancelableAndPromise(const CancelableRef& cancelable, const PromiseRef<T,E>& promise) noexcept {
+    promise->onCancel([cancelable]() {
+        cancelable->cancel();
+    });
+
+    Task<None,None> cancelableDeferredTask = Task<None,None>::deferAction([cancelable](auto sched) {
+        return Deferred<None,None>::forCancelable(cancelable, sched);
+    });
+
+    Task<T,E> resultTask = Task<T,E>::forPromise(promise);
+
+    Task<T,E> composedTask = cancelableDeferredTask
+        .template flatMapBoth<T,E>(
+            [resultTask](auto) { return resultTask; },
+            [resultTask](auto) { return resultTask; }
+        );
+
+    return composedTask;
 }
 
 template <class T, class E>
@@ -833,38 +888,6 @@ constexpr Task<T,E> Task<T,E>::timeout(uint32_t milliseconds, const E& error) co
     return raceWith(timeoutTask).template map<T>([](auto result) {
         return result.get_left();
     });
-}
-
-template <class T, class E>
-constexpr Task<T,E>::Task(const std::shared_ptr<const trampoline::TrampolineOp>& op) noexcept
-    : op(op)
-{}
-
-template <class T, class E>
-constexpr Task<T,E>::Task(std::shared_ptr<const trampoline::TrampolineOp>&& op) noexcept
-    : op(std::move(op))
-{}
-
-template <class T, class E>
-constexpr Task<T,E>::Task(const Task<T,E>& other) noexcept
-    : op(other.op)
-{}
-
-template <class T, class E>
-constexpr Task<T,E>::Task(Task<T,E>&& other) noexcept
-    : op(std::move(other.op))
-{}
-
-template <class T, class E>
-constexpr Task<T,E>& Task<T,E>::operator=(const Task<T,E>& other) noexcept{
-    this->op = other.op;
-    return *this;
-}
-
-template <class T, class E>
-constexpr Task<T,E>& Task<T,E>::operator=(Task<T,E>&& other) noexcept{
-    this->op = std::move(other.op);
-    return *this;
 }
 
 }
