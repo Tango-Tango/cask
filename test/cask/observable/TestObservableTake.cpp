@@ -214,3 +214,28 @@ TEST(ObservableTake, CompletesGuaranteedEffects) {
     EXPECT_EQ(result.size(), 1);
     EXPECT_TRUE(completed);
 }
+
+
+TEST(ObservableTake, RunsCancelCallbacks) {
+    int run_count = 0;
+    auto task = Task<None,None>::eval([&run_count]() {
+        run_count++;
+        return None();
+    });
+
+    auto deferred = Observable<int,float>::deferTask([]{
+            return Task<int,float>::never();
+        })
+        ->guarantee(task)
+        ->take(10)
+        .failed()
+        .run(Scheduler::global());
+    
+    try {
+        deferred->cancel();
+        deferred->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {
+        EXPECT_EQ(run_count, 1);
+    }
+}

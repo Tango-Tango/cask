@@ -558,12 +558,7 @@ Task<None,E> Observable<T,E>::foreach(const std::function<void(const T&)>& predi
         auto promise = Promise<None,E>::create(sched);
         auto observer = std::make_shared<observable::ForeachObserver<T,E>>(promise, predicate);
         auto subscription = self->subscribe(sched, observer);
-
-        promise->onCancel([subscription]() {
-            subscription->cancel();
-        });
-
-        return Deferred<None,E>::forPromise(promise);
+        return Task<None,E>::runCancelableThenPromise(subscription, promise, sched);
     });
 }
 
@@ -574,12 +569,7 @@ Task<None,E> Observable<T,E>::foreachTask(const std::function<Task<None,E>(const
         auto promise = Promise<None,E>::create(sched);
         auto observer = std::make_shared<observable::ForeachTaskObserver<T,E>>(promise, predicate);
         auto subscription = self->subscribe(sched, observer);
-
-        promise->onCancel([subscription]() {
-            subscription->cancel();
-        });
-
-        return Deferred<None,E>::forPromise(promise);
+        return Task<None,E>::runCancelableThenPromise(subscription, promise, sched);
     });
 }
 
@@ -590,12 +580,7 @@ Task<std::optional<T>,E> Observable<T,E>::last() const {
         auto promise = Promise<std::optional<T>,E>::create(sched);
         auto observer = std::make_shared<observable::LastObserver<T,E>>(promise);
         auto subscription = self->subscribe(sched, observer);
-
-        promise->onCancel([subscription]() {
-            subscription->cancel();
-        });
-
-        return Deferred<std::optional<T>,E>::forPromise(promise);
+        return Task<std::optional<T>,E>::runCancelableThenPromise(subscription, promise, sched);
     });
 }
 
@@ -614,8 +599,7 @@ Task<std::vector<T>,E> Observable<T,E>::take(uint32_t amount) const {
             auto promise = Promise<std::vector<T>,E>::create(sched);
             auto observer = std::shared_ptr<Observer<T,E>>(new observable::TakeObserver<T,E>(amount, promise));
             auto subscription = self->subscribe(sched, observer);
-            auto completionTask = Task<std::vector<T>,E>::forCancelableAndPromise(subscription, promise);
-            return completionTask.run(sched);
+            return Task<std::vector<T>,E>::runCancelableThenPromise(subscription, promise, sched);
         });
     }
 }

@@ -7,8 +7,10 @@
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
 
+using cask::None;
 using cask::Observable;
 using cask::Scheduler;
+using cask::Task;
 
 TEST(ObservableLast, Pure) {
     auto result = Observable<int>::pure(123)
@@ -65,4 +67,46 @@ TEST(ObservableLast, MergedFiniteValues) {
 
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(*result, 15);
+}
+
+TEST(ObservableLast, CompletesGuaranteedEffects) {
+    bool completed = false;
+    std::vector<int> values = {1,2,3,4,5};
+    auto result = Observable<int>::fromVector(values)
+        ->guarantee(
+            Task<None,None>::eval([&completed] {
+                completed = true;
+                return None();
+            }).delay(100)
+        )
+        ->last()
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_TRUE(result.has_value());
+    EXPECT_TRUE(completed);
+}
+
+TEST(ObservableLast, RunsCancelCallbacks) {
+    int run_count = 0;
+    auto task = Task<None,None>::eval([&run_count]() {
+        run_count++;
+        return None();
+    });
+
+    auto deferred = Observable<int,float>::deferTask([]{
+            return Task<int,float>::never();
+        })
+        ->guarantee(task)
+        ->last()
+        .failed()
+        .run(Scheduler::global());
+    
+    try {
+        deferred->cancel();
+        deferred->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {
+        EXPECT_EQ(run_count, 1);
+    }
 }
