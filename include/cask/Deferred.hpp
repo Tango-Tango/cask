@@ -55,6 +55,8 @@ public:
      */
     static DeferredRef<T,E> forPromise(PromiseRef<T,E> promise);
 
+    static DeferredRef<None,None> forCancelable(CancelableRef cancelable, SchedulerRef sched);
+
     /**
      * Properly chain this deferred to another promise which is
      * relying on its results. This not only chains normal values
@@ -172,6 +174,21 @@ constexpr DeferredRef<T,E> Deferred<T,E>::raiseError(const E& error) noexcept {
 template<class T, class E>
 DeferredRef<T,E> Deferred<T,E>::forPromise(PromiseRef<T,E> promise) {
     return std::make_shared<deferred::PromiseDeferred<T,E>>(promise);
+}
+
+template<class T, class E>
+DeferredRef<None,None> Deferred<T,E>::forCancelable(CancelableRef cancelable, SchedulerRef sched) {
+    auto promise = Promise<cask::None,cask::None>::create(sched);
+
+    cancelable->onCancel([promise]() {
+        promise->cancel();
+    });
+
+    cancelable->onShutdown([promise]() {
+        promise->success(cask::None());
+    });
+
+    return std::make_shared<deferred::PromiseDeferred<cask::None,cask::None>>(promise);
 }
 
 template<class T, class E>

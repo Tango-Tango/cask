@@ -619,7 +619,18 @@ Task<std::vector<T>,E> Observable<T,E>::take(uint32_t amount) const {
                 subscription->cancel();
             });
 
-            return Deferred<std::vector<T>,E>::forPromise(promise);
+            auto subscriptionDeferredTask = Task<None,None>::deferAction([subscription](auto sched) {
+                return Deferred<None,None>::forCancelable(subscription, sched);
+            });
+            auto resultTask = Task<std::vector<T>,E>::forPromise(promise);
+
+            auto composedTask = subscriptionDeferredTask
+                .template flatMapBoth<std::vector<T>, E>(
+                    [resultTask](auto) { return resultTask; },
+                    [resultTask](auto) { return resultTask; }
+                );
+
+            return composedTask.run(sched);
         });
     }
 }
