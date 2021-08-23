@@ -3,6 +3,15 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 10.2
+- Add the `runCancelableThenPromise` method to `Task`.
+- Add the `onShutdown` method to `Cancelable`.
+- Add the `forCancelable` method to `Deferred`.
+- Fix an issue where the ordering and evaluation of guaranteed effects on an observable
+  did not happen in a deterministic manner when using operators which transformed an
+  `Observable` into a `Task` (`take`, `last`, `foreach`, and `foreachTask`). Now, any
+  guaranteed effects are guaranteed to be evaluated _before_ a result can be observered.
+
 ## 10.1
 - Add the `appendAll` operator to `Observable`.
 

@@ -20,6 +20,7 @@ public:
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;
     void onCancel(const std::function<void()>& callback) override;
+    void onShutdown(const std::function<void()>& callback) override;
     void cancel() override;
     T await() override;
 };
@@ -47,6 +48,11 @@ void PureErrorDeferred<T,E>::onError(std::function<void(E)> callback) {
 template <class T, class E>
 void PureErrorDeferred<T,E>::onCancel(const std::function<void()>&) {
     return;
+}
+
+template <class T, class E>
+void PureErrorDeferred<T,E>::onShutdown(const std::function<void()>& callback) {
+    return callback();
 }
 
 template <class T, class E>

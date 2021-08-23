@@ -230,3 +230,45 @@ TEST(BenchScheduler, RegistersCallbackAfterCanceled) {
     EXPECT_EQ(timer_counter, 0);
     EXPECT_EQ(cancel_counter, 1);
 }
+
+TEST(BenchScheduler, RunsShutdownCallbackAfterTimerTaskCompletion) {
+    auto sched = std::make_shared<BenchScheduler>();
+
+    int timer_counter = 0;
+    int shutdown_counter = 0;
+
+    auto handle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
+    handle->onShutdown([&shutdown_counter] { shutdown_counter++; });
+
+    sched->advance_time(10);
+
+    EXPECT_FALSE(sched->isIdle());
+    EXPECT_EQ(sched->num_task_ready(), 1);
+    EXPECT_EQ(sched->num_timers(), 0);
+    EXPECT_EQ(shutdown_counter, 0);
+    EXPECT_EQ(timer_counter, 0);
+
+    sched->run_ready_tasks();
+    EXPECT_TRUE(sched->isIdle());
+    EXPECT_EQ(shutdown_counter, 1);
+    EXPECT_EQ(timer_counter, 1);
+}
+
+TEST(BenchScheduler, RunsShutdownImmediatelyCallbackIfTimerAlreadyFired) {
+    auto sched = std::make_shared<BenchScheduler>();
+
+    int timer_counter = 0;
+    int shutdown_counter = 0;
+
+    auto handle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
+
+    sched->advance_time(10);
+    sched->run_ready_tasks();
+    EXPECT_TRUE(sched->isIdle());
+    EXPECT_EQ(shutdown_counter, 0);
+    EXPECT_EQ(timer_counter, 1);
+
+    handle->onShutdown([&shutdown_counter] { shutdown_counter++; });
+    EXPECT_EQ(shutdown_counter, 1);
+}
+

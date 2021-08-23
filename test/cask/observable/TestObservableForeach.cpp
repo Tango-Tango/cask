@@ -86,3 +86,51 @@ TEST(ObservableForeach, Canceled) {
         EXPECT_EQ(counter, 0);
     }
 }
+
+TEST(ObservableForeach, CompletesGuaranteedEffects) {
+    int counter = 0;
+    bool completed = false;
+    std::vector<int> values = {1,2,3,4,5};
+    Observable<int>::fromVector(values)
+        ->guarantee(
+            Task<None,None>::eval([&completed] {
+                completed = true;
+                return None();
+            }).delay(100)
+        )
+        ->foreach([&counter](auto) {
+            counter++;
+        })
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_EQ(counter, 5);
+    EXPECT_TRUE(completed);
+}
+
+TEST(ObservableForeach, RunsCancelCallbacks) {
+    int counter = 0;
+    int run_count = 0;
+    auto task = Task<None,None>::eval([&run_count]() {
+        run_count++;
+        return None();
+    });
+
+    auto deferred = Observable<int,std::string>::deferTask([]{
+            return Task<int,std::string>::never();
+        })
+        ->guarantee(task)
+        ->foreach([&counter](auto) {
+            counter++;
+        })
+        .failed()
+        .run(Scheduler::global());
+    
+    try {
+        deferred->cancel();
+        deferred->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {
+        EXPECT_EQ(run_count, 1);
+    }
+}

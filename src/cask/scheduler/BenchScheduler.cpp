@@ -143,4 +143,35 @@ void BenchScheduler::BenchCancelableTimer::onCancel(const std::function<void()>&
     }
 }
 
+void BenchScheduler::BenchCancelableTimer::onShutdown(const std::function<void()>& shutdownCallback) {
+    bool found = false;
+
+    {
+        std::lock_guard<std::mutex> parent_guard(parent->scheduler_mutex);
+        std::lock_guard<std::mutex> self_guard(callback_mutex);
+        std::vector<TimerEntry> newEntries;
+
+        for(auto& entry : parent->timers) {
+            auto entryStamp = std::get<0>(entry);
+            auto entryId = std::get<1>(entry);
+            auto entryCallback = std::get<2>(entry);
+            if(entryId != id) {
+                newEntries.emplace_back(entry);
+            } else {
+                found = true;
+                newEntries.emplace_back(entryStamp, entryId, [entryCallback, shutdownCallback]() {
+                    entryCallback();
+                    shutdownCallback();
+                });
+            }
+        }
+
+        parent->timers = newEntries;
+    }
+
+    if(!found) {
+        shutdownCallback();
+    }
+}
+
 } // namespace cask::scheduler

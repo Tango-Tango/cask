@@ -89,6 +89,7 @@ public:
     bool isCancelled() const;
 
     void onCancel(const std::function<void()>& callback) override;
+    void onShutdown(const std::function<void()>& callback) override;
     void cancel() override;
 private:
     friend deferred::PromiseDeferred<T,E>;
@@ -213,6 +214,13 @@ void Promise<T,E>::onCancel(const std::function<void()>& callback) {
     if(runNow) {
         callback();
     }
+}
+
+template <class T, class E>
+void Promise<T,E>::onShutdown(const std::function<void()>& callback) {
+    onComplete([callback](auto) {
+        return callback();
+    });
 }
 
 template <class T, class E>

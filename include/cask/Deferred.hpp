@@ -56,6 +56,16 @@ public:
     static DeferredRef<T,E> forPromise(PromiseRef<T,E> promise);
 
     /**
+     * Create a value-less deferred which completes when the given cancelable
+     * shuts down.
+     * 
+     * @param cancelable The cancelable to watch for shutdown.
+     * @param sched The scheduler use for the result deferred.
+     * @return A deferred which completes with the given cancelable shuts down.
+     */
+    static DeferredRef<None,None> forCancelable(CancelableRef cancelable, SchedulerRef sched);
+
+    /**
      * Properly chain this deferred to another promise which is
      * relying on its results. This not only chains normal values
      * an errors from this source to its downstream promise - but
@@ -172,6 +182,21 @@ constexpr DeferredRef<T,E> Deferred<T,E>::raiseError(const E& error) noexcept {
 template<class T, class E>
 DeferredRef<T,E> Deferred<T,E>::forPromise(PromiseRef<T,E> promise) {
     return std::make_shared<deferred::PromiseDeferred<T,E>>(promise);
+}
+
+template<class T, class E>
+DeferredRef<None,None> Deferred<T,E>::forCancelable(CancelableRef cancelable, SchedulerRef sched) {
+    auto promise = Promise<cask::None,cask::None>::create(sched);
+
+    cancelable->onCancel([promise]() {
+        promise->cancel();
+    });
+
+    cancelable->onShutdown([promise]() {
+        promise->success(cask::None());
+    });
+
+    return std::make_shared<deferred::PromiseDeferred<cask::None,cask::None>>(promise);
 }
 
 template<class T, class E>

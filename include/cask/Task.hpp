@@ -109,6 +109,24 @@ public:
     constexpr static Task<T,E> forPromise(const PromiseRef<T,E>& promise) noexcept;
 
     /**
+     * A convenience method for a common task performed by observables.
+     * 
+     * This method takes a given cancelable and promise and returns a deferred that only
+     * completes after BOTH the given cancelable has completed AND the given promise has a
+     * success or error value. This ensures that callers cannot observe the result value
+     * until all relevant effects (including guaranteed shutdown effects and the like) have
+     * been evaluated. This is necessary, for example, when observing the result of an
+     * observable - the subscription must be properly completed AND a value of some kind
+     * must be obtained (via a promise) from an observer in the chain.
+     * 
+     * @param cancelable The cancelable background task to ensure is ended (e.g. an observable subscription)
+     * @param promise The promise which will provide the result value.
+     * @param sched The scheduler to use when composing these asynchronous operations.
+     * @return A deferred which is safeuly completed only when all relevant effects are completed.
+     */
+    static DeferredRef<T,E> runCancelableThenPromise(const CancelableRef& cancelable, const PromiseRef<T,E>& promise, const SchedulerRef& sched) noexcept;
+
+    /**
      * Creates a task that will never finish evaluation.
      *  
      * @return A task that will never finish evaluation.
@@ -335,6 +353,38 @@ public:
 };
 
 template <class T, class E>
+constexpr Task<T,E>::Task(const std::shared_ptr<const trampoline::TrampolineOp>& op) noexcept
+    : op(op)
+{}
+
+template <class T, class E>
+constexpr Task<T,E>::Task(std::shared_ptr<const trampoline::TrampolineOp>&& op) noexcept
+    : op(std::move(op))
+{}
+
+template <class T, class E>
+constexpr Task<T,E>::Task(const Task<T,E>& other) noexcept
+    : op(other.op)
+{}
+
+template <class T, class E>
+constexpr Task<T,E>::Task(Task<T,E>&& other) noexcept
+    : op(std::move(other.op))
+{}
+
+template <class T, class E>
+constexpr Task<T,E>& Task<T,E>::operator=(const Task<T,E>& other) noexcept{
+    this->op = other.op;
+    return *this;
+}
+
+template <class T, class E>
+constexpr Task<T,E>& Task<T,E>::operator=(Task<T,E>&& other) noexcept{
+    this->op = std::move(other.op);
+    return *this;
+}
+
+template <class T, class E>
 constexpr Task<T,E> Task<T,E>::pure(const T& value) noexcept {
     return Task<T,E>(
         trampoline::TrampolineOp::value(value)
@@ -414,6 +464,28 @@ constexpr Task<T,E> Task<T,E>::forPromise(const PromiseRef<T,E>& promise) noexce
             return Deferred<Erased,Erased>::forPromise(erasedPromise);
         })
     );
+}
+
+template <class T, class E>
+DeferredRef<T,E> Task<T,E>::runCancelableThenPromise(const CancelableRef& cancelable, const PromiseRef<T,E>& promise, const SchedulerRef& sched) noexcept {
+    auto deferred = Task<None,None>::deferAction([cancelable](auto sched) {
+            return Deferred<None,None>::forCancelable(cancelable, sched);
+        })
+        .template flatMapBoth<T,E>(
+            [promise](auto) { return Task<T,E>::forPromise(promise); },
+            [promise](auto) { return Task<T,E>::forPromise(promise); }
+        )
+        .run(sched);
+
+    deferred->onCancel([promise]() {
+        promise->cancel();
+    });
+
+    promise->onCancel([cancelable]() {
+        cancelable->cancel();
+    });
+
+    return deferred;
 }
 
 template <class T, class E>
@@ -833,38 +905,6 @@ constexpr Task<T,E> Task<T,E>::timeout(uint32_t milliseconds, const E& error) co
     return raceWith(timeoutTask).template map<T>([](auto result) {
         return result.get_left();
     });
-}
-
-template <class T, class E>
-constexpr Task<T,E>::Task(const std::shared_ptr<const trampoline::TrampolineOp>& op) noexcept
-    : op(op)
-{}
-
-template <class T, class E>
-constexpr Task<T,E>::Task(std::shared_ptr<const trampoline::TrampolineOp>&& op) noexcept
-    : op(std::move(op))
-{}
-
-template <class T, class E>
-constexpr Task<T,E>::Task(const Task<T,E>& other) noexcept
-    : op(other.op)
-{}
-
-template <class T, class E>
-constexpr Task<T,E>::Task(Task<T,E>&& other) noexcept
-    : op(std::move(other.op))
-{}
-
-template <class T, class E>
-constexpr Task<T,E>& Task<T,E>::operator=(const Task<T,E>& other) noexcept{
-    this->op = other.op;
-    return *this;
-}
-
-template <class T, class E>
-constexpr Task<T,E>& Task<T,E>::operator=(Task<T,E>&& other) noexcept{
-    this->op = std::move(other.op);
-    return *this;
 }
 
 }

@@ -7,9 +7,10 @@
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
 
+using cask::None;
 using cask::Observable;
 using cask::Scheduler;
-
+using cask::Task;
 
 TEST(ObservableTake, ErrorTakeNothing) {
     auto result = Observable<int,float>::raiseError(1.23)
@@ -124,7 +125,7 @@ TEST(ObservableTake, VectorTakeMoreThanAll) {
     EXPECT_EQ(result[4], 5);
 }
 
-TEST(Observable, VectorTakeMergedNone) {
+TEST(ObservableTake, VectorTakeMergedNone) {
     std::vector<int> first_values = {1,2,3,4,5};
     std::vector<int> second_values = {6,7,8,9,10};
     std::vector<int> third_values = {11,12,13,14,15};
@@ -139,7 +140,7 @@ TEST(Observable, VectorTakeMergedNone) {
     ASSERT_EQ(result.size(), 0);
 }
 
-TEST(Observable, VectorTakeMergedMulti) {
+TEST(ObservableTake, VectorTakeMergedMulti) {
     std::vector<int> first_values = {1,2,3,4,5};
     std::vector<int> second_values = {6,7,8,9,10};
     std::vector<int> third_values = {11,12,13,14,15};
@@ -160,7 +161,7 @@ TEST(Observable, VectorTakeMergedMulti) {
     EXPECT_EQ(result[5], 6);
 }
 
-TEST(Observable, VectorTakeMergedAll) {
+TEST(ObservableTake, VectorTakeMergedAll) {
     std::vector<int> first_values = {1,2,3,4,5};
     std::vector<int> second_values = {6,7,8,9,10};
     std::vector<int> third_values = {11,12,13,14,15};
@@ -178,8 +179,7 @@ TEST(Observable, VectorTakeMergedAll) {
     }
 }
 
-/*
-TEST(Observable, VectorTakeMergedMoreThanAll) {
+TEST(ObservableTake, VectorTakeMergedMoreThanAll) {
     std::vector<int> first_values = {1,2,3,4,5};
     std::vector<int> second_values = {6,7,8,9,10};
     std::vector<int> third_values = {11,12,13,14,15};
@@ -196,4 +196,46 @@ TEST(Observable, VectorTakeMergedMoreThanAll) {
         EXPECT_EQ(result[i], i+1);
     }
 }
-*/
+
+TEST(ObservableTake, CompletesGuaranteedEffects) {
+    bool completed = false;
+    std::vector<int> values = {1,2,3,4,5};
+    auto result = Observable<int>::fromVector(values)
+        ->guarantee(
+            Task<None,None>::eval([&completed] {
+                completed = true;
+                return None();
+            }).delay(100)
+        )
+        ->take(1)
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_EQ(result.size(), 1);
+    EXPECT_TRUE(completed);
+}
+
+
+TEST(ObservableTake, RunsCancelCallbacks) {
+    int run_count = 0;
+    auto task = Task<None,None>::eval([&run_count]() {
+        run_count++;
+        return None();
+    });
+
+    auto deferred = Observable<int,float>::deferTask([]{
+            return Task<int,float>::never();
+        })
+        ->guarantee(task)
+        ->take(10)
+        .failed()
+        .run(Scheduler::global());
+    
+    try {
+        deferred->cancel();
+        deferred->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {
+        EXPECT_EQ(run_count, 1);
+    }
+}

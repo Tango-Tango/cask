@@ -110,6 +110,7 @@ private:
 
         void cancel() override;
         void onCancel(const std::function<void()>& callback) override;
+        void onShutdown(const std::function<void()>&) override;
     private:
         std::shared_ptr<BenchScheduler> parent;
         int64_t id;
