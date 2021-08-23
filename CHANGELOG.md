@@ -6,6 +6,7 @@ in this file. This project follows [semantic versioning](https://semver.org/).
 ## 10.2
 - Add the `runCancelableThenPromise` method to `Task`.
 - Add the `onShutdown` method to `Cancelable`.
+- Add the `forCancelable` method to `Deferred`.
 - Fix an issue where the ordering and evaluation of guaranteed effects on an observable
   did not happen in a deterministic manner when using operators which transformed an
   `Observable` into a `Task` (`take`, `last`, `foreach`, and `foreachTask`). Now, any

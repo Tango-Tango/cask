@@ -55,6 +55,14 @@ public:
      */
     static DeferredRef<T,E> forPromise(PromiseRef<T,E> promise);
 
+    /**
+     * Create a value-less deferred which completes when the given cancelable
+     * shuts down.
+     * 
+     * @param cancelable The cancelable to watch for shutdown.
+     * @param sched The scheduler use for the result deferred.
+     * @return A deferred which completes with the given cancelable shuts down.
+     */
     static DeferredRef<None,None> forCancelable(CancelableRef cancelable, SchedulerRef sched);
 
     /**
