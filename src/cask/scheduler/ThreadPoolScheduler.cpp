@@ -208,4 +208,8 @@ void ThreadPoolScheduler::CancelableTimer::onCancel(const std::function<void()>&
     }
 }
 
+void ThreadPoolScheduler::CancelableTimer::onShutdown(const std::function<void()>&) {
+    // Not implemented yet for timers
+}
+
 } // namespace cask::scheduler

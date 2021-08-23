@@ -68,6 +68,7 @@ private:
 
         void cancel() override;
         void onCancel(const std::function<void()>& callback) override;
+        void onShutdown(const std::function<void()>& callback) override;
     private:
         std::shared_ptr<ThreadPoolScheduler> parent;
         int64_t time_slot;

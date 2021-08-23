@@ -34,9 +34,18 @@ public:
     /**
      * Register a callback to be processed in the event of a cancelation.
      *
-     * @param callback The callback to run if this promise is canceled.
+     * @param callback The callback to run if this computation is canceled.
      */
     virtual void onCancel(const std::function<void()>&) = 0;
+
+    /**
+     * Register a callback to be processed in the event the computation
+     * completes without being cancelled.
+     *
+     * @param callback The callback to run if the computation is completed
+     *                 without being cancelled.
+     */
+    virtual void onShutdown(const std::function<void()>&) = 0;
 
     virtual ~Cancelable() {};
 };
@@ -45,6 +54,7 @@ class IgnoreCancelation final : public Cancelable {
 public:
     void cancel() override {}
     void onCancel(const std::function<void()>&) override {}
+    void onShutdown(const std::function<void()>&) override {}
 };
 
 }

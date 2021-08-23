@@ -198,4 +198,8 @@ void SingleThreadScheduler::CancelableTimer::onCancel(const std::function<void()
     }
 }
 
+void SingleThreadScheduler::CancelableTimer::onShutdown(const std::function<void()>&) {
+    // Not implemented yet for timers
+}
+
 } // namespace cask::scheduler

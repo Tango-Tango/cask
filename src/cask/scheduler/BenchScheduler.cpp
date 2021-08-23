@@ -143,4 +143,8 @@ void BenchScheduler::BenchCancelableTimer::onCancel(const std::function<void()>&
     }
 }
 
+void BenchScheduler::BenchCancelableTimer::onShutdown(const std::function<void()>&) {
+    // Not implemented for the bench scheduler
+}
+
 } // namespace cask::scheduler
