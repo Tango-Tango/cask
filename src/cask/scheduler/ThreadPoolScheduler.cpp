@@ -119,9 +119,9 @@ void ThreadPoolScheduler::timer() {
     const static std::chrono::milliseconds sleep_time(10);
 
     while(running) {
-        auto before = std::chrono::high_resolution_clock::now();
+        auto before = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(sleep_time);
-        auto after = std::chrono::high_resolution_clock::now();
+        auto after = std::chrono::steady_clock::now();
         
         auto delta = after - before;
         auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
