@@ -134,13 +134,15 @@ void BenchScheduler::BenchCancelableTimer::cancel() {
     }
 }
 
-void BenchScheduler::BenchCancelableTimer::onCancel(const std::function<void()>& callback) {
+int BenchScheduler::BenchCancelableTimer::onCancel(const std::function<void()>& callback) {
     if(canceled) {
         callback();
     } else {
         std::lock_guard<std::mutex> guard(callback_mutex);
         callbacks.emplace_back(callback);
     }
+
+    return 0;
 }
 
 void BenchScheduler::BenchCancelableTimer::onShutdown(const std::function<void()>& shutdownCallback) {
@@ -173,5 +175,7 @@ void BenchScheduler::BenchCancelableTimer::onShutdown(const std::function<void()
         shutdownCallback();
     }
 }
+
+void BenchScheduler::BenchCancelableTimer::unregisterCancelCallback(int) {}
 
 } // namespace cask::scheduler

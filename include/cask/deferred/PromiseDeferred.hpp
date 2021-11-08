@@ -28,9 +28,10 @@ public:
     void onComplete(std::function<void(Either<T,E>)> callback) override;
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;
-    void onCancel(const std::function<void()>& callback) override;
+    int onCancel(const std::function<void()>& callback) override;
     void onShutdown(const std::function<void()>& callback) override;
     void cancel() override;
+    void unregisterCancelCallback(int) override;
     T await() override;
 
     std::shared_ptr<Promise<T,E>> promise;
@@ -68,8 +69,9 @@ void PromiseDeferred<T,E>::onError(std::function<void(E)> callback) {
 }
 
 template <class T, class E>
-void PromiseDeferred<T,E>::onCancel(const std::function<void()>& callback) {
+int PromiseDeferred<T,E>::onCancel(const std::function<void()>& callback) {
     promise->onCancel(callback);
+    return 0;
 }
 
 template <class T, class E>
@@ -80,6 +82,11 @@ void PromiseDeferred<T,E>::onShutdown(const std::function<void()>& callback) {
 template <class T, class E>
 void PromiseDeferred<T,E>::cancel() {
     promise->cancel();
+}
+
+template <class T, class E>
+void PromiseDeferred<T,E>::unregisterCancelCallback(int) {
+
 }
 
 template <class T, class E>

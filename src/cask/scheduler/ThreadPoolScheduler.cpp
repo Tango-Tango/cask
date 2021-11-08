@@ -199,13 +199,15 @@ void ThreadPoolScheduler::CancelableTimer::cancel() {
     }
 }
 
-void ThreadPoolScheduler::CancelableTimer::onCancel(const std::function<void()>& callback) {
+int ThreadPoolScheduler::CancelableTimer::onCancel(const std::function<void()>& callback) {
     if(canceled) {
         callback();
     } else {
         std::lock_guard<std::mutex> guard(callback_mutex);
         callbacks.emplace_back(callback);
     }
+
+    return 0;
 }
 
 void ThreadPoolScheduler::CancelableTimer::onShutdown(const std::function<void()>& shutdownCallback) {
@@ -241,6 +243,10 @@ void ThreadPoolScheduler::CancelableTimer::onShutdown(const std::function<void()
     if(!found) {
         shutdownCallback();
     }
+}
+
+void ThreadPoolScheduler::CancelableTimer::unregisterCancelCallback(int) {
+    
 }
 
 } // namespace cask::scheduler

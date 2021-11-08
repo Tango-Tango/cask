@@ -19,9 +19,10 @@ public:
     void onComplete(std::function<void(Either<T,E>)> callback) override;
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;
-    void onCancel(const std::function<void()>& callback) override;
+    int onCancel(const std::function<void()>& callback) override;
     void onShutdown(const std::function<void()>& callback) override;
     void cancel() override;
+    void unregisterCancelCallback(int) override;
     T await() override;
 };
 
@@ -46,8 +47,8 @@ void PureErrorDeferred<T,E>::onError(std::function<void(E)> callback) {
 }
 
 template <class T, class E>
-void PureErrorDeferred<T,E>::onCancel(const std::function<void()>&) {
-    return;
+int PureErrorDeferred<T,E>::onCancel(const std::function<void()>&) {
+    return 0;
 }
 
 template <class T, class E>
@@ -63,6 +64,11 @@ void PureErrorDeferred<T,E>::cancel() {
 template <class T, class E>
 T PureErrorDeferred<T,E>::await() {
     throw error;
+}
+
+template <class T, class E>
+void PureErrorDeferred<T,E>::unregisterCancelCallback(int) {
+    return;
 }
 
 }

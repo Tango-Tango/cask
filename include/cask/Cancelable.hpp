@@ -35,8 +35,16 @@ public:
      * Register a callback to be processed in the event of a cancelation.
      *
      * @param callback The callback to run if this computation is canceled.
+     * @return A handle which may be used to unregister the callback in the future.
      */
-    virtual void onCancel(const std::function<void()>&) = 0;
+    virtual int onCancel(const std::function<void()>&) = 0;
+
+    /**
+     * Unregister the cancel callback identified by the given handle.
+     * 
+     * @param handle The handle for the callback you with to unregister.
+     */
+    virtual void unregisterCancelCallback(int handle) = 0;
 
     /**
      * Register a callback to be processed in the event the computation
@@ -45,7 +53,7 @@ public:
      * @param callback The callback to run if the computation is completed
      *                 without being cancelled.
      */
-    virtual void onShutdown(const std::function<void()>&) = 0;
+    virtual void onShutdown(const std::function<void()>& callback) = 0;
 
     virtual ~Cancelable() {};
 };
@@ -53,8 +61,10 @@ public:
 class IgnoreCancelation final : public Cancelable {
 public:
     void cancel() override {}
-    void onCancel(const std::function<void()>&) override {}
+    int onCancel(const std::function<void()>&) override { return 0; }
     void onShutdown(const std::function<void()>&) override {}
+    void unregisterCancelCallback(int) override {};
+
 };
 
 }

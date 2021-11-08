@@ -273,6 +273,27 @@ TEST(Task, RecurseWithoutExploding) {
     EXPECT_EQ(result, 0);
 }
 
+TEST(Task, RecurseAsyncWithoutExploding) {
+    auto sched = Scheduler::global();
+
+    std::function<Task<int>(const int&)> recurse = [&recurse](auto counter) {
+        return Task<int>::defer([counter, &recurse]() {
+            char yuge[8192];
+            memset(yuge, 0, 8192);
+
+            if(counter > 0) {
+                return recurse(counter - 1).asyncBoundary();
+            } else  {
+                return Task<int>::pure(counter);
+            }
+        });
+    };
+
+    auto task = Task<int>::pure(1000).flatMap(recurse).asyncBoundary();
+    auto result = task.run(sched)->await();
+    EXPECT_EQ(result, 0);
+}
+
 TEST(Task, OnErrorSuccess) {
     int calls = 0;
     auto result = Task<int,None>::pure(123)
