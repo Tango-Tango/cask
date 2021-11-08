@@ -189,15 +189,13 @@ void SingleThreadScheduler::CancelableTimer::cancel() {
     }
 }
 
-int SingleThreadScheduler::CancelableTimer::onCancel(const std::function<void()>& callback) {
+void SingleThreadScheduler::CancelableTimer::onCancel(const std::function<void()>& callback) {
     if(canceled) {
         callback();
     } else {
         std::lock_guard<std::mutex> guard(callback_mutex);
         callbacks.emplace_back(callback);
     }
-
-    return 0;
 }
 
 void SingleThreadScheduler::CancelableTimer::onShutdown(const std::function<void()>& shutdownCallback) {
@@ -233,10 +231,6 @@ void SingleThreadScheduler::CancelableTimer::onShutdown(const std::function<void
     if(!found) {
         shutdownCallback();
     }
-}
-
-void SingleThreadScheduler::CancelableTimer::unregisterCancelCallback(int) {
-
 }
 
 } // namespace cask::scheduler

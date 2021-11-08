@@ -8,7 +8,6 @@
 
 #include <any>
 #include <functional>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -16,7 +15,6 @@
 #include "Either.hpp"
 #include "Scheduler.hpp"
 #include "None.hpp"
-#include "stdlib.h"
 
 namespace cask {
 
@@ -90,19 +88,17 @@ public:
      */
     bool isCancelled() const;
 
-    int onCancel(const std::function<void()>& callback) override;
+    void onCancel(const std::function<void()>& callback) override;
     void onShutdown(const std::function<void()>& callback) override;
     void cancel() override;
-    void unregisterCancelCallback(int) override;
 private:
     friend deferred::PromiseDeferred<T,E>;
 
     std::optional<Either<T,E>> resultOpt;
     bool canceled;
     mutable std::mutex mutex;
-    int next_id;
     std::vector<std::function<void(Either<T,E>)>> completeCallbacks;
-    std::map<int, std::function<void()>> cancelCallbacks;
+    std::vector<std::function<void()>> cancelCallbacks;
     std::vector<std::function<void(Either<T,E>, bool)>> eitherCallbacks;
     std::shared_ptr<Scheduler> sched;
 
@@ -120,7 +116,6 @@ Promise<T,E>::Promise(std::shared_ptr<Scheduler> sched)
     : resultOpt(std::nullopt)
     , canceled(false)
     , mutex()
-    , next_id(rand())
     , completeCallbacks()
     , cancelCallbacks()
     , sched(sched)
@@ -182,18 +177,9 @@ void Promise<T,E>::cancel() {
     if(runCallbacks) {
         // Cancel callbacks are run schronously to try
         // and expedite the process of cancelling.
-        for(auto& callback_pair : cancelCallbacks) {
-            callback_pair.second();
+        for(auto& callback : cancelCallbacks) {
+            callback();
         }
-    }
-}
-
-template <class T, class E>
-void Promise<T,E>::unregisterCancelCallback(int handle) {
-    std::lock_guard guard(mutex);
-    auto result = cancelCallbacks.find(handle);
-    if(result != cancelCallbacks.end()) {
-        cancelCallbacks.erase(result);
     }
 }
 
@@ -213,24 +199,21 @@ std::optional<Either<T,E>> Promise<T,E>::get() const {
 }
 
 template <class T, class E>
-int Promise<T,E>::onCancel(const std::function<void()>& callback) {
+void Promise<T,E>::onCancel(const std::function<void()>& callback) {
     bool runNow = false;
-    int id = next_id++;
 
     {
         std::lock_guard guard(mutex);
         if(canceled) {
             runNow = true;
         } else {
-            cancelCallbacks[id] = callback;
+            cancelCallbacks.push_back(callback);
         }
     }
 
     if(runNow) {
         callback();
     }
-
-    return id;
 }
 
 template <class T, class E>

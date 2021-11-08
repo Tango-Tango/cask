@@ -62,13 +62,5 @@ if not meson.is_subproject()
         dependencies: dependencies + test_dependencies
     )
 
-    playgroundexe = executable(
-        'playground',
-        ['playground.cpp'],
-        include_directories: includes,
-        link_with: cask_lib,
-        dependencies: dependencies + test_dependencies
-    )
-
     test('cask unit tests', testexe, timeout: 30, env: ['ASAN_OPTIONS=detect_leaks=1'])
 endif

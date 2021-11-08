@@ -207,16 +207,15 @@ void Deferred<T,E>::chainDownstream(
 ) {
     auto upstream = this->shared_from_this();
 
-    int handle = downstream->onCancel([upstream]() {
+    downstream->onCancel([upstream]() {
         upstream->cancel();
     });
 
-    upstream->onComplete([downstreamWeak = std::weak_ptr<Promise<T2,E2>>(downstream), transform, handle](Either<T,E> result) {
+    upstream->onComplete([downstreamWeak = std::weak_ptr<Promise<T2,E2>>(downstream), transform](Either<T,E> result) {
         auto transformResult = transform(result);
 
         if(auto downstream = downstreamWeak.lock()) {
             downstream->complete(transformResult);
-            downstream->unregisterCancelCallback(handle);
         }
     });
 }
@@ -229,11 +228,11 @@ void Deferred<T,E>::chainDownstreamAsync(
 ) {
     auto upstream = this->shared_from_this();
 
-    int handle = downstream->onCancel([upstream]() {
+    downstream->onCancel([upstream]() {
         upstream->cancel();
     });
 
-    upstream->onComplete([downstreamWeak = std::weak_ptr<Promise<T2,E2>>(downstream), transform, handle](Either<T,E> result) {
+    upstream->onComplete([downstreamWeak = std::weak_ptr<Promise<T2,E2>>(downstream), transform](Either<T,E> result) {
         DeferredRef<T2,E2> asyncTransformResult = transform(result);
 
         if(auto downstream = downstreamWeak.lock()) {
@@ -241,8 +240,6 @@ void Deferred<T,E>::chainDownstreamAsync(
                 downstream,
                 [](auto result){ return result; }
             );
-
-            downstream->unregisterCancelCallback(handle);
         }
     });
 }
