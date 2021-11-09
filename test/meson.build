@@ -7,6 +7,7 @@ if not meson.is_subproject()
     test_sources = [
         'cask/TestEither.cpp',
         'cask/TestErased.cpp',
+        'cask/TestFiber.cpp',
         'cask/TestList.cpp',
         'cask/TestMVar.cpp',
         'cask/TestObservable.cpp',
