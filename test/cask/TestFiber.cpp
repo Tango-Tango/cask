@@ -5,84 +5,92 @@
 
 #include "gtest/gtest.h"
 #include "cask/Fiber.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 
+using cask::Deferred;
 using cask::Fiber;
 using cask::Erased;
 using cask::FiberOp;
 using cask::None;
+using cask::scheduler::BenchScheduler;
 
 TEST(TestFiber, Constructs) {
+    auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>(op);
+    auto fiber = Fiber<int,std::string>::create(op, sched);
 
-    EXPECT_EQ(fiber.getState(), cask::READY);
-    EXPECT_FALSE(fiber.getValue().has_value());
-    EXPECT_FALSE(fiber.getError().has_value());
+    EXPECT_EQ(fiber->getState(), cask::READY);
+    EXPECT_FALSE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
 }
 
 TEST(TestFiber, EvaluatesPureValue) {
+    auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>(op);
+    auto fiber = Fiber<int,std::string>::create(op, sched);
+    
+    EXPECT_TRUE(fiber->resume());
+    EXPECT_FALSE(fiber->resume());
 
-    EXPECT_TRUE(fiber.resume());
-    EXPECT_FALSE(fiber.resume());
-
-    EXPECT_EQ(fiber.getState(), cask::COMPLETED);
-    EXPECT_TRUE(fiber.getValue().has_value());
-    EXPECT_FALSE(fiber.getError().has_value());
-    EXPECT_EQ(*(fiber.getValue()), 123);
+    EXPECT_EQ(fiber->getState(), cask::COMPLETED);
+    EXPECT_TRUE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getValue()), 123);
 }
 
 TEST(TestFiber, SuspendsAtAsyncBoundary) {
-    auto op = FiberOp::async(None());
-    auto fiber = Fiber<int,std::string>(op);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto op = FiberOp::async([](auto) {
+        return Deferred<Erased,Erased>::pure(123);
+    });
+    auto fiber = Fiber<int,std::string>::create(op, sched);
 
-    EXPECT_TRUE(fiber.resume());
-    EXPECT_FALSE(fiber.resume());
+    EXPECT_TRUE(fiber->resume());
+    EXPECT_FALSE(fiber->resume());
 
-    EXPECT_EQ(fiber.getState(), cask::WAITING);
-    EXPECT_FALSE(fiber.getValue().has_value());
-    EXPECT_FALSE(fiber.getError().has_value());
+    EXPECT_EQ(fiber->getState(), cask::WAITING);
+    EXPECT_FALSE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
 }
 
 TEST(TestFiber, ResumesAfterAsyncBoundary) {
-    auto op = FiberOp::async(None());
-    auto fiber = Fiber<int,std::string>(op);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto op = FiberOp::async([](auto) {
+        return Deferred<Erased,Erased>::pure(123);
+    });
+    auto fiber = Fiber<int,std::string>::create(op, sched);
 
-    EXPECT_TRUE(fiber.resume());
-    EXPECT_FALSE(fiber.resume());
-    
-    fiber.asyncSuccess(123);
+    EXPECT_TRUE(fiber->resume());
+    EXPECT_FALSE(fiber->resume());
 
-    EXPECT_EQ(fiber.getState(), cask::COMPLETED);
-    EXPECT_TRUE(fiber.getValue().has_value());
-    EXPECT_FALSE(fiber.getError().has_value());
-    EXPECT_EQ(*(fiber.getValue()), 123);
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(fiber->getState(), cask::COMPLETED);
+    EXPECT_TRUE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getValue()), 123);
 }
 
 TEST(TestFiber, DelaysAValue) {
+    auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::delay(10)->flatMap([](auto, auto) {
         return FiberOp::value(123);
     });
-    auto fiber = Fiber<int,std::string>(op);
+    auto fiber = Fiber<int,std::string>::create(op, sched);
 
     // Run until the delay is hit
-    EXPECT_TRUE(fiber.resume());
-    EXPECT_FALSE(fiber.resume());
-    EXPECT_EQ(fiber.getState(), cask::DELAYED);
+    EXPECT_TRUE(fiber->resume());
+    EXPECT_FALSE(fiber->resume());
+    EXPECT_EQ(fiber->getState(), cask::DELAYED);
 
     // Trigger the delay to resolve
-    fiber.delayFinished();
-    EXPECT_EQ(fiber.getState(), cask::READY);
-
-    // Run the remaining synchronous operations to get a value
-    EXPECT_TRUE(fiber.resume());
-    EXPECT_FALSE(fiber.resume());
-    EXPECT_EQ(fiber.getState(), cask::COMPLETED);
-
+    sched->advance_time(10);
+    sched->run_ready_tasks();
+    EXPECT_EQ(fiber->getState(), cask::COMPLETED);
+    
     // We should now have a result value
-    EXPECT_TRUE(fiber.getValue().has_value());
-    EXPECT_FALSE(fiber.getError().has_value());
-    EXPECT_EQ(*(fiber.getValue()), 123);
+    EXPECT_TRUE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getValue()), 123);
 }
 

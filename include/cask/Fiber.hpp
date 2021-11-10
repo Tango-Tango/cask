@@ -8,15 +8,18 @@
 
 #include <atomic>
 #include "cask/FiberOp.hpp"
+#include "cask/Scheduler.hpp"
 
 namespace cask {
 
 enum FiberState { READY, RUNNING, WAITING, DELAYED, COMPLETED, CANCELED };
 
 template <class T, class E>
-class Fiber {
+class Fiber : public std::enable_shared_from_this<Fiber<T,E>> {
 public:
-    Fiber(const std::shared_ptr<const FiberOp>& op);
+    static std::shared_ptr<Fiber<T,E>> create(const std::shared_ptr<const FiberOp>& op, const std::shared_ptr<Scheduler>& sched);
+
+    Fiber(const std::shared_ptr<const FiberOp>& op, const std::shared_ptr<Scheduler>& sched);
 
     bool resume();
     FiberState getState();
@@ -30,19 +33,30 @@ public:
 
 private:
     std::shared_ptr<const FiberOp> op;
+    std::shared_ptr<Scheduler> sched;
     Erased value;
     Erased error;
     FiberOp::FlatMapPredicate nextOp;
     std::atomic<FiberState> state;
+    DeferredRef<Erased,Erased> waitingOn;
+    CancelableRef delayedBy;
 };
 
 template <class T, class E>
-Fiber<T,E>::Fiber(const std::shared_ptr<const FiberOp>& op)
+std::shared_ptr<Fiber<T,E>> Fiber<T,E>::create(const std::shared_ptr<const FiberOp>& op, const std::shared_ptr<Scheduler>& sched) {
+    return std::make_shared<Fiber<T,E>>(op, sched);
+}
+
+template <class T, class E>
+Fiber<T,E>::Fiber(const std::shared_ptr<const FiberOp>& op, const std::shared_ptr<Scheduler>& sched)
     : op(op)
+    , sched(sched)
     , value()
     , error()
     , nextOp()
     , state(READY)
+    , waitingOn()
+    , delayedBy()
 {}
 
 template <class T, class E>
@@ -82,6 +96,29 @@ bool Fiber<T,E>::resume() {
             case ASYNC:
             {
                 state.store(WAITING);
+                const FiberOp::AsyncData* data = op->data.asyncData;
+                auto deferred = (*data)(sched);
+                auto self_weak = std::weak_ptr<Fiber<T,E>>(this->shared_from_this());
+                waitingOn = deferred;
+                
+                deferred->onSuccess([self_weak, sched = this->sched](auto value) {
+                    sched->submit([self_weak, value] {
+                        if(auto self = self_weak.lock()) {
+                            self->asyncSuccess(value);
+                            self->resume();
+                        }
+                    });
+                });
+
+                deferred->onError([self_weak, sched = this->sched](auto error) {
+                    sched->submit([self_weak, error] {
+                        if(auto self = self_weak.lock()) {
+                            self->asyncError(error);
+                            self->resume();
+                        }
+                    });
+                });
+
                 return true;
             }
             break;
@@ -95,8 +132,16 @@ bool Fiber<T,E>::resume() {
             case DELAY:
             {
                 state.store(DELAYED);
+                const FiberOp::DelayData* data = op->data.delayData;
+                auto self_weak = std::weak_ptr<Fiber<T,E>>(this->shared_from_this());
+                delayedBy = sched->submitAfter(*data, [self_weak] {
+                    if(auto self = self_weak.lock()) {
+                        self->delayFinished();
+                        self->resume();
+                    }
+                });
                 return true;
-            }  
+            }
             break;
         }
 
@@ -143,6 +188,7 @@ void Fiber<T,E>::asyncError(const Erased& error) {
     if(state.load() == WAITING) {
         this->error = error;
         this->value.reset();
+        this->waitingOn = nullptr;
 
         if(nextOp) {
             op = nextOp(error, true);
@@ -159,6 +205,7 @@ void Fiber<T,E>::asyncSuccess(const Erased& value) {
     if(state.load() == WAITING) {
         this->value = value;
         this->error.reset();
+        this->waitingOn = nullptr;
 
         if(nextOp) {
             op = nextOp(value, false);
@@ -174,7 +221,14 @@ template <class T, class E>
 void Fiber<T,E>::delayFinished() {
     if(state.load() == DELAYED) {
         if(nextOp) {
-            op = nextOp(value, false);
+            delayedBy = nullptr;
+
+            if(error.has_value()) {
+                op = nextOp(error, true);
+            } else {
+                op = nextOp(value, false);
+            }
+            
             nextOp = nullptr;
             state.store(READY);
         } else {
@@ -185,7 +239,23 @@ void Fiber<T,E>::delayFinished() {
 
 template <class T, class E>
 void Fiber<T,E>::cancel() {
-    state.store(CANCELED);
+    auto previous_state = state.exchange(CANCELED);
+
+    if(previous_state == WAITING) {
+        auto localWaiting = waitingOn;
+        if(localWaiting) {
+            localWaiting->cancel();
+        }
+        waitingOn = nullptr;
+    } else if(previous_state == DELAYED) {
+        auto localDelayedBy = delayedBy;
+
+        if(localDelayedBy) {
+            delayedBy->cancel();
+        }
+
+        delayedBy = nullptr;
+    }    
 }
 
 }

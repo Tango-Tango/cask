@@ -131,7 +131,7 @@ std::shared_ptr<const FiberOp> FiberOp::error(const Erased& e) noexcept {
     return std::make_shared<FiberOp>(new ConstantData(Either<Erased,Erased>::right(e)));
 }
 
-std::shared_ptr<const FiberOp> FiberOp::async(const None& predicate) noexcept {
+std::shared_ptr<const FiberOp> FiberOp::async(const  std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept {
     return std::make_shared<FiberOp>(new AsyncData(predicate));
 }
 
@@ -139,7 +139,7 @@ std::shared_ptr<const FiberOp> FiberOp::thunk(const std::function<Erased()>& thu
     return std::make_shared<FiberOp>(new ThunkData(thunk));
 }
 
-std::shared_ptr<const FiberOp> FiberOp::delay(int32_t delay_ms) noexcept {
+std::shared_ptr<const FiberOp> FiberOp::delay(int64_t delay_ms) noexcept {
     return std::make_shared<FiberOp>(new DelayData(delay_ms));
 }
 
