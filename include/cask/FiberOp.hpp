@@ -17,7 +17,7 @@
 
 namespace cask {
 
-enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK};
+enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY };
 
 /**
  * A `FiberOp` represents a trampolined and possibly asynchronous program
@@ -43,7 +43,8 @@ public:
     using ThunkData = std::function<Erased()>;
     using FlatMapInput = std::shared_ptr<const FiberOp>;
     using FlatMapPredicate = std::function<std::shared_ptr<const FiberOp>(const Erased&, bool)>;
-    using FlatMapData = std::pair<FlatMapInput,FlatMapPredicate>; 
+    using FlatMapData = std::pair<FlatMapInput,FlatMapPredicate>;
+    using DelayData = int32_t;
 
     /**
      * The type of operation represented. Used for optimization of internal
@@ -56,6 +57,7 @@ public:
     static std::shared_ptr<const FiberOp> error(const Erased& e) noexcept;
     static std::shared_ptr<const FiberOp> async(const None& predicate) noexcept;
     static std::shared_ptr<const FiberOp> thunk(const std::function<Erased()>& thunk) noexcept;
+    static std::shared_ptr<const FiberOp> delay(int32_t delay_ms) noexcept;
 
     /**
      * Create a new operation which represents the flat map of this operation
@@ -77,6 +79,7 @@ public:
     FiberOp(ConstantData* constant) noexcept;
     FiberOp(ThunkData* thunk) noexcept;
     FiberOp(FlatMapData* flatMap) noexcept;
+    FiberOp(DelayData* delay) noexcept;
 
 
     FiberOp& operator=(const FiberOp&);
@@ -86,6 +89,7 @@ public:
         ConstantData* constantData;
         ThunkData* thunkData;
         FlatMapData* flatMapData;
+        DelayData* delayData;
     } data;
 
     ~FiberOp();

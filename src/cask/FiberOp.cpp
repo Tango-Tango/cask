@@ -26,6 +26,9 @@ FiberOp::FiberOp(const FiberOp& other) noexcept
         case FLATMAP:
             data.flatMapData = new FlatMapData(*(other.data.flatMapData));
         break;
+        case DELAY:
+            data.delayData = new DelayData(*(other.data.delayData));
+        break;
     }
 }
 
@@ -50,6 +53,10 @@ FiberOp::FiberOp(FiberOp&& other) noexcept
             data.flatMapData = other.data.flatMapData;
             other.data.flatMapData = nullptr;
         break;
+        case DELAY:
+            data.delayData = other.data.delayData;
+            other.data.delayData = nullptr;
+        break;
     }
 }
 
@@ -71,10 +78,16 @@ FiberOp::FiberOp(ThunkData* thunk) noexcept
     data.thunkData = thunk;
 }
 
-FiberOp::FiberOp( FlatMapData* flatMap) noexcept
+FiberOp::FiberOp(FlatMapData* flatMap) noexcept
     : opType(FLATMAP)
 {
     data.flatMapData = flatMap;
+}
+
+FiberOp::FiberOp(DelayData* delay) noexcept
+    : opType(DELAY)
+{
+    data.delayData = delay;
 }
 
 FiberOp::~FiberOp() {
@@ -91,6 +104,9 @@ FiberOp::~FiberOp() {
         break;
         case FLATMAP:
             delete data.flatMapData;
+        break;
+        case DELAY:
+            delete data.delayData;
         break;
     }
 }
@@ -123,12 +139,17 @@ std::shared_ptr<const FiberOp> FiberOp::thunk(const std::function<Erased()>& thu
     return std::make_shared<FiberOp>(new ThunkData(thunk));
 }
 
+std::shared_ptr<const FiberOp> FiberOp::delay(int32_t delay_ms) noexcept {
+    return std::make_shared<FiberOp>(new DelayData(delay_ms));
+}
+
 std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicate) const noexcept {
     switch(opType) {
         case VALUE:
         case ERROR:
         case THUNK:
         case ASYNC:
+        case DELAY:
         {
             auto data = new FlatMapData(this->shared_from_this(), predicate);
             return std::make_shared<FiberOp>(data);

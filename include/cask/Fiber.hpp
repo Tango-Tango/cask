@@ -11,7 +11,7 @@
 
 namespace cask {
 
-enum FiberState { READY, RUNNING, WAITING, COMPLETED, CANCELED };
+enum FiberState { READY, RUNNING, WAITING, DELAYED, COMPLETED, CANCELED };
 
 template <class T, class E>
 class Fiber {
@@ -25,6 +25,7 @@ public:
 
     void asyncError(const Erased& error);
     void asyncSuccess(const Erased& value);
+    void delayFinished();
     void cancel();
 
 private:
@@ -91,6 +92,12 @@ bool Fiber<T,E>::resume() {
                 op = data->first;
             }
             break;
+            case DELAY:
+            {
+                state.store(DELAYED);
+                return true;
+            }  
+            break;
         }
 
         if(!nextOp) {
@@ -153,6 +160,19 @@ void Fiber<T,E>::asyncSuccess(const Erased& value) {
         this->value = value;
         this->error.reset();
 
+        if(nextOp) {
+            op = nextOp(value, false);
+            nextOp = nullptr;
+            state.store(READY);
+        } else {
+            state.store(COMPLETED);
+        }
+    }
+}
+
+template <class T, class E>
+void Fiber<T,E>::delayFinished() {
+    if(state.load() == DELAYED) {
         if(nextOp) {
             op = nextOp(value, false);
             nextOp = nullptr;

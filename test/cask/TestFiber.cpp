@@ -60,3 +60,29 @@ TEST(TestFiber, ResumesAfterAsyncBoundary) {
     EXPECT_EQ(*(fiber.getValue()), 123);
 }
 
+TEST(TestFiber, DelaysAValue) {
+    auto op = FiberOp::delay(10)->flatMap([](auto, auto) {
+        return FiberOp::value(123);
+    });
+    auto fiber = Fiber<int,std::string>(op);
+
+    // Run until the delay is hit
+    EXPECT_TRUE(fiber.resume());
+    EXPECT_FALSE(fiber.resume());
+    EXPECT_EQ(fiber.getState(), cask::DELAYED);
+
+    // Trigger the delay to resolve
+    fiber.delayFinished();
+    EXPECT_EQ(fiber.getState(), cask::READY);
+
+    // Run the remaining synchronous operations to get a value
+    EXPECT_TRUE(fiber.resume());
+    EXPECT_FALSE(fiber.resume());
+    EXPECT_EQ(fiber.getState(), cask::COMPLETED);
+
+    // We should now have a result value
+    EXPECT_TRUE(fiber.getValue().has_value());
+    EXPECT_FALSE(fiber.getError().has_value());
+    EXPECT_EQ(*(fiber.getValue()), 123);
+}
+
