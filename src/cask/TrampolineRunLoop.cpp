@@ -98,10 +98,12 @@ DeferredRef<Erased,Erased> TrampolineRunLoop::executeAsyncBoundary(
     const TrampolineOp::FlatMapPredicate& nextOp = std::get<1>(boundary);
 
     const TrampolineOp::AsyncData* async = op->data.asyncData;
-    auto promise = Promise<Erased,Erased>::create(sched);
+    
     auto deferred = (*async)(sched);
 
     if(nextOp) {
+        auto promise = Promise<Erased,Erased>::create(sched);
+
         deferred->template chainDownstreamAsync<Erased,Erased>(
             promise,
             [nextOp, sched](auto value) {
@@ -126,13 +128,11 @@ DeferredRef<Erased,Erased> TrampolineRunLoop::executeAsyncBoundary(
                 }
             }
         );
+
+        return Deferred<Erased,Erased>::forPromise(promise);
     } else {
-        deferred->template chainDownstream<Erased,Erased>(
-            promise,
-            [](auto result) { return result; }
-        );
+        return deferred;
     }
-    return Deferred<Erased,Erased>::forPromise(promise);
 }
 
 } // namespace cask::trampoline

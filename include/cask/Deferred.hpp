@@ -8,8 +8,9 @@
 
 #include <memory>
 #include <functional>
-#include "Promise.hpp"
 #include <exception>
+
+#include "Promise.hpp"
 
 namespace cask {
 
@@ -120,6 +121,12 @@ public:
         std::function<DeferredRef<T2,E2>(Either<T,E>)> transformDownstream
     );
 
+    template <class T2, class E2>
+    DeferredRef<T2,E2> mapBoth(
+        std::function<T2(const T&)> value_transform,
+        std::function<E2(const E&)> error_transform
+    );
+
     /**
      * Register a callback to be evaluated with the asynchronous
      * operation completes on success OR error.
@@ -158,6 +165,7 @@ public:
 
 }
 
+#include "deferred/MapDeferred.hpp"
 #include "deferred/PromiseDeferred.hpp"
 #include "deferred/PureDeferred.hpp"
 #include "deferred/PureErrorDeferred.hpp"
@@ -242,6 +250,19 @@ void Deferred<T,E>::chainDownstreamAsync(
             );
         }
     });
+}
+
+template<class T, class E>
+template <class T2, class E2>
+DeferredRef<T2,E2> Deferred<T,E>::mapBoth(
+    std::function<T2(const T&)> value_transform,
+    std::function<E2(const E&)> error_transform
+) {
+    return std::make_shared<deferred::MapDeferred<T,T2,E,E2>>(
+        this->shared_from_this(),
+        value_transform,
+        error_transform
+    );
 }
 
 }

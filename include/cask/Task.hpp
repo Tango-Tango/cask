@@ -430,18 +430,10 @@ template <class T, class E>
 constexpr Task<T,E> Task<T,E>::deferAction(const std::function<DeferredRef<T,E>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept {
     return Task<T,E>(
         trampoline::TrampolineOp::async([predicate](auto sched) {
-            auto promise = Promise<Erased,Erased>::create(sched);
-            auto deferred = predicate(sched);
-
-            deferred->template chainDownstream<Erased,Erased>(promise, [](Either<T,E> result) {
-                if(result.is_left()) {
-                    return Either<Erased,Erased>::left(result.get_left());
-                } else {
-                    return Either<Erased,Erased>::right(result.get_right());
-                }
-            });
-
-            return Deferred<Erased,Erased>::forPromise(promise);
+            return predicate(sched)->template mapBoth<Erased,Erased>(
+                [](auto value) { return value; },
+                [](auto error) { return error; }
+            );
         })
     );
 }
@@ -449,19 +441,11 @@ constexpr Task<T,E> Task<T,E>::deferAction(const std::function<DeferredRef<T,E>(
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::forPromise(const PromiseRef<T,E>& promise) noexcept {
     return Task<T,E>(
-        trampoline::TrampolineOp::async([promise](auto sched) {
-            auto erasedPromise = Promise<Erased,Erased>::create(sched);
-            auto deferred = Deferred<T,E>::forPromise(promise);
-
-            deferred->template chainDownstream<Erased,Erased>(erasedPromise, [](Either<T,E> result) {
-                if(result.is_left()) {
-                    return Either<Erased,Erased>::left(result.get_left());
-                } else {
-                    return Either<Erased,Erased>::right(result.get_right());
-                }
-            });
-
-            return Deferred<Erased,Erased>::forPromise(erasedPromise);
+        trampoline::TrampolineOp::async([promise](auto) {
+            return Deferred<T,E>::forPromise(promise)->template mapBoth<Erased,Erased>(
+                [](auto value) { return value; },
+                [](auto error) { return error; }
+            );
         })
     );
 }
@@ -512,15 +496,10 @@ DeferredRef<T,E> Task<T,E>::run(const std::shared_ptr<Scheduler>& sched) const {
         }
     } else {
         auto deferred = std::get<DeferredRef<Erased,Erased>>(result);
-        auto promise = Promise<T,E>::create(sched);
-        deferred->template chainDownstream<T,E>(promise, [](auto result) mutable {
-            if(result.is_left()) {
-                return Either<T,E>::left(result.get_left().template get<T>());
-            } else {
-                return Either<T,E>::right(result.get_right().template get<E>());
-            }
-        });
-        return Deferred<T,E>::forPromise(promise);
+        return deferred->template mapBoth<T,E>(
+            [](auto value) { return value.template get<T>(); },
+            [](auto error) { return error.template get<E>(); }
+        );
     }
 }
 
@@ -542,15 +521,10 @@ Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
         auto boundary = std::get<trampoline::AsyncBoundary>(result);
         auto asyncTask = Task<T,E>::deferAction([boundary](auto sched) {
             auto deferred = trampoline::TrampolineRunLoop::executeAsyncBoundary(boundary, sched);
-            auto promise = Promise<T,E>::create(sched);
-            deferred->template chainDownstream<T,E>(promise, [](auto result) mutable {
-                if(result.is_left()) {
-                    return Either<T,E>::left(result.get_left().template get<T>());
-                } else {
-                    return Either<T,E>::right(result.get_right().template get<E>());
-                }
-            });
-            return Deferred<T,E>::forPromise(promise);
+            return deferred->template mapBoth<T,E>(
+                [](auto value) { return value.template get<T>(); },
+                [](auto error) { return error.template get<E>(); }
+            );
         });
         return Either<Either<T,E>,Task<T,E>>::right(asyncTask);
     }
