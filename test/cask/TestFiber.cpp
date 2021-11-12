@@ -38,6 +38,20 @@ TEST(TestFiber, EvaluatesPureValue) {
     EXPECT_EQ(*(fiber->getValue()), 123);
 }
 
+TEST(TestFiber, EvaluatesPureValueSync) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto op = FiberOp::value(123);
+    auto fiber = Fiber<int,std::string>::create(op);
+    
+    EXPECT_TRUE(fiber->resumeSync());
+    EXPECT_FALSE(fiber->resumeSync());
+
+    EXPECT_EQ(fiber->getState(), cask::COMPLETED);
+    EXPECT_TRUE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getValue()), 123);
+}
+
 TEST(TestFiber, SuspendsAtAsyncBoundary) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::async([](auto) {

@@ -21,7 +21,9 @@ public:
 
     Fiber(const std::shared_ptr<const FiberOp>& op);
 
+    bool resumeSync();
     bool resume(const std::shared_ptr<Scheduler>& sched);
+
     FiberState getState();
     std::optional<T> getValue();
     std::optional<E> getError();
@@ -32,6 +34,9 @@ public:
     void cancel();
 
 private:
+    template <bool Async>
+    bool resumeUnsafe(const std::shared_ptr<Scheduler>& sched);
+
     std::shared_ptr<const FiberOp> op;
     std::shared_ptr<Scheduler> sched;
     Erased value;
@@ -59,7 +64,18 @@ Fiber<T,E>::Fiber(const std::shared_ptr<const FiberOp>& op)
 {}
 
 template <class T, class E>
+bool Fiber<T,E>::resumeSync() {
+    return resumeUnsafe<false>(nullptr);
+}
+
+template <class T, class E>
 bool Fiber<T,E>::resume(const std::shared_ptr<Scheduler>& sched) {
+    return resumeUnsafe<true>(sched);
+}
+
+template <class T, class E>
+template <bool Async>
+bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched) {
     FiberState expected = READY;
 
     if(!state.compare_exchange_strong(expected, RUNNING)) {
@@ -94,31 +110,36 @@ bool Fiber<T,E>::resume(const std::shared_ptr<Scheduler>& sched) {
             break;
             case ASYNC:
             {
-                state.store(WAITING);
-                const FiberOp::AsyncData* data = op->data.asyncData;
-                auto deferred = (*data)(sched);
-                auto self_weak = std::weak_ptr<Fiber<T,E>>(this->shared_from_this());
-                waitingOn = deferred;
-                
-                deferred->onSuccess([self_weak, sched](auto value) {
-                    sched->submit([self_weak, value, sched] {
-                        if(auto self = self_weak.lock()) {
-                            self->asyncSuccess(value);
-                            self->resume(sched);
-                        }
+                if constexpr(Async) {
+                    state.store(WAITING);
+                    const FiberOp::AsyncData* data = op->data.asyncData;
+                    auto deferred = (*data)(sched);
+                    auto self_weak = std::weak_ptr<Fiber<T,E>>(this->shared_from_this());
+                    waitingOn = deferred;
+                    
+                    deferred->onSuccess([self_weak, sched](auto value) {
+                        sched->submit([self_weak, value, sched] {
+                            if(auto self = self_weak.lock()) {
+                                self->asyncSuccess(value);
+                                self->resume(sched);
+                            }
+                        });
                     });
-                });
 
-                deferred->onError([self_weak, sched](auto error) {
-                    sched->submit([self_weak, error, sched] {
-                        if(auto self = self_weak.lock()) {
-                            self->asyncError(error);
-                            self->resume(sched);
-                        }
+                    deferred->onError([self_weak, sched](auto error) {
+                        sched->submit([self_weak, error, sched] {
+                            if(auto self = self_weak.lock()) {
+                                self->asyncError(error);
+                                self->resume(sched);
+                            }
+                        });
                     });
-                });
 
-                return true;
+                    return true;
+                } else {
+                    state.store(READY);
+                    return true;
+                }
             }
             break;
             case FLATMAP:
@@ -130,16 +151,21 @@ bool Fiber<T,E>::resume(const std::shared_ptr<Scheduler>& sched) {
             break;
             case DELAY:
             {
-                state.store(DELAYED);
-                const FiberOp::DelayData* data = op->data.delayData;
-                auto self_weak = std::weak_ptr<Fiber<T,E>>(this->shared_from_this());
-                delayedBy = sched->submitAfter(*data, [self_weak, sched] {
-                    if(auto self = self_weak.lock()) {
-                        self->delayFinished();
-                        self->resume(sched);
-                    }
-                });
-                return true;
+                if constexpr(Async) {
+                    state.store(DELAYED);
+                    const FiberOp::DelayData* data = op->data.delayData;
+                    auto self_weak = std::weak_ptr<Fiber<T,E>>(this->shared_from_this());
+                    delayedBy = sched->submitAfter(*data, [self_weak, sched] {
+                        if(auto self = self_weak.lock()) {
+                            self->delayFinished();
+                            self->resume(sched);
+                        }
+                    });
+                    return true;
+                } else {
+                    state.store(READY);
+                    return true;
+                }
             }
             break;
         }
