@@ -17,6 +17,8 @@ enum FiberState { READY, RUNNING, WAITING, DELAYED, COMPLETED, CANCELED };
 template <class T, class E>
 class Fiber : public std::enable_shared_from_this<Fiber<T,E>> {
 public:
+    using ShutdownCallback = std::function<void(const std::shared_ptr<Fiber<T,E>>&)>;
+
     static std::shared_ptr<Fiber<T,E>> create(const std::shared_ptr<const FiberOp>& op);
 
     Fiber(const std::shared_ptr<const FiberOp>& op);
@@ -28,12 +30,14 @@ public:
     std::optional<T> getValue();
     std::optional<E> getError();
 
+    void cancel();
+    void onShutdown(const ShutdownCallback& callback);
+
+private:
     void asyncError(const Erased& error);
     void asyncSuccess(const Erased& value);
     void delayFinished();
-    void cancel();
 
-private:
     template <bool Async>
     bool resumeUnsafe(const std::shared_ptr<Scheduler>& sched);
 
@@ -45,6 +49,8 @@ private:
     std::atomic<FiberState> state;
     DeferredRef<Erased,Erased> waitingOn;
     CancelableRef delayedBy;
+    std::mutex callback_mutex;
+    std::vector<ShutdownCallback> callbacks;
 };
 
 template <class T, class E>
@@ -61,6 +67,8 @@ Fiber<T,E>::Fiber(const std::shared_ptr<const FiberOp>& op)
     , state(READY)
     , waitingOn()
     , delayedBy()
+    , callback_mutex()
+    , callbacks()
 {}
 
 template <class T, class E>
@@ -172,6 +180,19 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched) {
 
         if(!nextOp) {
             state.store(COMPLETED);
+            std::vector<ShutdownCallback> local_callbacks;
+
+            {
+                std::lock_guard<std::mutex> guard(callback_mutex);
+                for(auto& callback: callbacks) {
+                    local_callbacks.emplace_back(callback);
+                }
+            }
+
+            for(auto& callback: local_callbacks) {
+                callback(this->shared_from_this());
+            }
+
             return true;
         } else if(op == nullptr) {
             if(error.has_value()) {
@@ -280,7 +301,40 @@ void Fiber<T,E>::cancel() {
         }
 
         delayedBy = nullptr;
-    }    
+    }
+
+    if(previous_state != CANCELED) {
+        std::vector<ShutdownCallback> local_callbacks;
+
+        {
+            std::lock_guard<std::mutex> guard(callback_mutex);
+            for(auto& callback: callbacks) {
+                local_callbacks.emplace_back(callback);
+            }
+        }
+
+        for(auto& callback: local_callbacks) {
+            callback(this->shared_from_this());
+        }
+    }
+}
+
+template <class T, class E>
+void Fiber<T,E>::onShutdown(const ShutdownCallback& callback) {
+    bool run_callback_now = false;
+
+    {
+        std::lock_guard<std::mutex> guard(callback_mutex);
+        if(state.load() != COMPLETED) {
+            callbacks.emplace_back(callback);
+        } else {
+            run_callback_now = true;
+        }
+    }
+
+    if(run_callback_now) {
+        callback(this->shared_from_this());
+    }
 }
 
 }

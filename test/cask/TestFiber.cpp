@@ -52,6 +52,44 @@ TEST(TestFiber, EvaluatesPureValueSync) {
     EXPECT_EQ(*(fiber->getValue()), 123);
 }
 
+TEST(TestFiber, CallsShutdownCallback) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto op = FiberOp::value(123);
+    auto fiber = Fiber<int,std::string>::create(op);
+    int value = 0;
+    int count = 0;
+    
+    fiber->onShutdown([&value, &count](auto fiber) {
+        count++;
+        value = *(fiber->getValue());
+    });
+
+    EXPECT_TRUE(fiber->resume(sched));
+    EXPECT_FALSE(fiber->resume(sched));
+
+    EXPECT_EQ(value, 123);
+    EXPECT_EQ(count, 1);
+}
+
+TEST(TestFiber, CallsShutdownCallbackImmediately) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto op = FiberOp::value(123);
+    auto fiber = Fiber<int,std::string>::create(op);
+    int value = 0;
+    int count = 0;
+
+    EXPECT_TRUE(fiber->resume(sched));
+    EXPECT_FALSE(fiber->resume(sched));
+
+    fiber->onShutdown([&value, &count](auto fiber) {
+        count++;
+        value = *(fiber->getValue());
+    });
+
+    EXPECT_EQ(value, 123);
+    EXPECT_EQ(count, 1);
+}
+
 TEST(TestFiber, SuspendsAtAsyncBoundary) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::async([](auto) {
