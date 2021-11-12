@@ -29,6 +29,9 @@ FiberOp::FiberOp(const FiberOp& other) noexcept
         case DELAY:
             data.delayData = new DelayData(*(other.data.delayData));
         break;
+        case RACE:
+            data.raceData = new RaceData(*(other.data.raceData));
+        break;
     }
 }
 
@@ -56,6 +59,10 @@ FiberOp::FiberOp(FiberOp&& other) noexcept
         case DELAY:
             data.delayData = other.data.delayData;
             other.data.delayData = nullptr;
+        break;
+        case RACE:
+            data.raceData = other.data.raceData;
+            other.data.raceData = nullptr;
         break;
     }
 }
@@ -90,6 +97,12 @@ FiberOp::FiberOp(DelayData* delay) noexcept
     data.delayData = delay;
 }
 
+FiberOp::FiberOp(RaceData* race) noexcept
+    : opType(RACE)
+{
+    data.raceData = race;
+}
+
 FiberOp::~FiberOp() {
     switch(opType) {
         case VALUE:
@@ -107,6 +120,9 @@ FiberOp::~FiberOp() {
         break;
         case DELAY:
             delete data.delayData;
+        break;
+        case RACE:
+            delete data.raceData;
         break;
     }
 }
@@ -143,6 +159,14 @@ std::shared_ptr<const FiberOp> FiberOp::delay(int64_t delay_ms) noexcept {
     return std::make_shared<FiberOp>(new DelayData(delay_ms));
 }
 
+std::shared_ptr<const FiberOp> FiberOp::race(const std::vector<std::shared_ptr<const FiberOp>>& race) noexcept {
+    return std::make_shared<FiberOp>(new RaceData(race));
+}
+
+std::shared_ptr<const FiberOp> FiberOp::race(std::vector<std::shared_ptr<const FiberOp>>&& race) noexcept {
+    return std::make_shared<FiberOp>(new RaceData(std::move(race)));
+}
+
 std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicate) const noexcept {
     switch(opType) {
         case VALUE:
@@ -150,6 +174,7 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
         case THUNK:
         case ASYNC:
         case DELAY:
+        case RACE:
         {
             auto data = new FlatMapData(this->shared_from_this(), predicate);
             return std::make_shared<FiberOp>(data);
