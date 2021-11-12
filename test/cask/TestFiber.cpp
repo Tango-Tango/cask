@@ -160,7 +160,7 @@ TEST(TestFiber, ResumesAfterAsyncBoundary) {
 
 TEST(TestFiber, DelaysAValue) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto op = FiberOp::delay(10)->flatMap([](auto, auto) {
+    auto op = FiberOp::delay(10)->flatMap([](auto) {
         return FiberOp::value(123);
     });
     auto fiber = Fiber<int,std::string>::create(op);

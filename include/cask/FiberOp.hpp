@@ -12,6 +12,7 @@
 #include <type_traits>
 #include <tuple>
 #include "Deferred.hpp"
+#include "FiberValue.hpp"
 #include "None.hpp"
 #include "Either.hpp"
 #include "Erased.hpp"
@@ -37,13 +38,13 @@ enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY };
  *      from one program (the input) and provides it to another program (
  *      the predicate) which returns a new and likely transformed result.
  */
-class FiberOp : public std::enable_shared_from_this<FiberOp> {
+class FiberOp final : public std::enable_shared_from_this<FiberOp> {
 public:
     using ConstantData = Either<Erased,Erased>;
     using AsyncData = std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>;
     using ThunkData = std::function<Erased()>;
     using FlatMapInput = std::shared_ptr<const FiberOp>;
-    using FlatMapPredicate = std::function<std::shared_ptr<const FiberOp>(const Erased&, bool)>;
+    using FlatMapPredicate = std::function<std::shared_ptr<const FiberOp>(const FiberValue&)>;
     using FlatMapData = std::pair<FlatMapInput,FlatMapPredicate>;
     using DelayData = int64_t;
 

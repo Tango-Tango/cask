@@ -15,7 +15,7 @@ namespace cask {
 enum FiberState { READY, RUNNING, WAITING, DELAYED, COMPLETED, CANCELED };
 
 template <class T, class E>
-class Fiber : public std::enable_shared_from_this<Fiber<T,E>> {
+class Fiber final : public std::enable_shared_from_this<Fiber<T,E>> {
 public:
     using ShutdownCallback = std::function<void(Fiber<T,E>*)>;
 
@@ -44,8 +44,7 @@ private:
 
     std::shared_ptr<const FiberOp> op;
     std::shared_ptr<Scheduler> sched;
-    Erased value;
-    Erased error;
+    FiberValue value;
     FiberOp::FlatMapPredicate nextOp;
     std::atomic<FiberState> state;
     DeferredRef<Erased,Erased> waitingOn;
@@ -63,7 +62,6 @@ template <class T, class E>
 Fiber<T,E>::Fiber(const std::shared_ptr<const FiberOp>& op)
     : op(op)
     , value()
-    , error()
     , nextOp()
     , state(READY)
     , waitingOn()
@@ -106,24 +104,21 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned 
             case VALUE:
             {
                 const FiberOp::ConstantData* data = op->data.constantData;
-                value = data->get_left();
-                error.reset();
+                value.setValue(data->get_left());
                 op = nullptr;
             }
             break;
             case ERROR:
             {
                 const FiberOp::ConstantData* data = op->data.constantData;
-                error = data->get_right();
-                value.reset();
+                value.setError(data->get_right());
                 op = nullptr;
             }
             break;
             case THUNK:
             {
                 const FiberOp::ThunkData* thunk = op->data.thunkData;
-                value = (*thunk)();
-                error.reset();
+                value.setValue((*thunk)());
                 op = nullptr;
             }
             break;
@@ -206,12 +201,7 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned 
 
             return true;
         } else if(op == nullptr) {
-            if(error.has_value()) {
-                op = nextOp(error, true);
-            } else {
-                op = nextOp(value, false);
-            }
-            
+            op = nextOp(value);
             nextOp = nullptr;
         }
     }
@@ -226,8 +216,9 @@ FiberState Fiber<T,E>::getState() {
 
 template <class T, class E>
 std::optional<T> Fiber<T,E>::getValue() {
-    if(state.load() == COMPLETED && value.has_value()) {
-        return value.get<T>();
+    if(state.load() == COMPLETED && value.isValue()) {
+        auto erased_value_opt = value.getValue();
+        return erased_value_opt->template get<T>();
     } else {
         return {};
     }
@@ -235,8 +226,9 @@ std::optional<T> Fiber<T,E>::getValue() {
 
 template <class T, class E>
 std::optional<E> Fiber<T,E>::getError() {
-    if(state.load() == COMPLETED && error.has_value()) {
-        return error.get<E>();
+    if(state.load() == COMPLETED && value.isError()) {
+        auto erased_error_opt = value.getError();
+        return erased_error_opt->template get<E>();
     } else {
         return {};
     }
@@ -245,12 +237,11 @@ std::optional<E> Fiber<T,E>::getError() {
 template <class T, class E>
 void Fiber<T,E>::asyncError(const Erased& error) {
     if(state.load() == WAITING) {
-        this->error = error;
-        this->value.reset();
-        this->waitingOn = nullptr;
+        value.setError(error);
+        waitingOn = nullptr;
 
         if(nextOp) {
-            op = nextOp(error, true);
+            op = nextOp(value);
             nextOp = nullptr;
             state.store(READY);
         } else {
@@ -260,14 +251,13 @@ void Fiber<T,E>::asyncError(const Erased& error) {
 }
 
 template <class T, class E>
-void Fiber<T,E>::asyncSuccess(const Erased& value) {
+void Fiber<T,E>::asyncSuccess(const Erased& new_value) {
     if(state.load() == WAITING) {
-        this->value = value;
-        this->error.reset();
+        value.setValue(new_value);
         this->waitingOn = nullptr;
 
         if(nextOp) {
-            op = nextOp(value, false);
+            op = nextOp(value);
             nextOp = nullptr;
             state.store(READY);
         } else {
@@ -281,13 +271,7 @@ void Fiber<T,E>::delayFinished() {
     if(state.load() == DELAYED) {
         if(nextOp) {
             delayedBy = nullptr;
-
-            if(error.has_value()) {
-                op = nextOp(error, true);
-            } else {
-                op = nextOp(value, false);
-            }
-            
+            op = nextOp(value);
             nextOp = nullptr;
             state.store(READY);
         } else {

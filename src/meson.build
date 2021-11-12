@@ -1,5 +1,6 @@
 cask_sources = [
     'cask/FiberOp.cpp',
+    'cask/FiberValue.cpp',
     'cask/Scheduler.cpp',
     'cask/TrampolineOp.cpp',
     'cask/TrampolineRunLoop.cpp',

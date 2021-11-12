@@ -158,8 +158,8 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
         case FLATMAP:
         {
             FiberOp::FlatMapData* data = this->data.flatMapData;
-            auto fixedPredicate = [inputPredicate = data->second, outputPredicate = predicate](auto value, auto isError) {
-                return inputPredicate(value, isError)->flatMap(outputPredicate);
+            auto fixedPredicate = [inputPredicate = data->second, outputPredicate = predicate](auto value) {
+                return inputPredicate(value)->flatMap(outputPredicate);
             };
             auto flatMapData = new FlatMapData(data->first, fixedPredicate);
             return std::make_shared<FiberOp>(flatMapData);
@@ -169,4 +169,4 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
     __builtin_unreachable();
 }
 
-} // namespace cask::trampoline
+} // namespace cask
