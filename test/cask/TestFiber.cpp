@@ -12,6 +12,7 @@ using cask::Fiber;
 using cask::Erased;
 using cask::FiberOp;
 using cask::None;
+using cask::Promise;
 using cask::scheduler::BenchScheduler;
 
 TEST(TestFiber, Constructs) {
@@ -127,8 +128,9 @@ TEST(TestFiber, CallsShutdownCallbackImmediately) {
 
 TEST(TestFiber, SuspendsAtAsyncBoundary) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto op = FiberOp::async([](auto) {
-        return Deferred<Erased,Erased>::pure(123);
+    auto promise = Promise<Erased,Erased>::create(sched);
+    auto op = FiberOp::async([promise](auto) {
+        return Deferred<Erased,Erased>::forPromise(promise);
     });
     auto fiber = Fiber<int,std::string>::create(op);
 
@@ -142,14 +144,16 @@ TEST(TestFiber, SuspendsAtAsyncBoundary) {
 
 TEST(TestFiber, ResumesAfterAsyncBoundary) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto op = FiberOp::async([](auto) {
-        return Deferred<Erased,Erased>::pure(123);
+    auto promise = Promise<Erased,Erased>::create(sched);
+    auto op = FiberOp::async([promise](auto) {
+        return Deferred<Erased,Erased>::forPromise(promise);
     });
     auto fiber = Fiber<int,std::string>::create(op);
 
     EXPECT_TRUE(fiber->resume(sched));
     EXPECT_FALSE(fiber->resume(sched));
 
+    promise->success(123);
     sched->run_ready_tasks();
 
     EXPECT_EQ(fiber->getState(), cask::COMPLETED);

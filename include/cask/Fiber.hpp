@@ -37,6 +37,7 @@ public:
 private:
     void asyncError(const Erased& error);
     void asyncSuccess(const Erased& value);
+    void asyncCancel();
     void delayFinished();
 
     template <bool Async>
@@ -51,6 +52,7 @@ private:
     CancelableRef delayedBy;
     std::mutex callback_mutex;
     std::vector<ShutdownCallback> callbacks;
+    std::atomic_bool attempting_cancel;
 };
 
 template <class T, class E>
@@ -68,16 +70,18 @@ Fiber<T,E>::Fiber(const std::shared_ptr<const FiberOp>& op)
     , delayedBy()
     , callback_mutex()
     , callbacks()
+    , attempting_cancel(false)
 {}
 
 template <class T, class E>
 Fiber<T,E>::~Fiber()
 {
-    while(state.load() == RUNNING);
-
     if(state.load() != COMPLETED) {
         cancel();
+        resumeSync();
     }
+
+    while(state.load() == RUNNING);
 }
 
 template <class T, class E>
@@ -93,59 +97,83 @@ bool Fiber<T,E>::resume(const std::shared_ptr<Scheduler>& sched) {
 template <class T, class E>
 template <bool Async>
 bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned int batch_size) {
-    FiberState expected = READY;
+    FiberState current_state = state.load();
 
-    if(!state.compare_exchange_strong(expected, RUNNING)) {
+    if(attempting_cancel.load()) {
+        while(true) {
+            current_state = state.load();
+            if(state == RUNNING || state == COMPLETED || state == CANCELED) {
+                return false;
+            } else {
+                if(state.compare_exchange_strong(current_state, RUNNING)) {
+                    break;
+                }
+            }
+        }
+
+        value.setCanceled();
+
+        if(current_state == WAITING) {
+            waitingOn->cancel();
+            waitingOn = nullptr;
+        } else if(current_state == DELAYED) {
+            delayedBy->cancel();
+            delayedBy = nullptr;
+        }
+
+    } else if(state != READY || (state == READY && !state.compare_exchange_strong(current_state, RUNNING))) {
         return false;
     }
 
     while(batch_size-- > 0) {
         switch(op->opType) {
             case VALUE:
-            {
+            if(!value.isCanceled()) {
                 const FiberOp::ConstantData* data = op->data.constantData;
                 value.setValue(data->get_left());
                 op = nullptr;
             }
             break;
             case ERROR:
-            {
+            if(!value.isCanceled()) {
                 const FiberOp::ConstantData* data = op->data.constantData;
                 value.setError(data->get_right());
                 op = nullptr;
             }
             break;
             case THUNK:
-            {
+            if(!value.isCanceled()) {
                 const FiberOp::ThunkData* thunk = op->data.thunkData;
                 value.setValue((*thunk)());
                 op = nullptr;
             }
             break;
             case ASYNC:
-            {
+            if(!value.isCanceled()) {
                 if constexpr(Async) {
                     state.store(WAITING);
                     const FiberOp::AsyncData* data = op->data.asyncData;
                     auto deferred = (*data)(sched);
-                    auto self_weak = std::weak_ptr<Fiber<T,E>>(this->shared_from_this());
                     waitingOn = deferred;
                     
-                    deferred->onSuccess([self_weak, sched](auto value) {
-                        sched->submit([self_weak, value, sched] {
-                            if(auto self = self_weak.lock()) {
-                                self->asyncSuccess(value);
-                                self->resume(sched);
-                            }
+                    deferred->onSuccess([self = this->shared_from_this(), sched](auto value) {
+                        self->asyncSuccess(value);
+                        sched->submit([self, sched] {
+                            self->resume(sched);
                         });
                     });
 
-                    deferred->onError([self_weak, sched](auto error) {
-                        sched->submit([self_weak, error, sched] {
-                            if(auto self = self_weak.lock()) {
-                                self->asyncError(error);
-                                self->resume(sched);
-                            }
+                    deferred->onError([self = this->shared_from_this(), sched](auto error) {
+                        self->asyncError(error);
+                        sched->submit([self, sched] {
+                            self->resume(sched);
+                        });
+                    });
+
+                    deferred->onCancel([self = this->shared_from_this(), sched]() {
+                        self->asyncCancel();
+                        sched->submit([self, sched] {
+                            self->resume(sched);
                         });
                     });
 
@@ -164,16 +192,13 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned 
             }
             break;
             case DELAY:
-            {
+            if(!value.isCanceled()) {
                 if constexpr(Async) {
                     state.store(DELAYED);
                     const FiberOp::DelayData* data = op->data.delayData;
-                    auto self_weak = std::weak_ptr<Fiber<T,E>>(this->shared_from_this());
-                    delayedBy = sched->submitAfter(*data, [self_weak, sched] {
-                        if(auto self = self_weak.lock()) {
-                            self->delayFinished();
-                            self->resume(sched);
-                        }
+                    delayedBy = sched->submitAfter(*data, [self = this->shared_from_this(), sched] {
+                        self->delayFinished();
+                        self->resume(sched);
                     });
                     return true;
                 } else {
@@ -185,7 +210,12 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned 
         }
 
         if(!nextOp) {
-            state.store(COMPLETED);
+            if(value.isCanceled()) {
+                state.store(CANCELED);
+            } else {
+                state.store(COMPLETED);
+            }
+            
             std::vector<ShutdownCallback> local_callbacks;
 
             {
@@ -204,6 +234,12 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned 
             op = nextOp(value);
             nextOp = nullptr;
         }
+    }
+
+    if constexpr(Async) {
+        sched->submit([self = this->shared_from_this(), sched] {
+            self->resume(sched);
+        });
     }
 
     return true;
@@ -267,6 +303,22 @@ void Fiber<T,E>::asyncSuccess(const Erased& new_value) {
 }
 
 template <class T, class E>
+void Fiber<T,E>::asyncCancel() {
+    if(state.load() == WAITING) {
+        value.setCanceled();
+        this->waitingOn = nullptr;
+
+        if(nextOp) {
+            op = nextOp(value);
+            nextOp = nullptr;
+            state.store(READY);
+        } else {
+            state.store(CANCELED);
+        }
+    }
+}
+
+template <class T, class E>
 void Fiber<T,E>::delayFinished() {
     if(state.load() == DELAYED) {
         if(nextOp) {
@@ -282,38 +334,7 @@ void Fiber<T,E>::delayFinished() {
 
 template <class T, class E>
 void Fiber<T,E>::cancel() {
-    auto previous_state = state.exchange(CANCELED);
-
-    if(previous_state == WAITING) {
-        auto localWaiting = waitingOn;
-        if(localWaiting) {
-            localWaiting->cancel();
-        }
-        waitingOn = nullptr;
-    } else if(previous_state == DELAYED) {
-        auto localDelayedBy = delayedBy;
-
-        if(localDelayedBy) {
-            delayedBy->cancel();
-        }
-
-        delayedBy = nullptr;
-    }
-
-    if(previous_state != CANCELED) {
-        std::vector<ShutdownCallback> local_callbacks;
-
-        {
-            std::lock_guard<std::mutex> guard(callback_mutex);
-            for(auto& callback: callbacks) {
-                local_callbacks.emplace_back(callback);
-            }
-        }
-
-        for(auto& callback: local_callbacks) {
-            callback(this);
-        }
-    }
+    attempting_cancel.store(true);
 }
 
 template <class T, class E>
