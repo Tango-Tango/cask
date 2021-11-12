@@ -17,11 +17,12 @@ enum FiberState { READY, RUNNING, WAITING, DELAYED, COMPLETED, CANCELED };
 template <class T, class E>
 class Fiber : public std::enable_shared_from_this<Fiber<T,E>> {
 public:
-    using ShutdownCallback = std::function<void(const std::shared_ptr<Fiber<T,E>>&)>;
+    using ShutdownCallback = std::function<void(Fiber<T,E>*)>;
 
     static std::shared_ptr<Fiber<T,E>> create(const std::shared_ptr<const FiberOp>& op);
 
     Fiber(const std::shared_ptr<const FiberOp>& op);
+    ~Fiber();
 
     bool resumeSync();
     bool resume(const std::shared_ptr<Scheduler>& sched);
@@ -39,7 +40,7 @@ private:
     void delayFinished();
 
     template <bool Async>
-    bool resumeUnsafe(const std::shared_ptr<Scheduler>& sched);
+    bool resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned int batch_size);
 
     std::shared_ptr<const FiberOp> op;
     std::shared_ptr<Scheduler> sched;
@@ -72,25 +73,35 @@ Fiber<T,E>::Fiber(const std::shared_ptr<const FiberOp>& op)
 {}
 
 template <class T, class E>
+Fiber<T,E>::~Fiber()
+{
+    while(state.load() == RUNNING);
+
+    if(state.load() != COMPLETED) {
+        cancel();
+    }
+}
+
+template <class T, class E>
 bool Fiber<T,E>::resumeSync() {
-    return resumeUnsafe<false>(nullptr);
+    return resumeUnsafe<false>(nullptr, 1024);
 }
 
 template <class T, class E>
 bool Fiber<T,E>::resume(const std::shared_ptr<Scheduler>& sched) {
-    return resumeUnsafe<true>(sched);
+    return resumeUnsafe<true>(sched, 1024);
 }
 
 template <class T, class E>
 template <bool Async>
-bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched) {
+bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned int batch_size) {
     FiberState expected = READY;
 
     if(!state.compare_exchange_strong(expected, RUNNING)) {
         return false;
     }
 
-    while(true) {
+    while(batch_size-- > 0) {
         switch(op->opType) {
             case VALUE:
             {
@@ -190,7 +201,7 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched) {
             }
 
             for(auto& callback: local_callbacks) {
-                callback(this->shared_from_this());
+                callback(this);
             }
 
             return true;
@@ -204,6 +215,8 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched) {
             nextOp = nullptr;
         }
     }
+
+    return true;
 }
 
 template <class T, class E>
@@ -314,7 +327,7 @@ void Fiber<T,E>::cancel() {
         }
 
         for(auto& callback: local_callbacks) {
-            callback(this->shared_from_this());
+            callback(this);
         }
     }
 }
@@ -333,7 +346,7 @@ void Fiber<T,E>::onShutdown(const ShutdownCallback& callback) {
     }
 
     if(run_callback_now) {
-        callback(this->shared_from_this());
+        callback(this);
     }
 }
 

@@ -24,6 +24,41 @@ TEST(TestFiber, Constructs) {
     EXPECT_FALSE(fiber->getError().has_value());
 }
 
+TEST(TestFiber, CancelsWhenDestructed) {
+    cask::FiberState last_state;
+
+    {
+        auto sched = std::make_shared<BenchScheduler>();
+        auto op = FiberOp::value(123);
+        auto fiber = Fiber<int,std::string>::create(op);
+
+        fiber->onShutdown([&last_state](auto fiber) {
+            last_state = fiber->getState();
+        });
+    }
+
+    EXPECT_EQ(last_state, cask::CANCELED);
+}
+
+TEST(TestFiber, DoesntCancelWhenCompletedAndDestructed) {
+    cask::FiberState last_state;
+
+    {
+        auto sched = std::make_shared<BenchScheduler>();
+        auto op = FiberOp::value(123);
+        auto fiber = Fiber<int,std::string>::create(op);
+
+        fiber->resumeSync();
+
+        fiber->onShutdown([&last_state](auto fiber) {
+            last_state = fiber->getState();
+        });
+    }
+
+    EXPECT_EQ(last_state, cask::COMPLETED);
+}
+
+
 TEST(TestFiber, EvaluatesPureValue) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
