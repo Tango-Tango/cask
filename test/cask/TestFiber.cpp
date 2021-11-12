@@ -17,7 +17,7 @@ using cask::scheduler::BenchScheduler;
 TEST(TestFiber, Constructs) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>::create(op, sched);
+    auto fiber = Fiber<int,std::string>::create(op);
 
     EXPECT_EQ(fiber->getState(), cask::READY);
     EXPECT_FALSE(fiber->getValue().has_value());
@@ -27,10 +27,10 @@ TEST(TestFiber, Constructs) {
 TEST(TestFiber, EvaluatesPureValue) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>::create(op, sched);
+    auto fiber = Fiber<int,std::string>::create(op);
     
-    EXPECT_TRUE(fiber->resume());
-    EXPECT_FALSE(fiber->resume());
+    EXPECT_TRUE(fiber->resume(sched));
+    EXPECT_FALSE(fiber->resume(sched));
 
     EXPECT_EQ(fiber->getState(), cask::COMPLETED);
     EXPECT_TRUE(fiber->getValue().has_value());
@@ -43,10 +43,10 @@ TEST(TestFiber, SuspendsAtAsyncBoundary) {
     auto op = FiberOp::async([](auto) {
         return Deferred<Erased,Erased>::pure(123);
     });
-    auto fiber = Fiber<int,std::string>::create(op, sched);
+    auto fiber = Fiber<int,std::string>::create(op);
 
-    EXPECT_TRUE(fiber->resume());
-    EXPECT_FALSE(fiber->resume());
+    EXPECT_TRUE(fiber->resume(sched));
+    EXPECT_FALSE(fiber->resume(sched));
 
     EXPECT_EQ(fiber->getState(), cask::WAITING);
     EXPECT_FALSE(fiber->getValue().has_value());
@@ -58,10 +58,10 @@ TEST(TestFiber, ResumesAfterAsyncBoundary) {
     auto op = FiberOp::async([](auto) {
         return Deferred<Erased,Erased>::pure(123);
     });
-    auto fiber = Fiber<int,std::string>::create(op, sched);
+    auto fiber = Fiber<int,std::string>::create(op);
 
-    EXPECT_TRUE(fiber->resume());
-    EXPECT_FALSE(fiber->resume());
+    EXPECT_TRUE(fiber->resume(sched));
+    EXPECT_FALSE(fiber->resume(sched));
 
     sched->run_ready_tasks();
 
@@ -76,11 +76,11 @@ TEST(TestFiber, DelaysAValue) {
     auto op = FiberOp::delay(10)->flatMap([](auto, auto) {
         return FiberOp::value(123);
     });
-    auto fiber = Fiber<int,std::string>::create(op, sched);
+    auto fiber = Fiber<int,std::string>::create(op);
 
     // Run until the delay is hit
-    EXPECT_TRUE(fiber->resume());
-    EXPECT_FALSE(fiber->resume());
+    EXPECT_TRUE(fiber->resume(sched));
+    EXPECT_FALSE(fiber->resume(sched));
     EXPECT_EQ(fiber->getState(), cask::DELAYED);
 
     // Trigger the delay to resolve
