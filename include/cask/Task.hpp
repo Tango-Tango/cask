@@ -596,7 +596,6 @@ constexpr Task<T,E2> Task<T,E>::mapError(const std::function<E2(const E&)>& pred
                     return FiberOp::value(fiber_value.underlying());
                 } else if(fiber_value.isError()) {
                     auto input = fiber_value.underlying().template get<E>();
-
                     return FiberOp::error(predicate(input));
                 } else {
                     return FiberOp::cancel();
@@ -795,13 +794,15 @@ constexpr Task<T,E> Task<T,E>::delay(uint32_t milliseconds) const noexcept {
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::recover(const std::function<T(const E&)>& predicate) const noexcept {
     return Task<T,E>(
-        op->flatMap([predicate](auto erased_input, auto isError) {
+        op->flatMap([predicate](auto fiber_input) {
             try {
-                if(isError) {
-                    auto input = erased_input.template get<E>();
+                if(fiber_input.isValue()) {
+                    return FiberOp::value(fiber_input.underlying());
+                } else if(fiber_input.isError()) {
+                    auto input = fiber_input.underlying().template get<E>();
                     return FiberOp::value(predicate(input));
                 } else {
-                    return FiberOp::value(erased_input);
+                    return FiberOp::cancel();
                 }
             } catch(E& error) {
                 return FiberOp::value(predicate(error));
@@ -845,19 +846,19 @@ constexpr Task<T,E> Task<T,E>::guarantee(const Task<T2, E>& task) const noexcept
     return Task<T,E>(
         op->flatMap(
             [guaranteed_op = task.op](auto fiber_value) constexpr {
-                if(fiber_value.isValue()) {
-                    return guaranteed_op->flatMap([fiber_value](auto) {
-                        return FiberOp::value(fiber_value.underlying());
-                    });
-                } else if(fiber_value.isError()) {
-                    return guaranteed_op->flatMap([fiber_value](auto) {
-                        return FiberOp::error(fiber_value.underlying());
-                    });
-                } else {
-                    return guaranteed_op->flatMap([](auto) {
+                return guaranteed_op->flatMap([fiber_value](auto guaranteed_value) {
+                    if(guaranteed_value.isError()) {
+                        return FiberOp::error(guaranteed_value.underlying());
+                    } else if(guaranteed_value.isCanceled()) {
                         return FiberOp::cancel();
-                    });
-                }
+                    } else if(fiber_value.isValue()) {
+                        return FiberOp::value(fiber_value.underlying());
+                    } else if(fiber_value.isError()) {
+                        return FiberOp::error(fiber_value.underlying());
+                    } else {
+                        return FiberOp::cancel();
+                    }
+                });
             }
         )
     );
