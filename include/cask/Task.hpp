@@ -770,27 +770,7 @@ constexpr Task<T2,E> Task<T,E>::dematerialize() const noexcept {
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::delay(uint32_t milliseconds) const noexcept {
     return Task<T,E>(
-        FiberOp::async([milliseconds, self = *this](auto sched) constexpr {
-            auto promise = Promise<Erased,Erased>::create(sched);
-
-            auto cancelable = sched->submitAfter(milliseconds, [sched, self, promise]() constexpr {
-                auto deferred = self.run(sched);
-
-                deferred->template chainDownstream<Erased,Erased>(promise, [](auto value) {
-                    if(value.is_left()) {
-                        return Either<Erased,Erased>::left(value.get_left());
-                    } else {
-                        return Either<Erased,Erased>::right(value.get_right());
-                    }
-                });
-            });
-
-            promise->onCancel([cancelable] {
-                cancelable->cancel();
-            });
-
-            return Deferred<Erased,Erased>::forPromise(promise);
-        })
+        FiberOp::delay(milliseconds)
     );
 }
 
@@ -827,45 +807,7 @@ template <class T, class E>
 template <class T2>
 constexpr Task<Either<T,T2>,E> Task<T,E>::raceWith(const Task<T2,E>& other) const noexcept {
     return Task<Either<T,T2>,E>(
-        FiberOp::async([left = *this, right = other](auto sched) constexpr {
-            auto promise = Promise<Erased,Erased>::create(sched);
-
-            auto leftDeferred = left.run(sched);
-            auto rightDeferred = right.run(sched);
-
-            auto leftDeferredWeak = std::weak_ptr<Deferred<T,E>>(leftDeferred);
-            auto rightDeferredWeak = std::weak_ptr<Deferred<T2,E>>(rightDeferred);
-
-            leftDeferred->template chainDownstream<Erased,Erased>(promise, [rightDeferredWeak](auto result) {
-                if(auto rightDeferred = rightDeferredWeak.lock()) {
-                    rightDeferred->cancel();
-                }
-
-                if(result.is_left()) {
-                    return Either<Erased,Erased>::left(
-                        Either<T,T2>::left(result.get_left())
-                    );
-                } else {
-                    return Either<Erased,Erased>::right(result.get_right());
-                }
-            });
-
-            rightDeferred->template chainDownstream<Erased,Erased>(promise, [leftDeferredWeak](auto result) {
-                if(auto leftDeferred = leftDeferredWeak.lock()) {
-                    leftDeferred->cancel();
-                }
-
-                if(result.is_left()) {
-                    return Either<Erased,Erased>::left(
-                        Either<T,T2>::right(result.get_left())
-                    );
-                } else {
-                    return Either<Erased,Erased>::right(result.get_right());
-                }
-            });
-
-            return Deferred<Erased,Erased>::forPromise(promise);
-        })
+        FiberOp::race({op, other.op})
     );
 }
 
@@ -882,19 +824,25 @@ constexpr Task<T,E> Task<T,E>::sideEffect(const Task<T2, E>& task) const noexcep
 template <class T, class E>
 template <class T2>
 constexpr Task<T,E> Task<T,E>::guarantee(const Task<T2, E>& task) const noexcept {
-    return Task<T,E>::deferAction([self = *this, task](auto sched) {
-        auto deferred = self
-            .materialize()
-            .template sideEffect<T2>(task)
-            .template dematerialize<T>()
-            .run(sched);
-
-        deferred->onCancel([task, sched]{
-            task.run(sched)->await();
-        });
-
-        return deferred;
-    });
+    return Task<T,E>(
+        op->flatMap(
+            [guaranteed_op = task.op](auto fiber_value) constexpr {
+                if(fiber_value.isValue()) {
+                    return guaranteed_op->flatMap([fiber_value](auto) {
+                        return FiberOp::value(fiber_value.underlying());
+                    });
+                } else if(fiber_value.isError()) {
+                    return guaranteed_op->flatMap([fiber_value](auto) {
+                        return FiberOp::error(fiber_value.underlying());
+                    });
+                } else {
+                    return guaranteed_op->flatMap([](auto) {
+                        return FiberOp::cancel();
+                    });
+                }
+            }
+        )
+    );
 }
 
 template <class T, class E>

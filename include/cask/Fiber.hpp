@@ -229,7 +229,6 @@ void Fiber<T,E>::asyncCancel() {
 template <class T, class E>
 void Fiber<T,E>::delayFinished() {
     if(state.load() == DELAYED) {
-        std::cout << "Finishing Iteration" << std::endl;
         if(!finishIteration()) {
             state.store(READY);
         }
@@ -239,8 +238,6 @@ void Fiber<T,E>::delayFinished() {
 template <class T, class E>
 bool Fiber<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>> racer) {
     if(state.load() == RACING && awaiting_first_racer.exchange(false)) {
-        std::cout << "FIRST RACER" << std::endl;
-
         this->value = racer->getRawValue();
 
         for(auto& other_racer: racing_fibers) {
@@ -255,7 +252,6 @@ bool Fiber<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>> racer
 
         return true;
     } else {
-        std::cout << "OTHER RACER" << std::endl;
         return false;
     }
 }
@@ -267,25 +263,25 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
 
     switch(op->opType) {
     case VALUE:
-        if(!value.isCanceled()) {
-            const FiberOp::ConstantData* data = op->data.constantData;
-            value.setValue(data->get_left());
-            op = nullptr;
-        }
-        break;
+    {
+        const FiberOp::ConstantData* data = op->data.constantData;
+        value.setValue(data->get_left());
+        op = nullptr;
+    }
+    break;
     case ERROR:
-        if(!value.isCanceled()) {
-            const FiberOp::ConstantData* data = op->data.constantData;
-            value.setError(data->get_right());
-            op = nullptr;
-        }
+    {
+        const FiberOp::ConstantData* data = op->data.constantData;
+        value.setError(data->get_right());
+        op = nullptr;
+    }
     break;
     case THUNK:
-        if(!value.isCanceled()) {
-            const FiberOp::ThunkData* thunk = op->data.thunkData;
-            value.setValue((*thunk)());
-            op = nullptr;
-        }
+    {
+        const FiberOp::ThunkData* thunk = op->data.thunkData;
+        value.setValue((*thunk)());
+        op = nullptr;
+    }
     break;
     case CANCEL:
     {
@@ -295,38 +291,38 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
     }
     break;
     case ASYNC:
+    {
         suspended = true;
-        if(!value.isCanceled()) {
-            if constexpr(Async) {
-                state.store(WAITING);
-                const FiberOp::AsyncData* data = op->data.asyncData;
-                auto deferred = (*data)(sched);
-                waitingOn = deferred;
-                
-                deferred->onSuccess([self = this->shared_from_this(), sched](auto value) {
-                    self->asyncSuccess(value);
-                    sched->submit([self, sched] {
-                        self->resume(sched);
-                    });
+        if constexpr(Async) {
+            state.store(WAITING);
+            const FiberOp::AsyncData* data = op->data.asyncData;
+            auto deferred = (*data)(sched);
+            waitingOn = deferred;
+            
+            deferred->onSuccess([self = this->shared_from_this(), sched](auto value) {
+                self->asyncSuccess(value);
+                sched->submit([self, sched] {
+                    self->resume(sched);
                 });
+            });
 
-                deferred->onError([self = this->shared_from_this(), sched](auto error) {
-                    self->asyncError(error);
-                    sched->submit([self, sched] {
-                        self->resume(sched);
-                    });
+            deferred->onError([self = this->shared_from_this(), sched](auto error) {
+                self->asyncError(error);
+                sched->submit([self, sched] {
+                    self->resume(sched);
                 });
+            });
 
-                deferred->onCancel([self = this->shared_from_this(), sched]() {
-                    self->asyncCancel();
-                    sched->submit([self, sched] {
-                        self->resume(sched);
-                    });
+            deferred->onCancel([self = this->shared_from_this(), sched]() {
+                self->asyncCancel();
+                sched->submit([self, sched] {
+                    self->resume(sched);
                 });
-            } else {
-                state.store(READY);
-            }
+            });
+        } else {
+            state.store(READY);
         }
+    }
     break;
     case FLATMAP:
     {
@@ -336,53 +332,50 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
     }
     break;
     case DELAY:
+    {
         suspended = true;
-        if(!value.isCanceled()) {
-            if constexpr(Async) {
-                state.store(DELAYED);
-                const FiberOp::DelayData* data = op->data.delayData;
-                delayedBy = sched->submitAfter(*data, [self = this->shared_from_this(), sched] {
-                    std::cout << "Timer Fired" << std::endl;
-                    self->delayFinished();
-                    self->resume(sched);
-                });
-            } else {
-                state.store(READY);
-            }
+        if constexpr(Async) {
+            state.store(DELAYED);
+            const FiberOp::DelayData* data = op->data.delayData;
+            delayedBy = sched->submitAfter(*data, [self = this->shared_from_this(), sched] {
+                self->delayFinished();
+                self->resume(sched);
+            });
+        } else {
+            state.store(READY);
         }
+    }
     break;
     case RACE:
+    {
         suspended = true;
-        if(!value.isCanceled()) {
-            if constexpr(Async) {
-                state.store(RACING);
-                awaiting_first_racer.store(true);
+        if constexpr(Async) {
+            state.store(RACING);
+            awaiting_first_racer.store(true);
 
-                const FiberOp::RaceData* data = op->data.raceData;
+            const FiberOp::RaceData* data = op->data.raceData;
 
-                for(auto& racer: *data) {
-                    std::cout << "SETTING UP RACER" << std::endl;
-                    auto fiber = Fiber<Erased,Erased>::create(racer);
-                    fiber->onShutdown([self = this->shared_from_this(), fiber, sched](auto){
-                        if(self->racerFinished(fiber)) {
-                            sched->submit([self, sched] {
-                                self->resume(sched);
-                            });
-                        }
-                    });
-                    racing_fibers.emplace_back(fiber);
-                }
-
-                for(auto& fiber: racing_fibers) {
-                    std::cout << "LAUNCHING RACER" << std::endl;
-                    sched->submit([fiber, sched] {
-                        fiber->resume(sched);
-                    });
-                }
-            } else {
-                state.store(READY);
+            for(auto& racer: *data) {
+                auto fiber = Fiber<Erased,Erased>::create(racer);
+                fiber->onShutdown([self = this->shared_from_this(), fiber, sched](auto){
+                    if(self->racerFinished(fiber)) {
+                        sched->submit([self, sched] {
+                            self->resume(sched);
+                        });
+                    }
+                });
+                racing_fibers.emplace_back(fiber);
             }
+
+            for(auto& fiber: racing_fibers) {
+                sched->submit([fiber, sched] {
+                    fiber->resume(sched);
+                });
+            }
+        } else {
+            state.store(READY);
         }
+    }
     break;
     }
 
@@ -392,12 +385,10 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
 template <class T, class E>
 bool Fiber<T,E>::finishIteration() {
     if(nextOp) {
-        std::cout << "Next Op" << std::endl;
         op = nextOp(value);
         nextOp = nullptr;
         return false;
     } else {
-        std::cout << "Completing" << std::endl;
         if(value.isCanceled()) {
             state.store(CANCELED);
         } else {
