@@ -495,11 +495,13 @@ DeferredRef<T,E> Task<T,E>::run(const std::shared_ptr<Scheduler>& sched) const {
     } else {
         auto promise = Promise<T,E>::create(sched);
 
-        fiber->onShutdown([promise](auto fiber) {
-            if(auto value_opt = fiber->getValue()) {
-                promise->success(*value_opt);
-            } else if(auto error_opt = fiber->getError()) {
-                promise->error(*error_opt);
+        fiber->onShutdown([promise_weak = std::weak_ptr(promise)](auto fiber) {
+            if(auto promise = promise_weak.lock()) {
+                if(auto value_opt = fiber->getValue()) {
+                    promise->success(*value_opt);
+                } else if(auto error_opt = fiber->getError()) {
+                    promise->error(*error_opt);
+                }
             }
         });
 
@@ -530,12 +532,13 @@ Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
             auto promise = Promise<T,E>::create(sched);
 
             fiber->resume(sched);
-
-            fiber->onShutdown([promise](auto fiber) {
-                if(auto value_opt = fiber->getValue()) {
-                    promise->success(*value_opt);
-                } else if(auto error_opt = fiber->getError()) {
-                    promise->error(*error_opt);
+            fiber->onShutdown([promise_weak = std::weak_ptr(promise)](auto fiber) {
+                if(auto promise = promise_weak.lock()) {
+                    if(auto value_opt = fiber->getValue()) {
+                        promise->success(*value_opt);
+                    } else if(auto error_opt = fiber->getError()) {
+                        promise->error(*error_opt);
+                    }
                 }
             });
 

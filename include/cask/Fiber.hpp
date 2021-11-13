@@ -168,8 +168,7 @@ const FiberValue& Fiber<T,E>::getRawValue() {
 template <class T, class E>
 std::optional<T> Fiber<T,E>::getValue() {
     if(state.load() == COMPLETED && value.isValue()) {
-        auto erased_value_opt = value.getValue();
-        return erased_value_opt->template get<T>();
+        return value.underlying().template get<T>();
     } else {
         return {};
     }
@@ -178,8 +177,7 @@ std::optional<T> Fiber<T,E>::getValue() {
 template <class T, class E>
 std::optional<E> Fiber<T,E>::getError() {
     if(state.load() == COMPLETED && value.isError()) {
-        auto erased_error_opt = value.getError();
-        return erased_error_opt->template get<E>();
+        return value.underlying().template get<E>();
     } else {
         return {};
     }
@@ -227,6 +225,7 @@ template <class T, class E>
 void Fiber<T,E>::delayFinished() {
     FiberState expected = DELAYED;
     if(state.compare_exchange_strong(expected, RUNNING)) {
+        delayedBy = nullptr;
         if(!finishIteration()) {
             state.store(READY);
         }
@@ -256,9 +255,11 @@ bool Fiber<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& race
 
 template <class T, class E>
 void Fiber<T,E>::reschedule(const std::shared_ptr<Scheduler>& sched) {
-    sched->submit([self_weak = this->weak_from_this(), sched] {
+    sched->submit([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)] {
         if(auto self = self_weak.lock()) {
-            self->resume(sched);
+            if(auto sched = sched_weak.lock()) {
+                self->resume(sched);
+            }
         }
     });
 }
@@ -344,10 +345,13 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
         if constexpr(Async) {
             state.store(DELAYED);
             const FiberOp::DelayData* data = op->data.delayData;
-            delayedBy = sched->submitAfter(*data, [self_weak = this->weak_from_this(), sched] {
+            delayedBy = sched->submitAfter(*data, [self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)] {
                 if(auto self = self_weak.lock()) {
                     self->delayFinished();
-                    self->resume(sched);
+
+                    if(auto sched = sched_weak.lock()) {
+                        self->resume(sched);
+                    }
                 }
             });
         } else {
@@ -379,9 +383,11 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
             }
 
             for(auto& fiber: racing_fibers) {
-                sched->submit([fiber_weak = std::weak_ptr(fiber), sched] {
+                sched->submit([fiber_weak = std::weak_ptr(fiber), sched_weak = std::weak_ptr(sched)] {
                     if(auto fiber = fiber_weak.lock()) {
-                        fiber->resume(sched);
+                        if(auto sched = sched_weak.lock()) {
+                            fiber->resume(sched);
+                        }
                     }
                 });
             }

@@ -28,6 +28,8 @@ TEST(TestTaskDelay, DelaysExecution) {
     sched->advance_time(1);
     sched->run_ready_tasks();
     EXPECT_EQ(counter, 1);
+    sched->run_ready_tasks();
+    EXPECT_TRUE(sched->isIdle());
 }
 
 TEST(TestTaskDelay, CancelsExecution) {
