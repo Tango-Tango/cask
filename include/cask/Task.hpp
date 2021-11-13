@@ -505,6 +505,7 @@ DeferredRef<T,E> Task<T,E>::run(const std::shared_ptr<Scheduler>& sched) const {
 
         promise->onCancel([fiber] {
             fiber->cancel();
+            fiber->resumeSync();
         });
 
         return Deferred<T,E>::forPromise(promise);
@@ -659,32 +660,44 @@ constexpr Task<T2,E2> Task<T,E>::flatMapBoth(
     if constexpr (std::is_same<E,E2>::value) {
         return Task<T2,E2>(
             op->flatMap([successPredicate, errorPredicate](auto fiber_input) {
-                if(fiber_input.isValue()) {
-                    auto input = fiber_input.underlying().template get<T>();
-                    auto resultTask = successPredicate(input);
+                try {
+                    if(fiber_input.isValue()) {
+                        auto input = fiber_input.underlying().template get<T>();
+                        auto resultTask = successPredicate(input);
+                        return resultTask.op;
+                    } else if(fiber_input.isError()) {
+                        auto input = fiber_input.underlying().template get<E>();
+                        auto resultTask = errorPredicate(input);
+                        return resultTask.op;
+                    } else {
+                        return FiberOp::cancel();
+                    }
+                } catch(E& error) {
+                    auto resultTask = errorPredicate(error);
                     return resultTask.op;
-                } else if(fiber_input.isError()) {
-                    auto input = fiber_input.underlying().template get<E>();
-                    auto resultTask = errorPredicate(input);
-                    return resultTask.op;
-                } else {
-                    return FiberOp::cancel();
                 }
             })
         );
     } else {
         return Task<T2,E2>(
             op->flatMap([successPredicate, errorPredicate](auto fiber_input) {
-                if(fiber_input.isValue()) {
-                    auto input = fiber_input.underlying().template get<T>();
-                    auto resultTask = successPredicate(input);
+                try {
+                    if(fiber_input.isValue()) {
+                        auto input = fiber_input.underlying().template get<T>();
+                        auto resultTask = successPredicate(input);
+                        return resultTask.op;
+                    } else if(fiber_input.isError()) {
+                        auto input = fiber_input.underlying().template get<E>();
+                        auto resultTask = errorPredicate(input);
+                        return resultTask.op;
+                    } else {
+                        return FiberOp::cancel();
+                    }
+                } catch(E2& error) {
+                    return FiberOp::error(error);
+                } catch(E& error) {
+                    auto resultTask = errorPredicate(error);
                     return resultTask.op;
-                } else if(fiber_input.isError()) {
-                    auto input = fiber_input.underlying().template get<E>();
-                    auto resultTask = errorPredicate(input);
-                    return resultTask.op;
-                } else {
-                    return FiberOp::cancel();
                 }
             })
         );
@@ -696,9 +709,9 @@ constexpr Task<E,T> Task<T,E>::failed() const noexcept {
     return Task<E,T>(
         op->flatMap([](auto input) constexpr {
             if(input.isError()) {
-                return FiberOp::value(input.getError());
+                return FiberOp::value(input.underlying());
             } else if(input.isValue()) {
-                return FiberOp::error(input.getValue());
+                return FiberOp::error(input.underlying());
             } else {
                 return FiberOp::cancel();
             }
@@ -770,7 +783,9 @@ constexpr Task<T2,E> Task<T,E>::dematerialize() const noexcept {
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::delay(uint32_t milliseconds) const noexcept {
     return Task<T,E>(
-        FiberOp::delay(milliseconds)
+        FiberOp::delay(milliseconds)->flatMap([op = this->op](auto) {
+            return op;
+        })
     );
 }
 

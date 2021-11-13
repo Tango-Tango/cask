@@ -31,3 +31,12 @@ if [ "$BUILD_TARGET" = "clang" ] || [ "$BUILD_TARGET" = "all" ]; then
         -Dwerror=true
 fi
 
+if [ "$BUILD_TARGET" = "clang_debug" ] || [ "$BUILD_TARGET" = "all" ]; then
+    rm -rf build_clang_debug
+    CC=clang CXX=clang++ meson setup build_clang_debug \
+        -Db_sanitize=address,undefined \
+        -Db_coverage=true \
+        -Dwarning_level=3 \
+        -Dwerror=true
+fi
+

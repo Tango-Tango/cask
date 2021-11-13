@@ -7,7 +7,6 @@
 #define _CASK_FIBER_H_
 
 #include <atomic>
-#include <iostream>
 #include "cask/FiberOp.hpp"
 #include "cask/Scheduler.hpp"
 
@@ -35,13 +34,16 @@ public:
 
     void cancel();
     void onShutdown(const ShutdownCallback& callback);
+    T await();
 
 private:
     void asyncError(const Erased& error);
     void asyncSuccess(const Erased& value);
     void asyncCancel();
     void delayFinished();
-    bool racerFinished(const std::shared_ptr<Fiber<Erased,Erased>> racer);
+    bool racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& racer);
+
+    void reschedule(const std::shared_ptr<Scheduler>& sched);
 
     template <bool Async>
     bool evaluateOp(const std::shared_ptr<Scheduler>& sched);
@@ -59,6 +61,7 @@ private:
     DeferredRef<Erased,Erased> waitingOn;
     CancelableRef delayedBy;
     std::mutex callback_mutex;
+    std::mutex racing_fibers_mutex;
     std::vector<ShutdownCallback> callbacks;
     std::atomic_bool attempting_cancel;
     std::atomic_bool awaiting_first_racer;
@@ -79,6 +82,7 @@ Fiber<T,E>::Fiber(const std::shared_ptr<const FiberOp>& op)
     , waitingOn()
     , delayedBy()
     , callback_mutex()
+    , racing_fibers_mutex()
     , callbacks()
     , attempting_cancel(false)
     , awaiting_first_racer(true)
@@ -132,6 +136,7 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned 
             delayedBy->cancel();
             delayedBy = nullptr;
         } else if(current_state == RACING) {
+            std::lock_guard<std::mutex> guard(racing_fibers_mutex);
             racing_fibers.clear();
         }
 
@@ -152,9 +157,7 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned 
     state.store(READY);
 
     if constexpr(Async) {
-        sched->submit([self = this->shared_from_this(), sched] {
-            self->resume(sched);
-        });
+        reschedule(sched);
     }
 
     return true;
@@ -236,15 +239,14 @@ void Fiber<T,E>::delayFinished() {
 }
 
 template <class T, class E>
-bool Fiber<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>> racer) {
+bool Fiber<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& racer) {
     if(state.load() == RACING && awaiting_first_racer.exchange(false)) {
-        this->value = racer->getRawValue();
-
-        for(auto& other_racer: racing_fibers) {
-            other_racer->cancel();
+        {
+            std::lock_guard<std::mutex> guard(racing_fibers_mutex);
+            racing_fibers.clear();
         }
-
-        racing_fibers.clear();
+        
+        this->value = racer->getRawValue();
 
         if(!finishIteration()) {
             state.store(READY);
@@ -255,6 +257,16 @@ bool Fiber<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>> racer
         return false;
     }
 }
+
+template <class T, class E>
+void Fiber<T,E>::reschedule(const std::shared_ptr<Scheduler>& sched) {
+    sched->submit([self_weak = this->weak_from_this(), sched] {
+        if(auto self = self_weak.lock()) {
+            self->resume(sched);
+        }
+    });
+}
+
 
 template <class T, class E>
 template <bool Async>
@@ -299,25 +311,25 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
             auto deferred = (*data)(sched);
             waitingOn = deferred;
             
-            deferred->onSuccess([self = this->shared_from_this(), sched](auto value) {
-                self->asyncSuccess(value);
-                sched->submit([self, sched] {
-                    self->resume(sched);
-                });
+            deferred->onSuccess([self_weak = this->weak_from_this(), sched](auto value) {
+                if(auto self = self_weak.lock()) {
+                    self->asyncSuccess(value);
+                    self->reschedule(sched);
+                }
             });
 
-            deferred->onError([self = this->shared_from_this(), sched](auto error) {
-                self->asyncError(error);
-                sched->submit([self, sched] {
-                    self->resume(sched);
-                });
+            deferred->onError([self_weak = this->weak_from_this(), sched](auto error) {
+                if(auto self = self_weak.lock()) {
+                    self->asyncError(error);
+                    self->reschedule(sched);
+                }
             });
 
-            deferred->onCancel([self = this->shared_from_this(), sched]() {
-                self->asyncCancel();
-                sched->submit([self, sched] {
-                    self->resume(sched);
-                });
+            deferred->onCancel([self_weak = this->weak_from_this(), sched]() {
+                if(auto self = self_weak.lock()) {
+                    self->asyncCancel();
+                    self->reschedule(sched);
+                }
             });
         } else {
             state.store(READY);
@@ -337,9 +349,11 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
         if constexpr(Async) {
             state.store(DELAYED);
             const FiberOp::DelayData* data = op->data.delayData;
-            delayedBy = sched->submitAfter(*data, [self = this->shared_from_this(), sched] {
-                self->delayFinished();
-                self->resume(sched);
+            delayedBy = sched->submitAfter(*data, [self_weak = this->weak_from_this(), sched] {
+                if(auto self = self_weak.lock()) {
+                    self->delayFinished();
+                    self->resume(sched);
+                }
             });
         } else {
             state.store(READY);
@@ -352,24 +366,29 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
         if constexpr(Async) {
             state.store(RACING);
             awaiting_first_racer.store(true);
+            std::lock_guard<std::mutex> guard(racing_fibers_mutex);
 
             const FiberOp::RaceData* data = op->data.raceData;
 
             for(auto& racer: *data) {
                 auto fiber = Fiber<Erased,Erased>::create(racer);
-                fiber->onShutdown([self = this->shared_from_this(), fiber, sched](auto){
-                    if(self->racerFinished(fiber)) {
-                        sched->submit([self, sched] {
-                            self->resume(sched);
-                        });
+                fiber->onShutdown([self_weak = this->weak_from_this(), fiber_weak = std::weak_ptr(fiber), sched](auto){
+                    if(auto self = self_weak.lock()) {
+                        if(auto fiber = fiber_weak.lock()) {
+                            if(self->racerFinished(fiber)) {
+                                self->reschedule(sched);
+                            }
+                        }
                     }
                 });
-                racing_fibers.emplace_back(fiber);
+                racing_fibers.emplace_back(std::move(fiber));
             }
 
             for(auto& fiber: racing_fibers) {
-                sched->submit([fiber, sched] {
-                    fiber->resume(sched);
+                sched->submit([fiber_weak = std::weak_ptr(fiber), sched] {
+                    if(auto fiber = fiber_weak.lock()) {
+                        fiber->resume(sched);
+                    }
                 });
             }
         } else {
@@ -432,6 +451,30 @@ void Fiber<T,E>::onShutdown(const ShutdownCallback& callback) {
 
     if(run_callback_now) {
         callback(this);
+    }
+}
+
+template <class T, class E>
+T Fiber<T,E>::await() {
+    auto current_state = state.load();
+
+    if(current_state != COMPLETED && current_state != CANCELED) {
+        std::mutex mutex;
+        mutex.lock();
+
+        onShutdown([&mutex](auto){
+            mutex.unlock();
+        });
+
+        mutex.lock();
+    }
+
+    if(auto value_opt = value.getValue()) {
+        return value_opt->template get<T>();
+    } else if(auto error_opt = value.getError()) {
+        throw error_opt->template get<E>();
+    } else {
+        throw std::runtime_error("Awaiting a fiber which was canceled");
     }
 }
 

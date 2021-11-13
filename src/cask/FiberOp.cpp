@@ -78,8 +78,13 @@ FiberOp::FiberOp(AsyncData* async) noexcept
 }
 
 FiberOp::FiberOp(ConstantData* constant) noexcept
-    : opType(VALUE)
 {
+    if(constant->is_left()) {
+        opType = VALUE;
+    } else {
+        opType = ERROR;
+    }
+    
     data.constantData = constant;
 }
 

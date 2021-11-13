@@ -226,3 +226,31 @@ TEST(TestFiber, RacesSeveralOperationsFirstCompletes) {
     EXPECT_EQ(*(fiber->getValue()), 123);
 }
 
+TEST(TestFiber, RacesSeveralPureValues) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto promise1 = Promise<Erased,Erased>::create(sched);
+    auto promise2 = Promise<Erased,Erased>::create(sched);
+    auto promise3 = Promise<Erased,Erased>::create(sched);
+
+    auto op1 = FiberOp::value(123);
+    auto op2 = FiberOp::value(456);
+    auto op3 = FiberOp::value(789);
+    auto race = FiberOp::race({op1, op2, op3});
+    auto fiber = Fiber<int,std::string>::create(race);
+
+    EXPECT_TRUE(fiber->resume(sched));
+    EXPECT_FALSE(fiber->resume(sched));
+
+    EXPECT_EQ(fiber->getState(), cask::RACING);
+    EXPECT_FALSE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
+
+    // Run the raced ops which are pure values
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(fiber->getState(), cask::COMPLETED);
+    EXPECT_TRUE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getValue()), 123);
+}
+
