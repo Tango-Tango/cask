@@ -83,5 +83,9 @@ std::optional<Erased> FiberValue::getError() const {
     }
 }
 
+const Erased& FiberValue::underlying() const {
+    return value;
+}
+
 
 } // namespace cask

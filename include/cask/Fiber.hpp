@@ -280,12 +280,19 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
             op = nullptr;
         }
     break;
-        case THUNK:
+    case THUNK:
         if(!value.isCanceled()) {
             const FiberOp::ThunkData* thunk = op->data.thunkData;
             value.setValue((*thunk)());
             op = nullptr;
         }
+    break;
+    case CANCEL:
+    {
+        suspended = true;
+        value.setCanceled();
+        op = nullptr;
+    }
     break;
     case ASYNC:
         suspended = true;

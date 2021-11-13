@@ -19,7 +19,7 @@
 
 namespace cask {
 
-enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE };
+enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE, CANCEL };
 
 /**
  * A `FiberOp` represents a trampolined and possibly asynchronous program
@@ -63,6 +63,7 @@ public:
     static std::shared_ptr<const FiberOp> delay(int64_t delay_ms) noexcept;
     static std::shared_ptr<const FiberOp> race(const std::vector<std::shared_ptr<const FiberOp>>& race) noexcept;
     static std::shared_ptr<const FiberOp> race(std::vector<std::shared_ptr<const FiberOp>>&& race) noexcept;
+    static std::shared_ptr<const FiberOp> cancel() noexcept;
 
     /**
      * Create a new operation which represents the flat map of this operation
@@ -86,6 +87,7 @@ public:
     FiberOp(FlatMapData* flatMap) noexcept;
     FiberOp(DelayData* delay) noexcept;
     FiberOp(RaceData* race) noexcept;
+    FiberOp(bool cancel_flag) noexcept;
 
 
     FiberOp& operator=(const FiberOp&);

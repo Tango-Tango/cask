@@ -11,10 +11,9 @@
 #include <memory>
 #include <type_traits>
 #include "Deferred.hpp"
+#include "Fiber.hpp"
 #include "None.hpp"
 #include "Scheduler.hpp"
-#include "trampoline/TrampolineOp.hpp"
-#include "trampoline/TrampolineRunLoop.hpp"
 
 namespace cask {
 
@@ -342,23 +341,23 @@ public:
      * should not be called directly and, instead, users should use provided
      * operators to build these operations automatically.
      */
-    constexpr explicit Task(const std::shared_ptr<const trampoline::TrampolineOp>& op) noexcept;
-    constexpr explicit Task(std::shared_ptr<const trampoline::TrampolineOp>&& op) noexcept;
+    constexpr explicit Task(const std::shared_ptr<const FiberOp>& op) noexcept;
+    constexpr explicit Task(std::shared_ptr<const FiberOp>&& op) noexcept;
     constexpr Task(const Task<T,E>& other) noexcept;
     constexpr Task(Task<T,E>&& other) noexcept;
     constexpr Task<T,E>& operator=(const Task<T,E>& other) noexcept;
     constexpr Task<T,E>& operator=(Task<T,E>&& other) noexcept;
 
-    std::shared_ptr<const trampoline::TrampolineOp> op;
+    std::shared_ptr<const FiberOp> op;
 };
 
 template <class T, class E>
-constexpr Task<T,E>::Task(const std::shared_ptr<const trampoline::TrampolineOp>& op) noexcept
+constexpr Task<T,E>::Task(const std::shared_ptr<const FiberOp>& op) noexcept
     : op(op)
 {}
 
 template <class T, class E>
-constexpr Task<T,E>::Task(std::shared_ptr<const trampoline::TrampolineOp>&& op) noexcept
+constexpr Task<T,E>::Task(std::shared_ptr<const FiberOp>&& op) noexcept
     : op(std::move(op))
 {}
 
@@ -387,14 +386,14 @@ constexpr Task<T,E>& Task<T,E>::operator=(Task<T,E>&& other) noexcept{
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::pure(const T& value) noexcept {
     return Task<T,E>(
-        trampoline::TrampolineOp::value(value)
+        FiberOp::value(value)
     );
 }
 
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::raiseError(const E& error) noexcept {
     return Task<T,E>(
-        trampoline::TrampolineOp::error(error)
+        FiberOp::error(error)
     );
 }
 
@@ -406,20 +405,22 @@ constexpr Task<None,E> Task<T,E>::none() noexcept {
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::eval(const std::function<T()>& predicate) noexcept {
     return Task<T,E>(
-        trampoline::TrampolineOp::thunk(predicate)
+        FiberOp::thunk(predicate)
     );
 }
 
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::defer(const std::function<Task<T,E>()>& predicate) noexcept {
     return Task<T,E>(
-        trampoline::TrampolineOp::thunk(predicate)->flatMap(
-            [](auto erased_task, auto isError) constexpr {
-                if(isError) {
-                    return trampoline::TrampolineOp::error(erased_task);
-                } else {
-                    auto task = erased_task.template get<Task<T,E>>();
+        FiberOp::thunk(predicate)->flatMap(
+            [](auto fiber_value) constexpr {
+                if(fiber_value.isValue()) {
+                    auto task = fiber_value.underlying().template get<Task<T,E>>();
                     return task.op;
+                } else if(fiber_value.isError()) {
+                    return FiberOp::error(fiber_value.underlying());
+                } else {
+                    return FiberOp::cancel();
                 }
             }
         )
@@ -429,7 +430,7 @@ constexpr Task<T,E> Task<T,E>::defer(const std::function<Task<T,E>()>& predicate
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::deferAction(const std::function<DeferredRef<T,E>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept {
     return Task<T,E>(
-        trampoline::TrampolineOp::async([predicate](auto sched) {
+        FiberOp::async([predicate](auto sched) {
             return predicate(sched)->template mapBoth<Erased,Erased>(
                 [](auto value) { return value; },
                 [](auto error) { return error; }
@@ -441,7 +442,7 @@ constexpr Task<T,E> Task<T,E>::deferAction(const std::function<DeferredRef<T,E>(
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::forPromise(const PromiseRef<T,E>& promise) noexcept {
     return Task<T,E>(
-        trampoline::TrampolineOp::async([promise](auto) {
+        FiberOp::async([promise](auto) {
             return Deferred<T,E>::forPromise(promise)->template mapBoth<Erased,Erased>(
                 [](auto value) { return value; },
                 [](auto error) { return error; }
@@ -475,7 +476,7 @@ DeferredRef<T,E> Task<T,E>::runCancelableThenPromise(const CancelableRef& cancel
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::never() noexcept {
     return Task<T,E>(
-        trampoline::TrampolineOp::async([](auto sched) constexpr {
+        FiberOp::async([](auto sched) constexpr {
             auto promise = Promise<Erased,Erased>::create(sched);
             return Deferred<Erased,Erased>::forPromise(promise);
         })
@@ -484,47 +485,64 @@ constexpr Task<T,E> Task<T,E>::never() noexcept {
 
 template <class T, class E>
 DeferredRef<T,E> Task<T,E>::run(const std::shared_ptr<Scheduler>& sched) const {
-    auto result = trampoline::TrampolineRunLoop::execute(op,sched);
+    auto fiber = Fiber<T,E>::create(op);
+    fiber->resume(sched);
 
-    if(auto either = std::get_if<Either<Erased,Erased>>(&result)) {
-        if(either->is_left()) {
-            auto success = either->get_left().template get<T>();
-            return Deferred<T,E>::pure(success);
-        } else {
-            auto error = either->get_right().template get<E>();
-            return Deferred<T,E>::raiseError(error);
-        }
+    if(auto value_opt = fiber->getValue()) {
+        return Deferred<T,E>::pure(*value_opt);
+    } else if(auto error_opt = fiber->getError()) {
+        return Deferred<T,E>::raiseError(*error_opt);
     } else {
-        auto deferred = std::get<DeferredRef<Erased,Erased>>(result);
-        return deferred->template mapBoth<T,E>(
-            [](auto value) { return value.template get<T>(); },
-            [](auto error) { return error.template get<E>(); }
-        );
+        auto promise = Promise<T,E>::create(sched);
+
+        fiber->onShutdown([promise](auto fiber) {
+            if(auto value_opt = fiber->getValue()) {
+                promise->success(*value_opt);
+            } else if(auto error_opt = fiber->getError()) {
+                promise->error(*error_opt);
+            }
+        });
+
+        promise->onCancel([fiber] {
+            fiber->cancel();
+        });
+
+        return Deferred<T,E>::forPromise(promise);
     }
 }
 
 template <class T, class E>
 Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
-    auto result = trampoline::TrampolineRunLoop::executeSync(op);
+    auto fiber = Fiber<T,E>::create(op);
+    fiber->resumeSync();
 
-    if(auto either = std::get_if<Either<Erased,Erased>>(&result)) {
-        if(either->is_left()) {
-            auto success = either->get_left().template get<T>();
-            auto syncResult = Either<T,E>::left(success);
-            return Either<Either<T,E>,Task<T,E>>::left(syncResult);
-        } else {
-            auto error = either->get_right().template get<E>();
-            auto syncResult = Either<T,E>::right(error);
-            return Either<Either<T,E>,Task<T,E>>::left(syncResult);
-        }
+    if(auto value_opt = fiber->getValue()) {
+        return Either<Either<T,E>,Task<T,E>>::left(
+            Either<T,E>::left(*value_opt)
+        );
+    } else if(auto error_opt = fiber->getError()) {
+        return Either<Either<T,E>,Task<T,E>>::left(
+            Either<T,E>::right(*error_opt)
+        );
     } else {
-        auto boundary = std::get<trampoline::AsyncBoundary>(result);
-        auto asyncTask = Task<T,E>::deferAction([boundary](auto sched) {
-            auto deferred = trampoline::TrampolineRunLoop::executeAsyncBoundary(boundary, sched);
-            return deferred->template mapBoth<T,E>(
-                [](auto value) { return value.template get<T>(); },
-                [](auto error) { return error.template get<E>(); }
-            );
+        auto asyncTask = Task<T,E>::deferAction([fiber](auto sched) {
+            auto promise = Promise<T,E>::create(sched);
+
+            fiber->resume(sched);
+
+            fiber->onShutdown([promise](auto fiber) {
+                if(auto value_opt = fiber->getValue()) {
+                    promise->success(*value_opt);
+                } else if(auto error_opt = fiber->getError()) {
+                    promise->error(*error_opt);
+                }
+            });
+
+            promise->onCancel([fiber] {
+                fiber->cancel();
+            });
+
+            return Deferred<T,E>::forPromise(promise);
         });
         return Either<Either<T,E>,Task<T,E>>::right(asyncTask);
     }
@@ -533,11 +551,11 @@ Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::asyncBoundary() const noexcept {
     return Task<T,E>(
-        trampoline::TrampolineOp::async([op = op](auto sched) {
+        FiberOp::async([op = op](auto sched) {
             auto promise = Promise<Erased,Erased>::create(sched);
             promise->success(Erased());
             return Deferred<Erased,Erased>::forPromise(promise);
-        })->flatMap([op = op](auto, auto) {
+        })->flatMap([op = op](auto) {
             return op;
         })
     );
@@ -547,16 +565,18 @@ template <class T, class E>
 template <class T2>
 constexpr Task<T2,E> Task<T,E>::map(const std::function<T2(const T&)>& predicate) const noexcept {
     return Task<T2,E>(
-        op->flatMap([predicate](auto erased_input, auto isError) {
+        op->flatMap([predicate](auto fiber_value) {
             try {
-                if(isError) {
-                    return trampoline::TrampolineOp::error(erased_input);
+                if(fiber_value.isValue()) {
+                    auto input = fiber_value.underlying().template get<T>();
+                    return FiberOp::value(predicate(input));
+                } else if(fiber_value.isError()) {
+                    return FiberOp::error(fiber_value.underlying());
                 } else {
-                    auto input = erased_input.template get<T>();
-                    return trampoline::TrampolineOp::value(predicate(input));
+                    return FiberOp::cancel();
                 }
             } catch(E& error) {
-                return trampoline::TrampolineOp::error(error);
+                return FiberOp::error(error);
             }
         })
     );
@@ -566,16 +586,19 @@ template <class T, class E>
 template <class E2>
 constexpr Task<T,E2> Task<T,E>::mapError(const std::function<E2(const E&)>& predicate) const noexcept {
     return Task<T,E2>(
-        op->flatMap([predicate](auto erased_input, auto isError) {
+        op->flatMap([predicate](auto fiber_value) {
             try {
-                if(isError) {
-                    auto input = erased_input.template get<E>();
-                    return trampoline::TrampolineOp::error(predicate(input));
+                if(fiber_value.isValue()) {
+                    return FiberOp::value(fiber_value.underlying());
+                } else if(fiber_value.isError()) {
+                    auto input = fiber_value.underlying().template get<E>();
+
+                    return FiberOp::error(predicate(input));
                 } else {
-                    return trampoline::TrampolineOp::value(erased_input);
+                    return FiberOp::cancel();
                 }
             } catch(E& error) {
-                return trampoline::TrampolineOp::error(predicate(error));
+                return FiberOp::error(predicate(error));
             }
         })
     );
@@ -586,17 +609,19 @@ template <class T, class E>
 template <class T2>
 constexpr Task<T2,E> Task<T,E>::flatMap(const std::function<Task<T2,E>(const T&)>& predicate) const noexcept {
     return Task<T2,E>(
-        op->flatMap([predicate](auto erased_input, auto isError) {
+        op->flatMap([predicate](auto fiber_input) {
             try {
-                if(isError) {
-                    return trampoline::TrampolineOp::error(erased_input);
-                } else {
-                    auto input = erased_input.template get<T>();
+                if(fiber_input.isValue()) {
+                    auto input = fiber_input.underlying().template get<T>();
                     auto resultTask = predicate(input);
                     return resultTask.op;
+                } else if(fiber_input.isError()) {
+                    return FiberOp::error(fiber_input.underlying());
+                } else {
+                    return FiberOp::cancel();
                 }
             } catch(E& error) {
-                return trampoline::TrampolineOp::error(error);
+                return FiberOp::error(error);
             }
         })
     );
@@ -613,10 +638,10 @@ constexpr Task<T,E2> Task<T,E>::flatMapError(const std::function<Task<T,E2>(cons
                     auto resultTask = predicate(input);
                     return resultTask.op;
                 } else {
-                    return trampoline::TrampolineOp::value(erased_input);
+                    return FiberOp::value(erased_input);
                 }
             } catch(E2& error) {
-                return trampoline::TrampolineOp::error(error);
+                return FiberOp::error(error);
             } catch(E& error) {
                 auto resultTask = predicate(error);
                 return resultTask.op;
@@ -633,41 +658,33 @@ constexpr Task<T2,E2> Task<T,E>::flatMapBoth(
 ) const noexcept {
     if constexpr (std::is_same<E,E2>::value) {
         return Task<T2,E2>(
-            op->flatMap([successPredicate, errorPredicate](auto erased_input, auto isError) {
-                try {
-                    if(isError) {
-                        auto input = erased_input.template get<E>();
-                        auto resultTask = errorPredicate(input);
-                        return resultTask.op;
-                    } else {
-                        auto input = erased_input.template get<T>();
-                        auto resultTask = successPredicate(input);
-                        return resultTask.op;
-                    }
-                } catch(E& error) {
-                    auto resultTask = errorPredicate(error);
+            op->flatMap([successPredicate, errorPredicate](auto fiber_input) {
+                if(fiber_input.isValue()) {
+                    auto input = fiber_input.underlying().template get<T>();
+                    auto resultTask = successPredicate(input);
                     return resultTask.op;
+                } else if(fiber_input.isError()) {
+                    auto input = fiber_input.underlying().template get<E>();
+                    auto resultTask = errorPredicate(input);
+                    return resultTask.op;
+                } else {
+                    return FiberOp::cancel();
                 }
             })
         );
     } else {
         return Task<T2,E2>(
-            op->flatMap([successPredicate, errorPredicate](auto erased_input, auto isError) {
-                try {
-                    if(isError) {
-                        auto input = erased_input.template get<E>();
-                        auto resultTask = errorPredicate(input);
-                        return resultTask.op;
-                    } else {
-                        auto input = erased_input.template get<T>();
-                        auto resultTask = successPredicate(input);
-                        return resultTask.op;
-                    }
-                } catch(E2& error) {
-                    return trampoline::TrampolineOp::error(error);
-                } catch(E& error) {
-                    auto resultTask = errorPredicate(error);
+            op->flatMap([successPredicate, errorPredicate](auto fiber_input) {
+                if(fiber_input.isValue()) {
+                    auto input = fiber_input.underlying().template get<T>();
+                    auto resultTask = successPredicate(input);
                     return resultTask.op;
+                } else if(fiber_input.isError()) {
+                    auto input = fiber_input.underlying().template get<E>();
+                    auto resultTask = errorPredicate(input);
+                    return resultTask.op;
+                } else {
+                    return FiberOp::cancel();
                 }
             })
         );
@@ -677,11 +694,13 @@ constexpr Task<T2,E2> Task<T,E>::flatMapBoth(
 template <class T, class E>
 constexpr Task<E,T> Task<T,E>::failed() const noexcept {
     return Task<E,T>(
-        op->flatMap([](auto input, auto isError) constexpr {
-            if(isError) {
-                return trampoline::TrampolineOp::value(input);
+        op->flatMap([](auto input) constexpr {
+            if(input.isError()) {
+                return FiberOp::value(input.getError());
+            } else if(input.isValue()) {
+                return FiberOp::error(input.getValue());
             } else {
-                return trampoline::TrampolineOp::error(input);
+                return FiberOp::cancel();
             }
         })
     );
@@ -690,17 +709,19 @@ constexpr Task<E,T> Task<T,E>::failed() const noexcept {
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::onError(const std::function<void(const E&)>& handler) const noexcept {
     return Task<T,E>(
-        op->flatMap([handler](auto input, auto isError) {
+        op->flatMap([handler](auto fiber_input) {
             try {
-                if(isError) {
-                    auto error = input.template get<E>();
+                if(fiber_input.isValue()) {
+                    return FiberOp::value(fiber_input.underlying());
+                } else if(fiber_input.isError()) {
+                    auto error = fiber_input.underlying().template get<E>();
                     handler(error);
-                    return trampoline::TrampolineOp::error(input);
+                    return FiberOp::error(fiber_input.underlying());
                 } else {
-                    return trampoline::TrampolineOp::value(input);
+                    return FiberOp::cancel();
                 }
             } catch(E& error) {
-                return trampoline::TrampolineOp::error(error);
+                return FiberOp::error(error);
             }
         })
     );
@@ -709,13 +730,15 @@ constexpr Task<T,E> Task<T,E>::onError(const std::function<void(const E&)>& hand
 template <class T, class E>
 constexpr Task<Either<T,E>,E> Task<T,E>::materialize() const noexcept {
     return Task<Either<T,E>,E>(
-        op->flatMap([](auto input, auto isError) constexpr {
-            if(isError) {
-                auto error = input.template get<E>();
-                return trampoline::TrampolineOp::value(Either<T,E>::right(error));
+        op->flatMap([](auto fiber_value) constexpr {
+            if(fiber_value.isValue()) {
+                auto value = fiber_value.underlying().template get<T>();
+                return FiberOp::value(Either<T,E>::left(value));
+            } else if(fiber_value.isError()) {
+                auto error = fiber_value.underlying().template get<E>();
+                return FiberOp::value(Either<T,E>::right(error));
             } else {
-                auto value = input.template get<T>();
-                return trampoline::TrampolineOp::value(Either<T,E>::left(value));
+                return FiberOp::cancel();
             }
         })
     );
@@ -727,16 +750,18 @@ template <class T2, typename std::enable_if<
 >::type*>
 constexpr Task<T2,E> Task<T,E>::dematerialize() const noexcept {
     return Task<T2,E>(
-        op->flatMap([](auto input, auto isError) constexpr {
-            if(isError) {
-                return trampoline::TrampolineOp::error(input);
-            } else {
-                auto value = input.template get<Either<T2,E>>();
+        op->flatMap([](auto fiber_input) constexpr {
+            if(fiber_input.isValue()) {
+                auto value = fiber_input.underlying().template get<Either<T2,E>>();
                 if(value.is_left()) {
-                    return trampoline::TrampolineOp::value(value.get_left());
+                    return FiberOp::value(value.get_left());
                 } else {
-                    return trampoline::TrampolineOp::error(value.get_right());
+                    return FiberOp::error(value.get_right());
                 }
+            } else if(fiber_input.isError()) {
+                return FiberOp::error(fiber_input.underlying());
+            } else {
+                return FiberOp::cancel();
             }
         })
     );
@@ -745,7 +770,7 @@ constexpr Task<T2,E> Task<T,E>::dematerialize() const noexcept {
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::delay(uint32_t milliseconds) const noexcept {
     return Task<T,E>(
-        trampoline::TrampolineOp::async([milliseconds, self = *this](auto sched) constexpr {
+        FiberOp::async([milliseconds, self = *this](auto sched) constexpr {
             auto promise = Promise<Erased,Erased>::create(sched);
 
             auto cancelable = sched->submitAfter(milliseconds, [sched, self, promise]() constexpr {
@@ -776,12 +801,12 @@ constexpr Task<T,E> Task<T,E>::recover(const std::function<T(const E&)>& predica
             try {
                 if(isError) {
                     auto input = erased_input.template get<E>();
-                    return trampoline::TrampolineOp::value(predicate(input));
+                    return FiberOp::value(predicate(input));
                 } else {
-                    return trampoline::TrampolineOp::value(erased_input);
+                    return FiberOp::value(erased_input);
                 }
             } catch(E& error) {
-                return trampoline::TrampolineOp::value(predicate(error));
+                return FiberOp::value(predicate(error));
             }
         })
     );
@@ -802,7 +827,7 @@ template <class T, class E>
 template <class T2>
 constexpr Task<Either<T,T2>,E> Task<T,E>::raceWith(const Task<T2,E>& other) const noexcept {
     return Task<Either<T,T2>,E>(
-        trampoline::TrampolineOp::async([left = *this, right = other](auto sched) constexpr {
+        FiberOp::async([left = *this, right = other](auto sched) constexpr {
             auto promise = Promise<Erased,Erased>::create(sched);
 
             auto leftDeferred = left.run(sched);

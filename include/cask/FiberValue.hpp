@@ -30,6 +30,7 @@ public:
 
     std::optional<Erased> getValue() const;
     std::optional<Erased> getError() const;
+    const Erased& underlying() const;
 
 private:
     Erased value;

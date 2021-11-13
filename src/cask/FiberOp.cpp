@@ -32,6 +32,8 @@ FiberOp::FiberOp(const FiberOp& other) noexcept
         case RACE:
             data.raceData = new RaceData(*(other.data.raceData));
         break;
+        case CANCEL:
+        break;
     }
 }
 
@@ -63,6 +65,8 @@ FiberOp::FiberOp(FiberOp&& other) noexcept
         case RACE:
             data.raceData = other.data.raceData;
             other.data.raceData = nullptr;
+        break;
+        case CANCEL:
         break;
     }
 }
@@ -103,6 +107,11 @@ FiberOp::FiberOp(RaceData* race) noexcept
     data.raceData = race;
 }
 
+FiberOp::FiberOp(bool) noexcept
+    : opType(CANCEL)
+{}
+
+
 FiberOp::~FiberOp() {
     switch(opType) {
         case VALUE:
@@ -123,6 +132,8 @@ FiberOp::~FiberOp() {
         break;
         case RACE:
             delete data.raceData;
+        break;
+        case CANCEL:
         break;
     }
 }
@@ -167,6 +178,10 @@ std::shared_ptr<const FiberOp> FiberOp::race(std::vector<std::shared_ptr<const F
     return std::make_shared<FiberOp>(new RaceData(std::move(race)));
 }
 
+std::shared_ptr<const FiberOp> FiberOp::cancel() noexcept {
+    return std::make_shared<FiberOp>(true);
+}
+
 std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicate) const noexcept {
     switch(opType) {
         case VALUE:
@@ -175,6 +190,7 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
         case ASYNC:
         case DELAY:
         case RACE:
+        case CANCEL:
         {
             auto data = new FlatMapData(this->shared_from_this(), predicate);
             return std::make_shared<FiberOp>(data);
