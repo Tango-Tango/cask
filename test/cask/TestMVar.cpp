@@ -16,7 +16,7 @@ TEST(MVar, Empty) {
     auto mvar = MVar<int, std::string>::empty(Scheduler::global());
 
     auto takeOrTimeout = mvar->take()
-        .raceWith(Task<float,std::string>::raiseError("timeout").delay(1))
+        .raceWith(Task<int,std::string>::raiseError("timeout").delay(1))
         .failed()
         .run(Scheduler::global());
 

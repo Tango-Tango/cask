@@ -12,35 +12,35 @@ using cask::Scheduler;
 
 TEST(TaskRace, LeftValue) {
     auto sched = Scheduler::global();
-    auto task = Task<int,None>::pure(123).raceWith(Task<float,None>::never());
+    auto task = Task<int,None>::pure(123).raceWith(Task<int,None>::never());
     auto result = task.run(sched)->await();
-    EXPECT_EQ(result.get_left(), 123);
+    EXPECT_EQ(result, 123);
 }
 
 TEST(TaskRace, LeftError) {
     auto sched = Scheduler::global();
-    auto task = Task<int,std::string>::raiseError("boom").raceWith(Task<float,std::string>::never());
+    auto task = Task<int,std::string>::raiseError("boom").raceWith(Task<int,std::string>::never());
     auto result = task.failed().run(sched)->await();
     EXPECT_EQ(result, "boom");
 }
 
 TEST(TaskRace, RightValue) {
     auto sched = Scheduler::global();
-    auto task = Task<float,None>::never().raceWith(Task<int,None>::pure(123));
+    auto task = Task<int,None>::never().raceWith(Task<int,None>::pure(123));
     auto result = task.run(sched)->await();
-    EXPECT_EQ(result.get_right(), 123);
+    EXPECT_EQ(result, 123);
 }
 
 TEST(TaskRace, RightError) {
     auto sched = Scheduler::global();
-    auto task = Task<float,std::string>::never().raceWith(Task<int,std::string>::raiseError("boom"));
+    auto task = Task<int,std::string>::never().raceWith(Task<int,std::string>::raiseError("boom"));
     auto result = task.failed().run(sched)->await();
     EXPECT_EQ(result, "boom");
 }
 
 TEST(TaskRace, Cancelled) {
     auto sched = Scheduler::global();
-    auto task = Task<float,None>::never().raceWith(Task<float,None>::never());
+    auto task = Task<int,None>::never().raceWith(Task<int,None>::never());
     auto deferred = task.run(sched);
 
     deferred->cancel();

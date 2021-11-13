@@ -298,8 +298,7 @@ public:
      * @param other The task to race the current task with.
      * @result The value of the task which finished first.
      */
-    template <class T2>
-    constexpr Task<Either<T,T2>,E> raceWith(const Task<T2,E>& other) const noexcept;
+    constexpr Task<T,E> raceWith(const Task<T,E>& other) const noexcept;
 
     /**
      * Runs the given task as a side effect whose success results are
@@ -823,9 +822,8 @@ constexpr Task<T,E> Task<T,E>::restartUntil(const std::function<bool(const T&)>&
 }
 
 template <class T, class E>
-template <class T2>
-constexpr Task<Either<T,T2>,E> Task<T,E>::raceWith(const Task<T2,E>& other) const noexcept {
-    return Task<Either<T,T2>,E>(
+constexpr Task<T,E> Task<T,E>::raceWith(const Task<T,E>& other) const noexcept {
+    return Task<T,E>(
         FiberOp::race({op, other.op})
     );
 }
@@ -867,10 +865,7 @@ constexpr Task<T,E> Task<T,E>::guarantee(const Task<T2, E>& task) const noexcept
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::timeout(uint32_t milliseconds, const E& error) const noexcept {
     auto timeoutTask = Task<T,E>::raiseError(error).delay(milliseconds);
-
-    return raceWith(timeoutTask).template map<T>([](auto result) {
-        return result.get_left();
-    });
+    return raceWith(timeoutTask);
 }
 
 }
