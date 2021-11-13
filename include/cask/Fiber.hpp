@@ -7,6 +7,7 @@
 #define _CASK_FIBER_H_
 
 #include <atomic>
+#include <iostream>
 #include "cask/FiberOp.hpp"
 #include "cask/Scheduler.hpp"
 
@@ -40,7 +41,7 @@ private:
     void asyncSuccess(const Erased& value);
     void asyncCancel();
     void delayFinished();
-    void racerFinished(const std::shared_ptr<Fiber<Erased,Erased>> racer);
+    bool racerFinished(const std::shared_ptr<Fiber<Erased,Erased>> racer);
 
     template <bool Async>
     bool resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned int batch_size);
@@ -125,6 +126,8 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned 
         } else if(current_state == DELAYED) {
             delayedBy->cancel();
             delayedBy = nullptr;
+        } else if(current_state == RACING) {
+            racing_fibers.clear();
         }
 
     } else if(state != READY || (state == READY && !state.compare_exchange_strong(current_state, RUNNING))) {
@@ -222,14 +225,20 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned 
                     const FiberOp::RaceData* data = op->data.raceData;
 
                     for(auto& racer: *data) {
+                        std::cout << "SETTING UP RACER" << std::endl;
                         auto fiber = Fiber<Erased,Erased>::create(racer);
-                        fiber->onShutdown([self = this->shared_from_this(), fiber](auto){
-                            self->racerFinished(fiber);
+                        fiber->onShutdown([self = this->shared_from_this(), fiber, sched](auto){
+                            if(self->racerFinished(fiber)) {
+                                sched->submit([self, sched] {
+                                    self->resume(sched);
+                                });
+                            }
                         });
                         racing_fibers.emplace_back(fiber);
                     }
 
                     for(auto& fiber: racing_fibers) {
+                        std::cout << "LAUNCHING RACER" << std::endl;
                         sched->submit([fiber, sched] {
                             fiber->resume(sched);
                         });
@@ -261,6 +270,7 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned 
             }
 
             for(auto& callback: local_callbacks) {
+                std::cout << "RUNNING CALLBACK" << std::endl;
                 callback(this);
             }
 
@@ -322,6 +332,20 @@ void Fiber<T,E>::asyncError(const Erased& error) {
             state.store(READY);
         } else {
             state.store(COMPLETED);
+
+            std::vector<ShutdownCallback> local_callbacks;
+
+            {
+                std::lock_guard<std::mutex> guard(callback_mutex);
+                for(auto& callback: callbacks) {
+                    local_callbacks.emplace_back(callback);
+                }
+            }
+
+            for(auto& callback: local_callbacks) {
+                std::cout << "RUNNING CALLBACK" << std::endl;
+                callback(this);
+            }
         }
     }
 }
@@ -338,6 +362,20 @@ void Fiber<T,E>::asyncSuccess(const Erased& new_value) {
             state.store(READY);
         } else {
             state.store(COMPLETED);
+
+            std::vector<ShutdownCallback> local_callbacks;
+
+            {
+                std::lock_guard<std::mutex> guard(callback_mutex);
+                for(auto& callback: callbacks) {
+                    local_callbacks.emplace_back(callback);
+                }
+            }
+
+            for(auto& callback: local_callbacks) {
+                std::cout << "RUNNING CALLBACK" << std::endl;
+                callback(this);
+            }
         }
     }
 }
@@ -373,8 +411,10 @@ void Fiber<T,E>::delayFinished() {
 }
 
 template <class T, class E>
-void Fiber<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>> racer) {
+bool Fiber<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>> racer) {
     if(state.load() == RACING && awaiting_first_racer.exchange(false)) {
+        std::cout << "FIRST RACER" << std::endl;
+
         this->value = racer->getRawValue();
 
         for(auto& other_racer: racing_fibers) {
@@ -393,6 +433,11 @@ void Fiber<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>> racer
         } else {
             state.store(COMPLETED);
         }
+
+        return true;
+    } else {
+        std::cout << "OTHER RACER" << std::endl;
+        return false;
     }
 }
 

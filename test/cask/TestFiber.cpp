@@ -185,3 +185,44 @@ TEST(TestFiber, DelaysAValue) {
     EXPECT_EQ(*(fiber->getValue()), 123);
 }
 
+TEST(TestFiber, RacesSeveralOperationsFirstCompletes) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto promise1 = Promise<Erased,Erased>::create(sched);
+    auto promise2 = Promise<Erased,Erased>::create(sched);
+    auto promise3 = Promise<Erased,Erased>::create(sched);
+
+    auto op1 = FiberOp::async([promise1](auto) {
+        return Deferred<Erased,Erased>::forPromise(promise1);
+    });
+    auto op2 = FiberOp::async([promise2](auto) {
+        return Deferred<Erased,Erased>::forPromise(promise2);
+    });
+    auto op3 = FiberOp::async([promise3](auto) {
+        return Deferred<Erased,Erased>::forPromise(promise3);
+    });
+    auto race = FiberOp::race({op1, op2, op3});
+    auto fiber = Fiber<int,std::string>::create(race);
+
+    EXPECT_TRUE(fiber->resume(sched));
+    EXPECT_FALSE(fiber->resume(sched));
+
+    EXPECT_EQ(fiber->getState(), cask::RACING);
+    EXPECT_FALSE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
+
+    // Run the raced ops until they block on a value
+    sched->run_ready_tasks();
+
+    // Provide values and then run their callbacks on
+    // the scheduler
+    promise1->success(123);
+    promise2->success(456);
+    promise3->success(789);
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(fiber->getState(), cask::COMPLETED);
+    EXPECT_TRUE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getValue()), 123);
+}
+
