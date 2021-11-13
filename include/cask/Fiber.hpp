@@ -64,7 +64,6 @@ private:
     std::mutex racing_fibers_mutex;
     std::vector<ShutdownCallback> callbacks;
     std::atomic_bool attempting_cancel;
-    std::atomic_bool awaiting_first_racer;
     std::vector<std::shared_ptr<Fiber<Erased,Erased>>> racing_fibers;
 };
 
@@ -85,20 +84,12 @@ Fiber<T,E>::Fiber(const std::shared_ptr<const FiberOp>& op)
     , racing_fibers_mutex()
     , callbacks()
     , attempting_cancel(false)
-    , awaiting_first_racer(true)
     , racing_fibers()
 {}
 
 template <class T, class E>
 Fiber<T,E>::~Fiber()
-{
-    if(state.load() != COMPLETED) {
-        cancel();
-        resumeSync();
-    }
-
-    while(state.load() == RUNNING);
-}
+{}
 
 template <class T, class E>
 bool Fiber<T,E>::resumeSync() {
@@ -115,7 +106,7 @@ template <bool Async>
 bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned int batch_size) {
     FiberState current_state = state.load();
 
-    if(attempting_cancel.load()) {
+    if(attempting_cancel.exchange(false)) {
         while(true) {
             current_state = state.load();
             if(state == RUNNING || state == COMPLETED || state == CANCELED) {
@@ -128,6 +119,7 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned 
         }
 
         value.setCanceled();
+        op = FiberOp::cancel();
 
         if(current_state == WAITING) {
             waitingOn->cancel();
@@ -207,7 +199,8 @@ void Fiber<T,E>::asyncError(const Erased& error) {
 
 template <class T, class E>
 void Fiber<T,E>::asyncSuccess(const Erased& new_value) {
-    if(state.load() == WAITING) {
+    FiberState expected = WAITING;
+    if(state.compare_exchange_strong(expected, RUNNING)) {
         value.setValue(new_value);
         this->waitingOn = nullptr;
 
@@ -219,7 +212,8 @@ void Fiber<T,E>::asyncSuccess(const Erased& new_value) {
 
 template <class T, class E>
 void Fiber<T,E>::asyncCancel() {
-    if(state.load() == WAITING) {
+    FiberState expected = WAITING;
+    if(state.compare_exchange_strong(expected, RUNNING)) {
         value.setCanceled();
         this->waitingOn = nullptr;
 
@@ -231,7 +225,8 @@ void Fiber<T,E>::asyncCancel() {
 
 template <class T, class E>
 void Fiber<T,E>::delayFinished() {
-    if(state.load() == DELAYED) {
+    FiberState expected = DELAYED;
+    if(state.compare_exchange_strong(expected, RUNNING)) {
         if(!finishIteration()) {
             state.store(READY);
         }
@@ -240,7 +235,8 @@ void Fiber<T,E>::delayFinished() {
 
 template <class T, class E>
 bool Fiber<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& racer) {
-    if(state.load() == RACING && awaiting_first_racer.exchange(false)) {
+    FiberState expected = RACING;
+    if(state.compare_exchange_strong(expected, RUNNING)) {
         {
             std::lock_guard<std::mutex> guard(racing_fibers_mutex);
             racing_fibers.clear();
@@ -297,7 +293,6 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
     break;
     case CANCEL:
     {
-        suspended = true;
         value.setCanceled();
         op = nullptr;
     }
@@ -365,7 +360,6 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
         suspended = true;
         if constexpr(Async) {
             state.store(RACING);
-            awaiting_first_racer.store(true);
             std::lock_guard<std::mutex> guard(racing_fibers_mutex);
 
             const FiberOp::RaceData* data = op->data.raceData;
