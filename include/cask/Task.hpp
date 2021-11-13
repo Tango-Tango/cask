@@ -633,20 +633,19 @@ template <class T, class E>
 template <class E2>
 constexpr Task<T,E2> Task<T,E>::flatMapError(const std::function<Task<T,E2>(const E&)>& predicate) const noexcept {
     return Task<T,E2>(
-        op->flatMap([predicate](auto erased_input, auto isError) {
+        op->flatMap([predicate](auto fiber_input) {
             try {
-                if(isError) {
-                    auto input = erased_input.template get<E>();
+                if(fiber_input.isValue()) {
+                    return FiberOp::value(fiber_input.underlying());
+                } else if(fiber_input.isError()) {
+                    auto input = fiber_input.underlying().template get<E>();
                     auto resultTask = predicate(input);
                     return resultTask.op;
                 } else {
-                    return FiberOp::value(erased_input);
+                    return FiberOp::cancel();
                 }
-            } catch(E2& error) {
-                return FiberOp::error(error);
             } catch(E& error) {
-                auto resultTask = predicate(error);
-                return resultTask.op;
+                return FiberOp::error(error);
             }
         })
     );
