@@ -485,23 +485,7 @@ constexpr Task<T,E> Task<T,E>::never() noexcept {
 template <class T, class E>
 DeferredRef<T,E> Task<T,E>::run(const std::shared_ptr<Scheduler>& sched) const {
     auto fiber = Fiber<T,E>::run(op, sched);
-    auto promise = Promise<T,E>::create(sched);
-
-    fiber->onFiberShutdown([promise_weak = std::weak_ptr(promise)](auto fiber) {
-        if(auto promise = promise_weak.lock()) {
-            if(auto value_opt = fiber->getValue()) {
-                promise->success(*value_opt);
-            } else if(auto error_opt = fiber->getError()) {
-                promise->error(*error_opt);
-            }
-        }
-    });
-
-    promise->onCancel([fiber] {
-        fiber->cancel();
-    });
-
-    return Deferred<T,E>::forPromise(promise);
+    return Deferred<T,E>::forFiber(fiber);
 }
 
 template <class T, class E>
