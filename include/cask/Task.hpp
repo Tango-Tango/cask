@@ -487,7 +487,7 @@ DeferredRef<T,E> Task<T,E>::run(const std::shared_ptr<Scheduler>& sched) const {
     auto fiber = Fiber<T,E>::run(op, sched);
     auto promise = Promise<T,E>::create(sched);
 
-    fiber->onShutdown([promise_weak = std::weak_ptr(promise)](auto fiber) {
+    fiber->onFiberShutdown([promise_weak = std::weak_ptr(promise)](auto fiber) {
         if(auto promise = promise_weak.lock()) {
             if(auto value_opt = fiber->getValue()) {
                 promise->success(*value_opt);

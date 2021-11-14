@@ -35,7 +35,7 @@ TEST(TestFiber, DoesntCancelWhenCompletedAndDestructed) {
 
         sched->run_ready_tasks();
 
-        fiber->onShutdown([&last_state](auto fiber) {
+        fiber->onFiberShutdown([&last_state](auto fiber) {
             last_state = fiber->getState();
         });
     }
@@ -77,7 +77,7 @@ TEST(TestFiber, CallsShutdownCallback) {
     int value = 0;
     int count = 0;
     
-    fiber->onShutdown([&value, &count](auto fiber) {
+    fiber->onFiberShutdown([&value, &count](auto fiber) {
         count++;
         value = *(fiber->getValue());
     });
@@ -97,7 +97,7 @@ TEST(TestFiber, CallsShutdownCallbackImmediately) {
 
     sched->run_ready_tasks();
 
-    fiber->onShutdown([&value, &count](auto fiber) {
+    fiber->onFiberShutdown([&value, &count](auto fiber) {
         count++;
         value = *(fiber->getValue());
     });

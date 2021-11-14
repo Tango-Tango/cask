@@ -7,6 +7,7 @@
 #define _CASK_FIBER_H_
 
 #include <atomic>
+#include "cask/Cancelable.hpp"
 #include "cask/Either.hpp"
 #include "cask/FiberOp.hpp"
 #include "cask/Scheduler.hpp"
@@ -16,12 +17,18 @@ namespace cask {
 enum FiberState { READY, RUNNING, WAITING, DELAYED, RACING, COMPLETED, CANCELED };
 
 template <class T, class E>
-class Fiber final : public std::enable_shared_from_this<Fiber<T,E>> {
+class Fiber;
+
+template <class T, class E>
+using FiberRef = std::shared_ptr<Fiber<T,E>>;
+
+template <class T, class E>
+class Fiber final : public Cancelable, public std::enable_shared_from_this<Fiber<T,E>> {
 public:
     using ShutdownCallback = std::function<void(Fiber<T,E>*)>;
 
-    static std::shared_ptr<Fiber<T,E>> create(const std::shared_ptr<const FiberOp>& op);
-    static std::shared_ptr<Fiber<T,E>> run(const std::shared_ptr<const FiberOp>& op, const std::shared_ptr<Scheduler>& sched);
+    static FiberRef<T,E> create(const std::shared_ptr<const FiberOp>& op);
+    static FiberRef<T,E> run(const std::shared_ptr<const FiberOp>& op, const std::shared_ptr<Scheduler>& sched);
     static std::optional<Either<T,E>> runSync(const std::shared_ptr<const FiberOp>& op);
 
     Fiber(const std::shared_ptr<const FiberOp>& op);
@@ -33,7 +40,9 @@ public:
     std::optional<E> getError();
 
     void cancel();
-    void onShutdown(const ShutdownCallback& callback);
+    void onCancel(const std::function<void()>& callback);
+    void onShutdown(const std::function<void()>& callback);
+    void onFiberShutdown(const ShutdownCallback& callback);
     T await();
 
 private:
@@ -71,12 +80,12 @@ private:
 };
 
 template <class T, class E>
-std::shared_ptr<Fiber<T,E>> Fiber<T,E>::create(const std::shared_ptr<const FiberOp>& op) {
+FiberRef<T,E> Fiber<T,E>::create(const std::shared_ptr<const FiberOp>& op) {
     return std::make_shared<Fiber<T,E>>(op);
 }
 
 template <class T, class E>
-std::shared_ptr<Fiber<T,E>> Fiber<T,E>::run(const std::shared_ptr<const FiberOp>& op, const std::shared_ptr<Scheduler>& sched) {
+FiberRef<T,E> Fiber<T,E>::run(const std::shared_ptr<const FiberOp>& op, const std::shared_ptr<Scheduler>& sched) {
     auto fiber = std::make_shared<Fiber<T,E>>(op);
     fiber->reschedule(sched);
     return fiber;
@@ -417,7 +426,7 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
 
             for(auto& racer: *data) {
                 auto fiber = Fiber<Erased,Erased>::run(racer, sched);
-                fiber->onShutdown([self_weak = this->weak_from_this(), fiber_weak = std::weak_ptr(fiber), sched](auto){
+                fiber->onFiberShutdown([self_weak = this->weak_from_this(), fiber_weak = std::weak_ptr(fiber), sched](auto){
                     if(auto self = self_weak.lock()) {
                         if(auto fiber = fiber_weak.lock()) {
                             if(self->racerFinished(fiber)) {
@@ -475,7 +484,25 @@ void Fiber<T,E>::cancel() {
 }
 
 template <class T, class E>
-void Fiber<T,E>::onShutdown(const ShutdownCallback& callback) {
+void Fiber<T,E>::onCancel(const std::function<void()>& callback) {
+    onFiberShutdown([callback](auto fiber) {
+        if(fiber->value.isCanceled()) {
+            callback();
+        }
+    });
+}
+
+template <class T, class E>
+void Fiber<T,E>::onShutdown(const std::function<void()>& callback) {
+    onFiberShutdown([callback](auto fiber) {
+        if(!fiber->value.isCanceled()) {
+            callback();
+        }
+    });
+}
+
+template <class T, class E>
+void Fiber<T,E>::onFiberShutdown(const ShutdownCallback& callback) {
     bool run_callback_now = false;
 
     {
@@ -500,7 +527,7 @@ T Fiber<T,E>::await() {
         std::mutex mutex;
         mutex.lock();
 
-        onShutdown([&mutex](auto){
+        onFiberShutdown([&mutex](auto){
             mutex.unlock();
         });
 
