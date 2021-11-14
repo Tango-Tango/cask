@@ -12,10 +12,19 @@
 #include <type_traits>
 #include <tuple>
 #include "FiberValue.hpp"
-#include "../Deferred.hpp"
 #include "../None.hpp"
 #include "../Either.hpp"
 #include "../Erased.hpp"
+
+namespace cask {
+
+template <class T, class E>
+class Deferred;
+
+template <class T, class E>
+using DeferredRef = std::shared_ptr<Deferred<T,E>>;
+
+}
 
 namespace cask::fiber {
 

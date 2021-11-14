@@ -7,6 +7,8 @@
 #define _CASK_FIBER_IMPL_H_
 
 #include <atomic>
+#include <mutex>
+#include "cask/Deferred.hpp"
 #include "cask/Fiber.hpp"
 
 namespace cask::fiber {

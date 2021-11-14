@@ -15,6 +15,12 @@
 namespace cask {
 
 template <class T, class E>
+class Fiber;
+
+template <class T, class E>
+using FiberRef = std::shared_ptr<Fiber<T,E>>;
+
+template <class T, class E>
 class Deferred;
 
 template <class T = None, class E = std::any>
@@ -55,6 +61,8 @@ public:
      * @return A deferred instance for the given promise.
      */
     static DeferredRef<T,E> forPromise(PromiseRef<T,E> promise);
+
+    static DeferredRef<T,E> forFiber(FiberRef<T,E> promise);
 
     /**
      * Create a value-less deferred which completes when the given cancelable
@@ -110,6 +118,7 @@ public:
 
 }
 
+#include "deferred/FiberDeferred.hpp"
 #include "deferred/MapDeferred.hpp"
 #include "deferred/PromiseDeferred.hpp"
 #include "deferred/PureDeferred.hpp"
@@ -136,6 +145,12 @@ template<class T, class E>
 DeferredRef<T,E> Deferred<T,E>::forPromise(PromiseRef<T,E> promise) {
     return std::make_shared<deferred::PromiseDeferred<T,E>>(promise);
 }
+
+template<class T, class E>
+DeferredRef<T,E> Deferred<T,E>::forFiber(FiberRef<T,E> fiber) {
+    return std::make_shared<deferred::FiberDeferred<T,E>>(fiber);
+}
+
 
 template<class T, class E>
 DeferredRef<None,None> Deferred<T,E>::forCancelable(CancelableRef cancelable, SchedulerRef sched) {
