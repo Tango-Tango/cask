@@ -48,10 +48,14 @@ Task<Ack, None> ForeachTaskObserver<T,E>::onNext(const T& value) {
             [](auto) {
                 return Task<Ack,None>::pure(cask::Continue);
             },
-            [this](auto error) {
-                return onError(error).template map<Ack>([](auto) {
-                    return cask::Stop;
-                });
+            [self_weak = this->weak_from_this()](auto error) {
+                if(auto self = self_weak.lock()) {
+                    return self->onError(error).template map<Ack>([](auto) {
+                        return cask::Stop;
+                    });
+                } else {
+                    return Task<Ack,None>::pure(Stop);
+                }
             }
         );
 }

@@ -7,6 +7,7 @@
 #define _CASK_FIBER_H_
 
 #include <atomic>
+#include "cask/Either.hpp"
 #include "cask/FiberOp.hpp"
 #include "cask/Scheduler.hpp"
 
@@ -20,12 +21,11 @@ public:
     using ShutdownCallback = std::function<void(Fiber<T,E>*)>;
 
     static std::shared_ptr<Fiber<T,E>> create(const std::shared_ptr<const FiberOp>& op);
+    static std::shared_ptr<Fiber<T,E>> run(const std::shared_ptr<const FiberOp>& op, const std::shared_ptr<Scheduler>& sched);
+    static std::optional<Either<T,E>> runSync(const std::shared_ptr<const FiberOp>& op);
 
     Fiber(const std::shared_ptr<const FiberOp>& op);
     ~Fiber();
-
-    bool resumeSync();
-    bool resume(const std::shared_ptr<Scheduler>& sched);
 
     FiberState getState();
     const FiberValue& getRawValue();
@@ -37,6 +37,9 @@ public:
     T await();
 
 private:
+    bool resumeSync();
+    bool resume(const std::shared_ptr<Scheduler>& sched);
+
     void asyncError(const Erased& error);
     void asyncSuccess(const Erased& value);
     void asyncCancel();
@@ -70,6 +73,27 @@ private:
 template <class T, class E>
 std::shared_ptr<Fiber<T,E>> Fiber<T,E>::create(const std::shared_ptr<const FiberOp>& op) {
     return std::make_shared<Fiber<T,E>>(op);
+}
+
+template <class T, class E>
+std::shared_ptr<Fiber<T,E>> Fiber<T,E>::run(const std::shared_ptr<const FiberOp>& op, const std::shared_ptr<Scheduler>& sched) {
+    auto fiber = std::make_shared<Fiber<T,E>>(op);
+    fiber->reschedule(sched);
+    return fiber;
+}
+
+template <class T, class E>
+std::optional<Either<T,E>> Fiber<T,E>::runSync(const std::shared_ptr<const FiberOp>& op) {
+    auto fiber = std::make_shared<Fiber<T,E>>(op);
+    fiber->resumeSync();
+
+    if(auto value_opt = fiber->getValue()) {
+        return Either<T,E>::left(*value_opt);
+    } else if(auto error_opt = fiber->getError()) {
+        return Either<T,E>::right(*error_opt);
+    } else {
+        return {};
+    }
 }
 
 template <class T, class E>
@@ -135,7 +159,6 @@ bool Fiber<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned 
             std::lock_guard<std::mutex> guard(racing_fibers_mutex);
             for(auto& racer: racing_fibers) {
                 racer->cancel();
-                racer->resumeSync();
             }
             racing_fibers.clear();
         }
@@ -251,7 +274,6 @@ bool Fiber<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& race
             for(auto& other_racer : racing_fibers) {
                 if(other_racer != racer) {
                     other_racer->cancel();
-                    other_racer->resumeSync();
                 }
             }
 
@@ -389,12 +411,12 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
     {
         suspended = true;
         if constexpr(Async) {
-            
             std::lock_guard<std::mutex> guard(racing_fibers_mutex);
+            state.store(RACING);
             const FiberOp::RaceData* data = op->data.raceData;
 
             for(auto& racer: *data) {
-                auto fiber = Fiber<Erased,Erased>::create(racer);
+                auto fiber = Fiber<Erased,Erased>::run(racer, sched);
                 fiber->onShutdown([self_weak = this->weak_from_this(), fiber_weak = std::weak_ptr(fiber), sched](auto){
                     if(auto self = self_weak.lock()) {
                         if(auto fiber = fiber_weak.lock()) {
@@ -406,19 +428,7 @@ bool Fiber<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
                 });
                 racing_fibers.emplace_back(std::move(fiber));
             }
-
-            state.store(RACING);
-
-            for(auto& fiber: racing_fibers) {
-                sched->submit([fiber_weak = std::weak_ptr(fiber), sched_weak = std::weak_ptr(sched)] {
-                    if(auto fiber = fiber_weak.lock()) {
-                        if(auto sched = sched_weak.lock()) {
-                            fiber->resume(sched);
-                        }
-                    }
-                });
-            }
-
+            
         } else {
             state.store(READY);
         }

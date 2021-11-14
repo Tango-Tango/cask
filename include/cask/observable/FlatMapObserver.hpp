@@ -48,10 +48,14 @@ Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(const TI& value) {
             [downstream = downstream](auto result) {
                 return downstream->onNext(result);
             },
-            [this](auto error) {
-                return onError(error).template map<Ack>([](auto) {
-                    return Stop;
-                });
+            [self_weak = this->weak_from_this()](auto error) {
+                if(auto self = self_weak.lock()) {
+                    return self->onError(error).template map<Ack>([](auto) {
+                        return Stop;
+                    });
+                } else {
+                    return Task<Ack,None>::pure(Stop);
+                }
             }
         )
         ->takeWhileInclusive([](auto ack){

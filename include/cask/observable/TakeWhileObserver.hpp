@@ -53,8 +53,12 @@ Task<Ack,None> TakeWhileObserver<T,E>::onNext(const T& value) {
     } else {
         if(inclusive) {
             return downstream->onNext(value)
-                .template flatMap<None>([this](auto) {
-                    return onComplete();
+                .template flatMap<None>([self_weak = this->weak_from_this()](auto) {
+                    if(auto self = self_weak.lock()) {
+                        return self->onComplete();
+                    } else {
+                        return Task<None,None>::none();
+                    }
                 })
                 .template map<Ack>([](auto) {
                     return Stop;

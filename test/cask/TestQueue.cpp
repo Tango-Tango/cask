@@ -5,42 +5,55 @@
 
 #include "gtest/gtest.h"
 #include "cask/Queue.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::DeferredRef;
 using cask::Task;
 using cask::Queue;
 using cask::Scheduler;
 using cask::None;
+using cask::scheduler::BenchScheduler;
 
 TEST(Queue, Empty) {
-    auto mvar = Queue<int, std::string>::empty(Scheduler::global(), 1);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto mvar = Queue<int, std::string>::empty(sched, 1);
 
     auto takeOrTimeout = mvar->take()
         .raceWith(Task<int,std::string>::raiseError("timeout").delay(1))
         .failed()
-        .run(Scheduler::global());
+        .run(sched);
+
+    sched->run_ready_tasks();
+    sched->advance_time(1);
+    sched->run_ready_tasks();
 
     EXPECT_EQ(takeOrTimeout->await(), "timeout");
 }
 
 TEST(Queue, PutsAndTakes) {
-    auto mvar = Queue<int>::empty(Scheduler::global(), 1);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto mvar = Queue<int>::empty(sched, 1);
 
-    auto put = mvar->put(123).run(Scheduler::global());
-    auto take = mvar->take().run(Scheduler::global());
+    auto put = mvar->put(123).run(sched);
+    auto take = mvar->take().run(sched);
+
+    sched->run_ready_tasks();
 
     EXPECT_EQ(take->await(), 123);
     put->await();
 }
 
 TEST(Queue, ResolvesPendingTakesInOrder) {
-    auto mvar = Queue<int>::empty(Scheduler::global(), 1);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto mvar = Queue<int>::empty(sched, 1);
 
-    auto firstTake = mvar->take().run(Scheduler::global());
-    auto secondTake = mvar->take().run(Scheduler::global());
+    auto firstTake = mvar->take().run(sched);
+    auto secondTake = mvar->take().run(sched);
     
-    auto firstPut = mvar->put(1).run(Scheduler::global());
-    auto secondPut = mvar->put(2).run(Scheduler::global());
+    auto firstPut = mvar->put(1).run(sched);
+    auto secondPut = mvar->put(2).run(sched);
+
+    sched->run_ready_tasks();
 
     EXPECT_EQ(firstTake->await(), 1);
     EXPECT_EQ(secondTake->await(), 2);
@@ -50,15 +63,18 @@ TEST(Queue, ResolvesPendingTakesInOrder) {
 }
 
 TEST(Queue, ResolvesPendingPutsInOrder) {
-    auto mvar = Queue<int>::empty(Scheduler::global(), 1);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto mvar = Queue<int>::empty(sched, 1);
 
-    auto firstPut = mvar->put(1).run(Scheduler::global());
-    auto secondPut = mvar->put(2).run(Scheduler::global());
-    auto thirdPut = mvar->put(3).run(Scheduler::global());
+    auto firstPut = mvar->put(1).run(sched);
+    auto secondPut = mvar->put(2).run(sched);
+    auto thirdPut = mvar->put(3).run(sched);
 
-    auto firstTake = mvar->take().run(Scheduler::global());
-    auto secondTake = mvar->take().run(Scheduler::global());
-    auto thirdTake = mvar->take().run(Scheduler::global());
+    auto firstTake = mvar->take().run(sched);
+    auto secondTake = mvar->take().run(sched);
+    auto thirdTake = mvar->take().run(sched);
+
+    sched->run_ready_tasks();
 
     EXPECT_EQ(firstTake->await(), 1);
     EXPECT_EQ(secondTake->await(), 2);
@@ -70,16 +86,19 @@ TEST(Queue, ResolvesPendingPutsInOrder) {
 }
 
 TEST(Queue, InterleavePutsAndTakes) {
-    auto mvar = Queue<int>::empty(Scheduler::global(), 1);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto mvar = Queue<int>::empty(sched, 1);
 
-    auto firstPut = mvar->put(1).run(Scheduler::global());
-    auto firstTake = mvar->take().run(Scheduler::global());
+    auto firstPut = mvar->put(1).run(sched);
+    auto firstTake = mvar->take().run(sched);
 
-    auto secondPut = mvar->put(2).run(Scheduler::global());
-    auto secondTake = mvar->take().run(Scheduler::global());
+    auto secondPut = mvar->put(2).run(sched);
+    auto secondTake = mvar->take().run(sched);
 
-    auto thirdPut = mvar->put(3).run(Scheduler::global());
-    auto thirdTake = mvar->take().run(Scheduler::global());
+    auto thirdPut = mvar->put(3).run(sched);
+    auto thirdTake = mvar->take().run(sched);
+
+    sched->run_ready_tasks();
 
     EXPECT_EQ(firstTake->await(), 1);
     EXPECT_EQ(secondTake->await(), 2);
@@ -91,16 +110,19 @@ TEST(Queue, InterleavePutsAndTakes) {
 }
 
 TEST(Queue, InterleavesTakesAndPuts) {
-    auto mvar = Queue<int>::empty(Scheduler::global(), 1);
+    auto sched = std::make_shared<BenchScheduler>();    
+    auto mvar = Queue<int>::empty(sched, 1);
 
-    auto firstTake = mvar->take().run(Scheduler::global());
-    auto firstPut = mvar->put(1).run(Scheduler::global());
+    auto firstTake = mvar->take().run(sched);
+    auto firstPut = mvar->put(1).run(sched);
     
-    auto secondTake = mvar->take().run(Scheduler::global());
-    auto secondPut = mvar->put(2).run(Scheduler::global());
+    auto secondTake = mvar->take().run(sched);
+    auto secondPut = mvar->put(2).run(sched);
     
-    auto thirdTake = mvar->take().run(Scheduler::global());
-    auto thirdPut = mvar->put(3).run(Scheduler::global());
+    auto thirdTake = mvar->take().run(sched);
+    auto thirdPut = mvar->put(3).run(sched);
+
+    sched->run_ready_tasks();
 
     EXPECT_EQ(firstTake->await(), 1);
     EXPECT_EQ(secondTake->await(), 2);
@@ -112,16 +134,19 @@ TEST(Queue, InterleavesTakesAndPuts) {
 }
 
 TEST(Queue, CleanupCanceledPut) {
-    auto mvar = Queue<int,std::string>::empty(Scheduler::global(), 1);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto mvar = Queue<int,std::string>::empty(sched, 1);
 
-    auto firstPut = mvar->put(1).run(Scheduler::global());
-    auto secondPut = mvar->put(2).run(Scheduler::global());
-    auto thirdPut = mvar->put(3).run(Scheduler::global());
+    auto firstPut = mvar->put(1).run(sched);
+    auto secondPut = mvar->put(2).run(sched);
+    auto thirdPut = mvar->put(3).run(sched);
 
     secondPut->cancel();
 
-    auto firstTake = mvar->take().run(Scheduler::global());
-    auto secondTake = mvar->take().run(Scheduler::global());
+    auto firstTake = mvar->take().run(sched);
+    auto secondTake = mvar->take().run(sched);
+
+    sched->run_ready_tasks();
 
     EXPECT_EQ(firstTake->await(), 1);
     EXPECT_EQ(secondTake->await(), 3);
@@ -131,17 +156,20 @@ TEST(Queue, CleanupCanceledPut) {
 }
 
 TEST(Queue, CleanupCanceledTake) {
-    auto mvar = Queue<int,std::string>::empty(Scheduler::global(), 1);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto mvar = Queue<int,std::string>::empty(sched, 1);
 
-    auto firstTake = mvar->take().run(Scheduler::global());
-    auto secondTake = mvar->take().run(Scheduler::global());
-    auto thirdTake = mvar->take().run(Scheduler::global());
+    auto firstTake = mvar->take().run(sched);
+    auto secondTake = mvar->take().run(sched);
+    auto thirdTake = mvar->take().run(sched);
 
     secondTake->cancel();
 
-    auto firstPut = mvar->put(1).run(Scheduler::global());
-    auto secondPut = mvar->put(2).run(Scheduler::global());
-    auto thirdPut = mvar->put(3).run(Scheduler::global());
+    auto firstPut = mvar->put(1).run(sched);
+    auto secondPut = mvar->put(2).run(sched);
+    auto thirdPut = mvar->put(3).run(sched);
+
+    sched->run_ready_tasks();
 
     EXPECT_EQ(firstTake->await(), 1);
     EXPECT_EQ(thirdTake->await(), 2);
@@ -152,17 +180,21 @@ TEST(Queue, CleanupCanceledTake) {
 }
 
 TEST(Queue, TryPutEmpty) {
-    auto mvar = Queue<int,std::string>::empty(Scheduler::global(), 1);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto mvar = Queue<int,std::string>::empty(sched, 1);
 
     ASSERT_TRUE(mvar->tryPut(1));
     ASSERT_FALSE(mvar->tryPut(2));
 
-    auto firstTake = mvar->take().run(Scheduler::global())->await();
-    EXPECT_EQ(firstTake, 1);
+    auto firstTake = mvar->take().run(sched);
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(firstTake->await(), 1);
 }
 
 TEST(Queue, TryPutFillQueue) {
-    auto mvar = Queue<int,std::string>::empty(Scheduler::global(), 5);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto mvar = Queue<int,std::string>::empty(sched, 5);
 
     for(unsigned int i = 0; i < 5; i++) {
         ASSERT_TRUE(mvar->tryPut(i));
@@ -171,23 +203,29 @@ TEST(Queue, TryPutFillQueue) {
     ASSERT_FALSE(mvar->tryPut(6));
 
     for(unsigned int i = 0; i < 5; i++) {
-        auto take = mvar->take().run(Scheduler::global())->await();
-        ASSERT_EQ(take, i);
+        auto take = mvar->take().run(sched);
+        sched->run_ready_tasks();
+        ASSERT_EQ(take->await(), i);
     }
 }
 
 TEST(Queue, TryPutPendingTakes) {
-    auto mvar = Queue<int,std::string>::empty(Scheduler::global(), 1);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto mvar = Queue<int,std::string>::empty(sched, 1);
 
-    auto firstTake = mvar->take().run(Scheduler::global());
-    auto secondTake = mvar->take().run(Scheduler::global());
-    auto thirdTake = mvar->take().run(Scheduler::global());
+    auto firstTake = mvar->take().run(sched);
+    auto secondTake = mvar->take().run(sched);
+    auto thirdTake = mvar->take().run(sched);
+
+    sched->run_ready_tasks();
 
     ASSERT_TRUE(mvar->tryPut(1));
     ASSERT_TRUE(mvar->tryPut(2));
     ASSERT_TRUE(mvar->tryPut(3));
     ASSERT_TRUE(mvar->tryPut(4));
     ASSERT_FALSE(mvar->tryPut(5));
+
+    sched->run_ready_tasks();
 
     EXPECT_EQ(firstTake->await(), 1);
     EXPECT_EQ(secondTake->await(), 2);

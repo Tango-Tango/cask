@@ -18,7 +18,7 @@ TEST(TaskAssignment,MoveAssignment) {
     Task<int> outer = Task<int>::pure(123);
 
     auto beforeResult = outer.runSync();
-    EXPECT_EQ(beforeResult.get_left().get_left(), 123);
+    EXPECT_EQ(beforeResult->get_left(), 123);
 
     {
         Task<int> inner = Task<int>::pure(456);
@@ -26,5 +26,5 @@ TEST(TaskAssignment,MoveAssignment) {
     }
 
     auto afterResult = outer.runSync();
-    EXPECT_EQ(afterResult.get_left().get_left(), 456);
+    EXPECT_EQ(afterResult->get_left(), 456);
 }

@@ -31,7 +31,7 @@ private:
     std::function<Task<TO,EO>(const TI&)> successPredicate;
     std::function<Task<TO,EO>(const EI&)> errorPredicate;
     std::shared_ptr<Observer<TO,EO>> downstream;
-    std::atomic_flag completed;
+    std::shared_ptr<std::atomic_flag> completed;
 };
 
 
@@ -44,17 +44,17 @@ MapBothTaskObserver<TI,TO,EI,EO>::MapBothTaskObserver(
     : successPredicate(successPredicate)
     , errorPredicate(errorPredicate)
     , downstream(downstream)
-    , completed(false)
+    , completed(std::make_shared<std::atomic_flag>(false))
 {}
 
 template <class TI, class TO, class EI, class EO>
 Task<Ack,None> MapBothTaskObserver<TI,TO,EI,EO>::onNext(const TI& value) {
     return successPredicate(value).template flatMapBoth<Ack,None>(
-        [this](TO downstreamValue) -> Task<Ack,None> {
+        [downstream = downstream](TO downstreamValue) -> Task<Ack,None> {
             return downstream->onNext(downstreamValue);
         },
-        [this](EO downstreamError) -> Task<Ack,None> {
-            if(!completed.test_and_set()) {
+        [downstream = downstream, completed = completed](EO downstreamError) -> Task<Ack,None> {
+            if(!completed->test_and_set()) {
                 return downstream->onError(downstreamError).template map<Ack>(
                     [](auto) { return Stop; }
                 );
@@ -67,16 +67,16 @@ Task<Ack,None> MapBothTaskObserver<TI,TO,EI,EO>::onNext(const TI& value) {
 
 template <class TI, class TO, class EI, class EO>
 Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onError(const EI& error) {
-    if(!completed.test_and_set()) {
+    if(!completed->test_and_set()) {
         return errorPredicate(error).template flatMapBoth<None,None>(
-            [this](TO downstreamValue) -> Task<None,None> {
+            [downstream = downstream](TO downstreamValue) -> Task<None,None> {
                 return downstream->onNext(downstreamValue).template flatMap<None>(
-                    [this](auto) {
+                    [downstream](auto) {
                         return downstream->onComplete();
                     }
                 );
             },
-            [this](EO downstreamError) -> Task<None,None> {
+            [downstream = downstream](EO downstreamError) -> Task<None,None> {
                 return downstream->onError(downstreamError);
             }
         );
@@ -87,7 +87,7 @@ Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onError(const EI& error) {
 
 template <class TI, class TO, class EI, class EO>
 Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onComplete() {
-    if(!completed.test_and_set()) {
+    if(!completed->test_and_set()) {
         return downstream->onComplete();
     } else {
         return Task<None,None>::none();

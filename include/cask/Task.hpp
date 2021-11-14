@@ -150,7 +150,7 @@ public:
      * @return A value, an error, or a Task representing the asynchronous
      *         continuation of this computation.
      */
-    Either<Either<T,E>,Task<T,E>> runSync() const;
+    std::optional<Either<T,E>> runSync() const;
 
     /**
      * Force an asynchronous boundary causing this task to defer
@@ -484,71 +484,29 @@ constexpr Task<T,E> Task<T,E>::never() noexcept {
 
 template <class T, class E>
 DeferredRef<T,E> Task<T,E>::run(const std::shared_ptr<Scheduler>& sched) const {
-    auto fiber = Fiber<T,E>::create(op);
-    fiber->resume(sched);
+    auto fiber = Fiber<T,E>::run(op, sched);
+    auto promise = Promise<T,E>::create(sched);
 
-    if(auto value_opt = fiber->getValue()) {
-        return Deferred<T,E>::pure(*value_opt);
-    } else if(auto error_opt = fiber->getError()) {
-        return Deferred<T,E>::raiseError(*error_opt);
-    } else {
-        auto promise = Promise<T,E>::create(sched);
-
-        fiber->onShutdown([promise_weak = std::weak_ptr(promise)](auto fiber) {
-            if(auto promise = promise_weak.lock()) {
-                if(auto value_opt = fiber->getValue()) {
-                    promise->success(*value_opt);
-                } else if(auto error_opt = fiber->getError()) {
-                    promise->error(*error_opt);
-                }
+    fiber->onShutdown([promise_weak = std::weak_ptr(promise)](auto fiber) {
+        if(auto promise = promise_weak.lock()) {
+            if(auto value_opt = fiber->getValue()) {
+                promise->success(*value_opt);
+            } else if(auto error_opt = fiber->getError()) {
+                promise->error(*error_opt);
             }
-        });
+        }
+    });
 
-        promise->onCancel([fiber] {
-            fiber->cancel();
-            fiber->resumeSync();
-        });
+    promise->onCancel([fiber] {
+        fiber->cancel();
+    });
 
-        return Deferred<T,E>::forPromise(promise);
-    }
+    return Deferred<T,E>::forPromise(promise);
 }
 
 template <class T, class E>
-Either<Either<T,E>,Task<T,E>> Task<T,E>::runSync() const {
-    auto fiber = Fiber<T,E>::create(op);
-    fiber->resumeSync();
-
-    if(auto value_opt = fiber->getValue()) {
-        return Either<Either<T,E>,Task<T,E>>::left(
-            Either<T,E>::left(*value_opt)
-        );
-    } else if(auto error_opt = fiber->getError()) {
-        return Either<Either<T,E>,Task<T,E>>::left(
-            Either<T,E>::right(*error_opt)
-        );
-    } else {
-        auto asyncTask = Task<T,E>::deferAction([fiber](auto sched) {
-            auto promise = Promise<T,E>::create(sched);
-
-            fiber->resume(sched);
-            fiber->onShutdown([promise_weak = std::weak_ptr(promise)](auto fiber) {
-                if(auto promise = promise_weak.lock()) {
-                    if(auto value_opt = fiber->getValue()) {
-                        promise->success(*value_opt);
-                    } else if(auto error_opt = fiber->getError()) {
-                        promise->error(*error_opt);
-                    }
-                }
-            });
-
-            promise->onCancel([fiber] {
-                fiber->cancel();
-            });
-
-            return Deferred<T,E>::forPromise(promise);
-        });
-        return Either<Either<T,E>,Task<T,E>>::right(asyncTask);
-    }
+std::optional<Either<T,E>> Task<T,E>::runSync() const {
+    return Fiber<T,E>::runSync(op);
 }
 
 template <class T, class E>

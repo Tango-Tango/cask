@@ -18,7 +18,7 @@ using cask::scheduler::BenchScheduler;
 TEST(TestFiber, Constructs) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>::create(op);
+    auto fiber = Fiber<int,std::string>::run(op, sched);
 
     EXPECT_EQ(fiber->getState(), cask::READY);
     EXPECT_FALSE(fiber->getValue().has_value());
@@ -31,9 +31,9 @@ TEST(TestFiber, DoesntCancelWhenCompletedAndDestructed) {
     {
         auto sched = std::make_shared<BenchScheduler>();
         auto op = FiberOp::value(123);
-        auto fiber = Fiber<int,std::string>::create(op);
+        auto fiber = Fiber<int,std::string>::run(op, sched);
 
-        fiber->resumeSync();
+        sched->run_ready_tasks();
 
         fiber->onShutdown([&last_state](auto fiber) {
             last_state = fiber->getState();
@@ -47,10 +47,9 @@ TEST(TestFiber, DoesntCancelWhenCompletedAndDestructed) {
 TEST(TestFiber, EvaluatesPureValue) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>::create(op);
-    
-    EXPECT_TRUE(fiber->resume(sched));
-    EXPECT_FALSE(fiber->resume(sched));
+    auto fiber = Fiber<int,std::string>::run(op, sched);
+
+    sched->run_ready_tasks();
 
     EXPECT_EQ(fiber->getState(), cask::COMPLETED);
     EXPECT_TRUE(fiber->getValue().has_value());
@@ -61,10 +60,9 @@ TEST(TestFiber, EvaluatesPureValue) {
 TEST(TestFiber, EvaluatesPureValueSync) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>::create(op);
-    
-    EXPECT_TRUE(fiber->resumeSync());
-    EXPECT_FALSE(fiber->resumeSync());
+    auto fiber = Fiber<int,std::string>::run(op, sched);
+
+    sched->run_ready_tasks();
 
     EXPECT_EQ(fiber->getState(), cask::COMPLETED);
     EXPECT_TRUE(fiber->getValue().has_value());
@@ -75,7 +73,7 @@ TEST(TestFiber, EvaluatesPureValueSync) {
 TEST(TestFiber, CallsShutdownCallback) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>::create(op);
+    auto fiber = Fiber<int,std::string>::run(op, sched);
     int value = 0;
     int count = 0;
     
@@ -84,8 +82,7 @@ TEST(TestFiber, CallsShutdownCallback) {
         value = *(fiber->getValue());
     });
 
-    EXPECT_TRUE(fiber->resume(sched));
-    EXPECT_FALSE(fiber->resume(sched));
+    sched->run_ready_tasks();
 
     EXPECT_EQ(value, 123);
     EXPECT_EQ(count, 1);
@@ -94,12 +91,11 @@ TEST(TestFiber, CallsShutdownCallback) {
 TEST(TestFiber, CallsShutdownCallbackImmediately) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>::create(op);
+    auto fiber = Fiber<int,std::string>::run(op, sched);
     int value = 0;
     int count = 0;
 
-    EXPECT_TRUE(fiber->resume(sched));
-    EXPECT_FALSE(fiber->resume(sched));
+    sched->run_ready_tasks();
 
     fiber->onShutdown([&value, &count](auto fiber) {
         count++;
@@ -116,10 +112,9 @@ TEST(TestFiber, SuspendsAtAsyncBoundary) {
     auto op = FiberOp::async([promise](auto) {
         return Deferred<Erased,Erased>::forPromise(promise);
     });
-    auto fiber = Fiber<int,std::string>::create(op);
+    auto fiber = Fiber<int,std::string>::run(op, sched);
 
-    EXPECT_TRUE(fiber->resume(sched));
-    EXPECT_FALSE(fiber->resume(sched));
+    sched->run_ready_tasks();
 
     EXPECT_EQ(fiber->getState(), cask::WAITING);
     EXPECT_FALSE(fiber->getValue().has_value());
@@ -132,10 +127,9 @@ TEST(TestFiber, ResumesAfterAsyncBoundary) {
     auto op = FiberOp::async([promise](auto) {
         return Deferred<Erased,Erased>::forPromise(promise);
     });
-    auto fiber = Fiber<int,std::string>::create(op);
+    auto fiber = Fiber<int,std::string>::run(op, sched);
 
-    EXPECT_TRUE(fiber->resume(sched));
-    EXPECT_FALSE(fiber->resume(sched));
+    sched->run_ready_tasks();
 
     promise->success(123);
     sched->run_ready_tasks();
@@ -151,11 +145,10 @@ TEST(TestFiber, DelaysAValue) {
     auto op = FiberOp::delay(10)->flatMap([](auto) {
         return FiberOp::value(123);
     });
-    auto fiber = Fiber<int,std::string>::create(op);
+    auto fiber = Fiber<int,std::string>::run(op, sched);
 
     // Run until the delay is hit
-    EXPECT_TRUE(fiber->resume(sched));
-    EXPECT_FALSE(fiber->resume(sched));
+    sched->run_ready_tasks();
     EXPECT_EQ(fiber->getState(), cask::DELAYED);
 
     // Trigger the delay to resolve
@@ -185,10 +178,9 @@ TEST(TestFiber, RacesSeveralOperationsFirstCompletes) {
         return Deferred<Erased,Erased>::forPromise(promise3);
     });
     auto race = FiberOp::race({op1, op2, op3});
-    auto fiber = Fiber<int,std::string>::create(race);
+    auto fiber = Fiber<int,std::string>::run(race, sched);
 
-    EXPECT_TRUE(fiber->resume(sched));
-    EXPECT_FALSE(fiber->resume(sched));
+    sched->run_ready_tasks();
 
     EXPECT_EQ(fiber->getState(), cask::RACING);
     EXPECT_FALSE(fiber->getValue().has_value());
@@ -220,18 +212,12 @@ TEST(TestFiber, RacesSeveralPureValues) {
     auto op2 = FiberOp::value(456);
     auto op3 = FiberOp::value(789);
     auto race = FiberOp::race({op1, op2, op3});
-    auto fiber = Fiber<int,std::string>::create(race);
+    auto fiber = Fiber<int,std::string>::run(race, sched);
 
-    EXPECT_TRUE(fiber->resume(sched));
-    EXPECT_FALSE(fiber->resume(sched));
-
-    EXPECT_EQ(fiber->getState(), cask::RACING);
-    EXPECT_FALSE(fiber->getValue().has_value());
-    EXPECT_FALSE(fiber->getError().has_value());
-
-    // Run the raced ops which are pure values
     sched->run_ready_tasks();
-
+    
+    // Should immediately complete since these pure values
+    // get immediately evaluated.
     EXPECT_EQ(fiber->getState(), cask::COMPLETED);
     EXPECT_TRUE(fiber->getValue().has_value());
     EXPECT_FALSE(fiber->getError().has_value());
