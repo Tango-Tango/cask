@@ -6,9 +6,9 @@
 #ifndef _CASK_FIBER_VALUE_H_
 #define _CASK_FIBER_VALUE_H_
 
-#include "Erased.hpp"
+#include "../Erased.hpp"
 
-namespace cask {
+namespace cask::fiber {
 
 class FiberValue {
 public:

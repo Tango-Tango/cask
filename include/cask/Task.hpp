@@ -340,23 +340,23 @@ public:
      * should not be called directly and, instead, users should use provided
      * operators to build these operations automatically.
      */
-    constexpr explicit Task(const std::shared_ptr<const FiberOp>& op) noexcept;
-    constexpr explicit Task(std::shared_ptr<const FiberOp>&& op) noexcept;
+    constexpr explicit Task(const std::shared_ptr<const fiber::FiberOp>& op) noexcept;
+    constexpr explicit Task(std::shared_ptr<const fiber::FiberOp>&& op) noexcept;
     constexpr Task(const Task<T,E>& other) noexcept;
     constexpr Task(Task<T,E>&& other) noexcept;
     constexpr Task<T,E>& operator=(const Task<T,E>& other) noexcept;
     constexpr Task<T,E>& operator=(Task<T,E>&& other) noexcept;
 
-    std::shared_ptr<const FiberOp> op;
+    std::shared_ptr<const fiber::FiberOp> op;
 };
 
 template <class T, class E>
-constexpr Task<T,E>::Task(const std::shared_ptr<const FiberOp>& op) noexcept
+constexpr Task<T,E>::Task(const std::shared_ptr<const fiber::FiberOp>& op) noexcept
     : op(op)
 {}
 
 template <class T, class E>
-constexpr Task<T,E>::Task(std::shared_ptr<const FiberOp>&& op) noexcept
+constexpr Task<T,E>::Task(std::shared_ptr<const fiber::FiberOp>&& op) noexcept
     : op(std::move(op))
 {}
 
@@ -385,14 +385,14 @@ constexpr Task<T,E>& Task<T,E>::operator=(Task<T,E>&& other) noexcept{
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::pure(const T& value) noexcept {
     return Task<T,E>(
-        FiberOp::value(value)
+        fiber::FiberOp::value(value)
     );
 }
 
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::raiseError(const E& error) noexcept {
     return Task<T,E>(
-        FiberOp::error(error)
+        fiber::FiberOp::error(error)
     );
 }
 
@@ -404,22 +404,22 @@ constexpr Task<None,E> Task<T,E>::none() noexcept {
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::eval(const std::function<T()>& predicate) noexcept {
     return Task<T,E>(
-        FiberOp::thunk(predicate)
+        fiber::FiberOp::thunk(predicate)
     );
 }
 
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::defer(const std::function<Task<T,E>()>& predicate) noexcept {
     return Task<T,E>(
-        FiberOp::thunk(predicate)->flatMap(
+        fiber::FiberOp::thunk(predicate)->flatMap(
             [](auto fiber_value) constexpr {
                 if(fiber_value.isValue()) {
                     auto task = fiber_value.underlying().template get<Task<T,E>>();
                     return task.op;
                 } else if(fiber_value.isError()) {
-                    return FiberOp::error(fiber_value.underlying());
+                    return fiber::FiberOp::error(fiber_value.underlying());
                 } else {
-                    return FiberOp::cancel();
+                    return fiber::FiberOp::cancel();
                 }
             }
         )
@@ -429,7 +429,7 @@ constexpr Task<T,E> Task<T,E>::defer(const std::function<Task<T,E>()>& predicate
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::deferAction(const std::function<DeferredRef<T,E>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept {
     return Task<T,E>(
-        FiberOp::async([predicate](auto sched) {
+        fiber::FiberOp::async([predicate](auto sched) {
             return predicate(sched)->template mapBoth<Erased,Erased>(
                 [](auto value) { return value; },
                 [](auto error) { return error; }
@@ -441,7 +441,7 @@ constexpr Task<T,E> Task<T,E>::deferAction(const std::function<DeferredRef<T,E>(
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::forPromise(const PromiseRef<T,E>& promise) noexcept {
     return Task<T,E>(
-        FiberOp::async([promise](auto) {
+        fiber::FiberOp::async([promise](auto) {
             return Deferred<T,E>::forPromise(promise)->template mapBoth<Erased,Erased>(
                 [](auto value) { return value; },
                 [](auto error) { return error; }
@@ -475,7 +475,7 @@ DeferredRef<T,E> Task<T,E>::runCancelableThenPromise(const CancelableRef& cancel
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::never() noexcept {
     return Task<T,E>(
-        FiberOp::async([](auto sched) constexpr {
+        fiber::FiberOp::async([](auto sched) constexpr {
             auto promise = Promise<Erased,Erased>::create(sched);
             return Deferred<Erased,Erased>::forPromise(promise);
         })
@@ -512,7 +512,7 @@ std::optional<Either<T,E>> Task<T,E>::runSync() const {
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::asyncBoundary() const noexcept {
     return Task<T,E>(
-        FiberOp::async([op = op](auto sched) {
+        fiber::FiberOp::async([op = op](auto sched) {
             auto promise = Promise<Erased,Erased>::create(sched);
             promise->success(Erased());
             return Deferred<Erased,Erased>::forPromise(promise);
@@ -530,14 +530,14 @@ constexpr Task<T2,E> Task<T,E>::map(const std::function<T2(const T&)>& predicate
             try {
                 if(fiber_value.isValue()) {
                     auto input = fiber_value.underlying().template get<T>();
-                    return FiberOp::value(predicate(input));
+                    return fiber::FiberOp::value(predicate(input));
                 } else if(fiber_value.isError()) {
-                    return FiberOp::error(fiber_value.underlying());
+                    return fiber::FiberOp::error(fiber_value.underlying());
                 } else {
-                    return FiberOp::cancel();
+                    return fiber::FiberOp::cancel();
                 }
             } catch(E& error) {
-                return FiberOp::error(error);
+                return fiber::FiberOp::error(error);
             }
         })
     );
@@ -550,15 +550,15 @@ constexpr Task<T,E2> Task<T,E>::mapError(const std::function<E2(const E&)>& pred
         op->flatMap([predicate](auto fiber_value) {
             try {
                 if(fiber_value.isValue()) {
-                    return FiberOp::value(fiber_value.underlying());
+                    return fiber::FiberOp::value(fiber_value.underlying());
                 } else if(fiber_value.isError()) {
                     auto input = fiber_value.underlying().template get<E>();
-                    return FiberOp::error(predicate(input));
+                    return fiber::FiberOp::error(predicate(input));
                 } else {
-                    return FiberOp::cancel();
+                    return fiber::FiberOp::cancel();
                 }
             } catch(E& error) {
-                return FiberOp::error(predicate(error));
+                return fiber::FiberOp::error(predicate(error));
             }
         })
     );
@@ -576,12 +576,12 @@ constexpr Task<T2,E> Task<T,E>::flatMap(const std::function<Task<T2,E>(const T&)
                     auto resultTask = predicate(input);
                     return resultTask.op;
                 } else if(fiber_input.isError()) {
-                    return FiberOp::error(fiber_input.underlying());
+                    return fiber::FiberOp::error(fiber_input.underlying());
                 } else {
-                    return FiberOp::cancel();
+                    return fiber::FiberOp::cancel();
                 }
             } catch(E& error) {
-                return FiberOp::error(error);
+                return fiber::FiberOp::error(error);
             }
         })
     );
@@ -594,16 +594,16 @@ constexpr Task<T,E2> Task<T,E>::flatMapError(const std::function<Task<T,E2>(cons
         op->flatMap([predicate](auto fiber_input) {
             try {
                 if(fiber_input.isValue()) {
-                    return FiberOp::value(fiber_input.underlying());
+                    return fiber::FiberOp::value(fiber_input.underlying());
                 } else if(fiber_input.isError()) {
                     auto input = fiber_input.underlying().template get<E>();
                     auto resultTask = predicate(input);
                     return resultTask.op;
                 } else {
-                    return FiberOp::cancel();
+                    return fiber::FiberOp::cancel();
                 }
             } catch(E& error) {
-                return FiberOp::error(error);
+                return fiber::FiberOp::error(error);
             }
         })
     );
@@ -628,7 +628,7 @@ constexpr Task<T2,E2> Task<T,E>::flatMapBoth(
                         auto resultTask = errorPredicate(input);
                         return resultTask.op;
                     } else {
-                        return FiberOp::cancel();
+                        return fiber::FiberOp::cancel();
                     }
                 } catch(E& error) {
                     auto resultTask = errorPredicate(error);
@@ -649,10 +649,10 @@ constexpr Task<T2,E2> Task<T,E>::flatMapBoth(
                         auto resultTask = errorPredicate(input);
                         return resultTask.op;
                     } else {
-                        return FiberOp::cancel();
+                        return fiber::FiberOp::cancel();
                     }
                 } catch(E2& error) {
-                    return FiberOp::error(error);
+                    return fiber::FiberOp::error(error);
                 } catch(E& error) {
                     auto resultTask = errorPredicate(error);
                     return resultTask.op;
@@ -667,11 +667,11 @@ constexpr Task<E,T> Task<T,E>::failed() const noexcept {
     return Task<E,T>(
         op->flatMap([](auto input) constexpr {
             if(input.isError()) {
-                return FiberOp::value(input.underlying());
+                return fiber::FiberOp::value(input.underlying());
             } else if(input.isValue()) {
-                return FiberOp::error(input.underlying());
+                return fiber::FiberOp::error(input.underlying());
             } else {
-                return FiberOp::cancel();
+                return fiber::FiberOp::cancel();
             }
         })
     );
@@ -683,16 +683,16 @@ constexpr Task<T,E> Task<T,E>::onError(const std::function<void(const E&)>& hand
         op->flatMap([handler](auto fiber_input) {
             try {
                 if(fiber_input.isValue()) {
-                    return FiberOp::value(fiber_input.underlying());
+                    return fiber::FiberOp::value(fiber_input.underlying());
                 } else if(fiber_input.isError()) {
                     auto error = fiber_input.underlying().template get<E>();
                     handler(error);
-                    return FiberOp::error(fiber_input.underlying());
+                    return fiber::FiberOp::error(fiber_input.underlying());
                 } else {
-                    return FiberOp::cancel();
+                    return fiber::FiberOp::cancel();
                 }
             } catch(E& error) {
-                return FiberOp::error(error);
+                return fiber::FiberOp::error(error);
             }
         })
     );
@@ -704,12 +704,12 @@ constexpr Task<Either<T,E>,E> Task<T,E>::materialize() const noexcept {
         op->flatMap([](auto fiber_value) constexpr {
             if(fiber_value.isValue()) {
                 auto value = fiber_value.underlying().template get<T>();
-                return FiberOp::value(Either<T,E>::left(value));
+                return fiber::FiberOp::value(Either<T,E>::left(value));
             } else if(fiber_value.isError()) {
                 auto error = fiber_value.underlying().template get<E>();
-                return FiberOp::value(Either<T,E>::right(error));
+                return fiber::FiberOp::value(Either<T,E>::right(error));
             } else {
-                return FiberOp::cancel();
+                return fiber::FiberOp::cancel();
             }
         })
     );
@@ -725,14 +725,14 @@ constexpr Task<T2,E> Task<T,E>::dematerialize() const noexcept {
             if(fiber_input.isValue()) {
                 auto value = fiber_input.underlying().template get<Either<T2,E>>();
                 if(value.is_left()) {
-                    return FiberOp::value(value.get_left());
+                    return fiber::FiberOp::value(value.get_left());
                 } else {
-                    return FiberOp::error(value.get_right());
+                    return fiber::FiberOp::error(value.get_right());
                 }
             } else if(fiber_input.isError()) {
-                return FiberOp::error(fiber_input.underlying());
+                return fiber::FiberOp::error(fiber_input.underlying());
             } else {
-                return FiberOp::cancel();
+                return fiber::FiberOp::cancel();
             }
         })
     );
@@ -741,7 +741,7 @@ constexpr Task<T2,E> Task<T,E>::dematerialize() const noexcept {
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::delay(uint32_t milliseconds) const noexcept {
     return Task<T,E>(
-        FiberOp::delay(milliseconds)->flatMap([op = this->op](auto) {
+        fiber::FiberOp::delay(milliseconds)->flatMap([op = this->op](auto) {
             return op;
         })
     );
@@ -753,15 +753,15 @@ constexpr Task<T,E> Task<T,E>::recover(const std::function<T(const E&)>& predica
         op->flatMap([predicate](auto fiber_input) {
             try {
                 if(fiber_input.isValue()) {
-                    return FiberOp::value(fiber_input.underlying());
+                    return fiber::FiberOp::value(fiber_input.underlying());
                 } else if(fiber_input.isError()) {
                     auto input = fiber_input.underlying().template get<E>();
-                    return FiberOp::value(predicate(input));
+                    return fiber::FiberOp::value(predicate(input));
                 } else {
-                    return FiberOp::cancel();
+                    return fiber::FiberOp::cancel();
                 }
             } catch(E& error) {
-                return FiberOp::value(predicate(error));
+                return fiber::FiberOp::value(predicate(error));
             }
         })
     );
@@ -781,7 +781,7 @@ constexpr Task<T,E> Task<T,E>::restartUntil(const std::function<bool(const T&)>&
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::raceWith(const Task<T,E>& other) const noexcept {
     return Task<T,E>(
-        FiberOp::race({op, other.op})
+        fiber::FiberOp::race({op, other.op})
     );
 }
 
@@ -803,15 +803,15 @@ constexpr Task<T,E> Task<T,E>::guarantee(const Task<T2, E>& task) const noexcept
             [guaranteed_op = task.op](auto fiber_value) constexpr {
                 return guaranteed_op->flatMap([fiber_value](auto guaranteed_value) {
                     if(guaranteed_value.isError()) {
-                        return FiberOp::error(guaranteed_value.underlying());
+                        return fiber::FiberOp::error(guaranteed_value.underlying());
                     } else if(guaranteed_value.isCanceled()) {
-                        return FiberOp::cancel();
+                        return fiber::FiberOp::cancel();
                     } else if(fiber_value.isValue()) {
-                        return FiberOp::value(fiber_value.underlying());
+                        return fiber::FiberOp::value(fiber_value.underlying());
                     } else if(fiber_value.isError()) {
-                        return FiberOp::error(fiber_value.underlying());
+                        return fiber::FiberOp::error(fiber_value.underlying());
                     } else {
-                        return FiberOp::cancel();
+                        return fiber::FiberOp::cancel();
                     }
                 });
             }

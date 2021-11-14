@@ -3,9 +3,9 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "cask/FiberValue.hpp"
+#include "cask/fiber/FiberValue.hpp"
 
-namespace cask {
+namespace cask::fiber {
 
 FiberValue::FiberValue()
     : value()

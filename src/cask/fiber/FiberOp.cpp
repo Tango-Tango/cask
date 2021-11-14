@@ -3,10 +3,10 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "cask/FiberOp.hpp"
+#include "cask/fiber/FiberOp.hpp"
 #include <utility>
 
-namespace cask {
+namespace cask::fiber {
 
 FiberOp::FiberOp(const FiberOp& other) noexcept
     : std::enable_shared_from_this<FiberOp>(other)

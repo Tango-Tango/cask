@@ -11,13 +11,13 @@
 #include <optional>
 #include <type_traits>
 #include <tuple>
-#include "Deferred.hpp"
 #include "FiberValue.hpp"
-#include "None.hpp"
-#include "Either.hpp"
-#include "Erased.hpp"
+#include "../Deferred.hpp"
+#include "../None.hpp"
+#include "../Either.hpp"
+#include "../Erased.hpp"
 
-namespace cask {
+namespace cask::fiber {
 
 enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE, CANCEL };
 
