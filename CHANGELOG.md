@@ -3,6 +3,13 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 11.0
+- Add `Fiber` as a replacement for the `TrampolineRunLoop`.
+- Remove mutex blocking of the cancel callback in `guarantee`.
+- Remove the `Deferred:chainDownstream` and `Deferred:chainDownstreamAsync` methods
+  which could lead memory.
+- Resolve a memory leak resulting from an infinite series of async operations.
+
 ## 10.2
 - Add the `runCancelableThenPromise` method to `Task`.
 - Add the `onShutdown` method to `Cancelable`.
