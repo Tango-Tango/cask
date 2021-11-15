@@ -26,6 +26,7 @@ public:
     static FiberRef<T,E> run(const std::shared_ptr<const fiber::FiberOp>& op, const std::shared_ptr<Scheduler>& sched);
     static std::optional<Either<T,E>> runSync(const std::shared_ptr<const fiber::FiberOp>& op);
 
+    virtual int getId() = 0;
     virtual const fiber::FiberValue& getRawValue() = 0;
     virtual std::optional<T> getValue() = 0;
     virtual std::optional<E> getError() = 0;
