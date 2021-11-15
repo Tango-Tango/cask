@@ -47,6 +47,7 @@ CancelableRef RepeatTaskObservable<T,E>::subscribe(const std::shared_ptr<Schedul
 
     return task.template flatMapBoth<Ack,None>(pushToObserver,pushError)
         .restartUntil([](auto ack) { return ack == Stop; })
+        .doOnCancel(Task<None,None>::defer([observer] { return observer->onCancel(); }))
         .run(sched);
 }
 

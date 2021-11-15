@@ -80,6 +80,7 @@ public:
      * Handle stream close because all events have been processed.
      */
     virtual Task<None,None> onComplete() = 0;
+    virtual Task<None,None> onCancel() = 0;
 
     virtual ~Observer() = default;
 };

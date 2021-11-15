@@ -40,7 +40,9 @@ CancelableRef VectorObservable<T,E>::subscribe(
     const std::shared_ptr<Scheduler>& sched,
     const std::shared_ptr<Observer<T,E>>& observer) const
 {
-    return pushEvent(0, source, sched, observer, Continue).run(sched);
+    return pushEvent(0, source, sched, observer, Continue)
+        .doOnCancel(Task<None,None>::defer([observer] { return observer->onCancel(); }))
+        .run(sched);
 }
 
 template <class T, class E>
@@ -58,7 +60,6 @@ Task<Ack,None> VectorObservable<T,E>::pushEvent(
             });
     } else if(lastAck == Continue) {
         auto value = source[i];
-
         return observer->onNext(value)
             .template flatMap<Ack>(std::bind(pushEvent, i + 1, source, sched, observer, _1));
     } else {

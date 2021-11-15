@@ -35,6 +35,7 @@ CancelableRef EvalObservable<T,E>::subscribe(
             .template flatMap<None>([observer](auto) {
                 return observer->onComplete();
             })
+            .doOnCancel(Task<None,None>::defer([observer] { return observer->onCancel(); }))
             .run(sched);
     } catch(E& error) {
         return observer->onError(error).run(sched);

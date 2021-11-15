@@ -188,9 +188,6 @@ TEST(TestFiber, RacesSeveralOperationsFirstCompletes) {
 
 TEST(TestFiber, RacesSeveralPureValues) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto promise1 = Promise<Erased,Erased>::create(sched);
-    auto promise2 = Promise<Erased,Erased>::create(sched);
-    auto promise3 = Promise<Erased,Erased>::create(sched);
 
     auto op1 = FiberOp::value(123);
     auto op2 = FiberOp::value(456);

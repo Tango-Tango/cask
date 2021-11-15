@@ -23,6 +23,7 @@ public:
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
+    Task<None,None> onCancel() override;
 private:
     uint32_t remaining;
     std::vector<T> entries;
@@ -70,6 +71,16 @@ Task<None,None> TakeObserver<T,E>::onComplete() {
 
     return Task<None,None>::none();
 }
+
+template <class T, class E>
+Task<None,None> TakeObserver<T,E>::onCancel() {
+    if(auto promiseLock = promise.lock()) {
+        promiseLock->cancel();
+    }
+
+    return Task<None,None>::none();
+}
+
 
 }
 

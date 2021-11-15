@@ -23,7 +23,7 @@ public:
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
-    Task<None,None> onCancel();
+    Task<None,None> onCancel() override;
 
 private:
     std::shared_ptr<Observer<T,E>> downstream;
@@ -78,8 +78,10 @@ Task<None,None> GuaranteeObserver<T,E>::onComplete() {
 
 template <class T, class E>
 Task<None,None> GuaranteeObserver<T,E>::onCancel() {
+    std::cout << "GUARANTEE OBSERVER ONCANCEL" << std::endl;
+
     if(!completed->test_and_set()) {
-        return task;
+        return downstream->onCancel().template guarantee<None>(task);
     } else {
         return Task<None,None>::none();
     }

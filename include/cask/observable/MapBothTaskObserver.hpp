@@ -27,6 +27,7 @@ public:
     Task<Ack,None> onNext(const TI& value) override;
     Task<None,None> onError(const EI& error) override;
     Task<None,None> onComplete() override;
+    Task<None,None> onCancel() override;
 private:
     std::function<Task<TO,EO>(const TI&)> successPredicate;
     std::function<Task<TO,EO>(const EI&)> errorPredicate;
@@ -89,6 +90,15 @@ template <class TI, class TO, class EI, class EO>
 Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onComplete() {
     if(!completed->test_and_set()) {
         return downstream->onComplete();
+    } else {
+        return Task<None,None>::none();
+    }
+}
+
+template <class TI, class TO, class EI, class EO>
+Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onCancel() {
+    if(!completed->test_and_set()) {
+        return downstream->onCancel();
     } else {
         return Task<None,None>::none();
     }

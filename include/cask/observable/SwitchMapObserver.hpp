@@ -26,6 +26,7 @@ public:
     Task<Ack,None> onNext(const TI& value) override;
     Task<None,None> onError(const E& value) override;
     Task<None,None> onComplete() override;
+    Task<None,None> onCancel() override;
 
     int cancelRunningSubscription();
 private:
@@ -103,6 +104,16 @@ Task<Ack,None> SwitchMapObserver<TI,TO,E>::onNext(const TI& value) {
                 } else {
                     return Task<None,None>::none();
                 }
+            },
+            [downstream = downstream, running_id = running_id, my_id] {
+                // If upstream provides a cancel then we simply provide that cancel downstream
+                // so long as the downstream subscription is still valid
+
+                if(running_id->load() == my_id) {
+                    return downstream->onCancel();
+                } else {
+                    return Task<None,None>::none();
+                }
             }
         );
 
@@ -132,6 +143,25 @@ Task<None,None> SwitchMapObserver<TI,TO,E>::onComplete() {
 
     if(!upstream_complete->exchange(true) && downstream_complete->load()) {
         return downstream->onComplete();
+    } else {
+        return Task<None,None>::none();
+    }
+}
+
+template <class TI, class TO, class E>
+Task<None,None> SwitchMapObserver<TI,TO,E>::onCancel() {
+    auto cleanup_task = Task<None,None>::eval([self_weak = this->weak_from_this()] {
+        if(auto self = self_weak.lock()) {
+            auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI,TO,E>>(self);
+            casted_self->cancelRunningSubscription();
+        }
+        return None();
+    });
+    
+    if(!upstream_complete->exchange(true) && !downstream_complete->load()) {
+        return downstream->onCancel().template flatMap<None>([cleanup_task](auto) {
+            return cleanup_task;
+        });
     } else {
         return Task<None,None>::none();
     }

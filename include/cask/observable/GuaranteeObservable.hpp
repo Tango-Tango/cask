@@ -34,11 +34,7 @@ GuaranteeObservable<T,E>::GuaranteeObservable(const std::shared_ptr<const Observ
 template <class T, class E>
 CancelableRef GuaranteeObservable<T,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const {
     auto guaranteeObserver = std::make_shared<GuaranteeObserver<T,E>>(observer, task);
-    auto subscription = upstream->subscribe(sched, guaranteeObserver);
-    subscription->onCancel([guaranteeObserver, sched]() {
-        guaranteeObserver->onCancel().run(sched)->await();
-    });
-    return subscription;
+    return upstream->subscribe(sched, guaranteeObserver);
 }
 
 }

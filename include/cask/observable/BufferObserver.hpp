@@ -23,6 +23,7 @@ public:
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
+    Task<None,None> onCancel() override;
 private:
     std::shared_ptr<Observer<BufferRef<T>,E>> downstream;
     uint32_t buffer_size;
@@ -67,6 +68,11 @@ Task<None,None> BufferObserver<T,E>::onComplete() {
     } else {
         return downstream->onComplete();
     }
+}
+
+template <class T, class E>
+Task<None,None> BufferObserver<T,E>::onCancel() {
+    return downstream->onCancel();
 }
 
 }

@@ -8,6 +8,7 @@
 
 #include "../Observable.hpp"
 #include "../Observer.hpp"
+#include <iostream>
 
 namespace cask::observable {
 
@@ -30,23 +31,30 @@ CancelableRef DeferTaskObservable<T,E>::subscribe(
     const std::shared_ptr<Scheduler>& sched,
     const std::shared_ptr<Observer<T,E>>& observer) const
 {
-    try {
-        return predicate()
-        .template flatMapBoth<None,None>(
-            [observer](auto result) {
-                return observer->onNext(result)
-                .template flatMap<None>([observer](auto) {
-                    return observer->onComplete();
-                });
-            },
-            [observer](auto error) {
-                return observer->onError(error);
-            }
-        )
+    auto downstreamTask = Task<None,None>::defer([predicate = predicate, observer] {
+        try {
+            return predicate().template flatMapBoth<None,None>(
+                [observer](auto result) {
+                    return observer->onNext(result)
+                    .template flatMap<None>([observer](auto) {
+                        return observer->onComplete();
+                    });
+                },
+                [observer](auto error) {
+                    return observer->onError(error);
+                }
+            );
+        } catch(E& error) {
+            return observer->onError(error);
+        }
+    });
+
+    return downstreamTask
+        .doOnCancel(Task<None,None>::defer([observer] {
+            std::cout << "CANCEL FIRED" << std::endl;
+            return observer->onCancel();
+        }))
         .run(sched);
-    } catch(E& error) {
-        return observer->onError(error).run(sched);
-    }
 }
 
 }

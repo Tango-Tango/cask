@@ -23,6 +23,7 @@ public:
     Task<Ack,None> onNext(const TI& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
+    Task<None,None> onCancel() override;
 private:
     std::function<Task<TO,E>(const TI&)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
@@ -66,6 +67,15 @@ template <class TI, class TO, class E>
 Task<None,None> MapTaskObserver<TI,TO,E>::onComplete() {
     if(!completed.test_and_set()) {
         return downstream->onComplete();
+    } else {
+        return Task<None,None>::none();
+    }
+}
+
+template <class TI, class TO, class E>
+Task<None,None> MapTaskObserver<TI,TO,E>::onCancel() {
+    if(!completed.test_and_set()) {
+        return downstream->onCancel();
     } else {
         return Task<None,None>::none();
     }

@@ -240,6 +240,8 @@ public:
      */
     constexpr Task<T,E> onError(const std::function<void(const E&)>& handler) const noexcept;
 
+    constexpr Task<T,E> doOnCancel(const Task<None,None>& handler) const noexcept;
+
     /**
      * Materialize both values and errors into the success type so that they
      * may be operated on simulataneously.
@@ -452,24 +454,21 @@ constexpr Task<T,E> Task<T,E>::forPromise(const PromiseRef<T,E>& promise) noexce
 
 template <class T, class E>
 DeferredRef<T,E> Task<T,E>::runCancelableThenPromise(const CancelableRef& cancelable, const PromiseRef<T,E>& promise, const SchedulerRef& sched) noexcept {
-    auto deferred = Task<None,None>::deferAction([cancelable](auto sched) {
+    return Task<None,None>::deferAction([cancelable](auto sched) {
+        std::cout << "runCancelableThenPromise 1" << std::endl;
             return Deferred<None,None>::forCancelable(cancelable, sched);
         })
         .template flatMapBoth<T,E>(
-            [promise](auto) { return Task<T,E>::forPromise(promise); },
-            [promise](auto) { return Task<T,E>::forPromise(promise); }
+            [promise](auto) {
+                std::cout << "runCancelableThenPromise 2" << std::endl;
+                return Task<T,E>::forPromise(promise);
+            },
+            [promise](auto) {
+                std::cout << "runCancelableThenPromise 3" << std::endl;
+                return Task<T,E>::forPromise(promise);
+            }
         )
         .run(sched);
-
-    deferred->onCancel([promise]() {
-        promise->cancel();
-    });
-
-    promise->onCancel([cancelable]() {
-        cancelable->cancel();
-    });
-
-    return deferred;
 }
 
 template <class T, class E>
@@ -683,6 +682,24 @@ constexpr Task<T,E> Task<T,E>::onError(const std::function<void(const E&)>& hand
 }
 
 template <class T, class E>
+constexpr Task<T,E> Task<T,E>::doOnCancel(const Task<None,None>& handler) const noexcept {
+    return Task<T,E>(
+        op->flatMap([handler_op = handler.op](auto fiber_input) {
+            if(fiber_input.isValue()) {
+                return fiber::FiberOp::value(fiber_input.underlying());
+            } else if(fiber_input.isError()) {
+                return fiber::FiberOp::error(fiber_input.underlying());
+            } else {
+                std::cout << "DO ON CANCEL" << std::endl;
+                return handler_op->flatMap([](auto) {
+                    return fiber::FiberOp::cancel();
+                });
+            }
+        })
+    );
+}
+
+template <class T, class E>
 constexpr Task<Either<T,E>,E> Task<T,E>::materialize() const noexcept {
     return Task<Either<T,E>,E>(
         op->flatMap([](auto fiber_value) constexpr {
@@ -789,12 +806,14 @@ constexpr Task<T,E> Task<T,E>::guarantee(const Task<T2, E>& task) const noexcept
                     if(guaranteed_value.isError()) {
                         return fiber::FiberOp::error(guaranteed_value.underlying());
                     } else if(guaranteed_value.isCanceled()) {
+                        std::cout << "GUARANTEE CANCEL 1" << std::endl;
                         return fiber::FiberOp::cancel();
                     } else if(fiber_value.isValue()) {
                         return fiber::FiberOp::value(fiber_value.underlying());
                     } else if(fiber_value.isError()) {
                         return fiber::FiberOp::error(fiber_value.underlying());
                     } else {
+                        std::cout << "GUARANTEE CANCEL 2" << std::endl;
                         return fiber::FiberOp::cancel();
                     }
                 });

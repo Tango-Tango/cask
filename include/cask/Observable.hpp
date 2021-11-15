@@ -151,7 +151,7 @@ public:
         const std::function<Task<Ack,None>(const T&)>& onNext,
         const std::function<Task<None,None>(const E&)>& onError = [](auto) { return Task<None,None>::none(); },
         const std::function<Task<None,None>()>& onComplete = [] { return Task<None,None>::none(); },
-        const std::function<void()>& onCancel = [] {}
+        const std::function<Task<None,None>()>& onCancel = [] { return Task<None,None>::none(); }
     ) const;
 
     /**
@@ -465,19 +465,13 @@ CancelableRef Observable<T,E>::subscribeHandlers(
     const std::function<Task<Ack,None>(const T&)>& onNext,
     const std::function<Task<None,None>(const E&)>& onError,
     const std::function<Task<None,None>()>& onComplete,
-    const std::function<void()>& onCancel
+    const std::function<Task<None,None>()>& onCancel
 ) const {
     auto observer = std::make_shared<observable::CallbackObserver<T,E>>(
-        onNext, onError, onComplete
+        onNext, onError, onComplete, onCancel
     );
 
-    auto subscription = subscribe(sched, observer);
-
-    subscription->onCancel([onCancel] {
-        return onCancel();
-    });
-
-    return subscription;
+    return subscribe(sched, observer);
 }
 
 template <class T, class E>

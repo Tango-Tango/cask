@@ -74,7 +74,7 @@ TEST(TaskFlatMapBoth, ErrorDifferentErrorTypes) {
 
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->is_right());
-    EXPECT_EQ(result->get_right().what(), std::string("broke-mapped"));
+    EXPECT_EQ(result->get_right().what(), std::string("broke"));
 }
 
 TEST(TaskFlatMapBoth, ThrowsSameErrorTypes) {

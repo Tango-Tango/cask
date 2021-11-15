@@ -5,45 +5,60 @@
 
 #include "gtest/gtest.h"
 #include "cask/Task.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::None;
 using cask::Task;
-using cask::Scheduler;
+using cask::scheduler::BenchScheduler;
 
 TEST(TaskRace, LeftValue) {
-    auto sched = Scheduler::global();
+    auto sched = std::make_shared<BenchScheduler>();
     auto task = Task<int,None>::pure(123).raceWith(Task<int,None>::never());
-    auto result = task.run(sched)->await();
-    EXPECT_EQ(result, 123);
+    auto result = task.run(sched);
+
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(result->await(), 123);
 }
 
 TEST(TaskRace, LeftError) {
-    auto sched = Scheduler::global();
+    auto sched = std::make_shared<BenchScheduler>();
     auto task = Task<int,std::string>::raiseError("boom").raceWith(Task<int,std::string>::never());
-    auto result = task.failed().run(sched)->await();
-    EXPECT_EQ(result, "boom");
+    auto result = task.failed().run(sched);
+
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(result->await(), "boom");
 }
 
 TEST(TaskRace, RightValue) {
-    auto sched = Scheduler::global();
+    auto sched = std::make_shared<BenchScheduler>();
     auto task = Task<int,None>::never().raceWith(Task<int,None>::pure(123));
-    auto result = task.run(sched)->await();
-    EXPECT_EQ(result, 123);
+    auto result = task.run(sched);
+
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(result->await(), 123);
 }
 
 TEST(TaskRace, RightError) {
-    auto sched = Scheduler::global();
+    auto sched = std::make_shared<BenchScheduler>();
     auto task = Task<int,std::string>::never().raceWith(Task<int,std::string>::raiseError("boom"));
-    auto result = task.failed().run(sched)->await();
-    EXPECT_EQ(result, "boom");
+    auto result = task.failed().run(sched);
+
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(result->await(), "boom");
 }
 
 TEST(TaskRace, Cancelled) {
-    auto sched = Scheduler::global();
+    auto sched = std::make_shared<BenchScheduler>();
     auto task = Task<int,None>::never().raceWith(Task<int,None>::never());
     auto deferred = task.run(sched);
 
+    sched->run_ready_tasks();
     deferred->cancel();
+    sched->run_ready_tasks();
 
     try {
         deferred->await();

@@ -22,6 +22,7 @@ public:
     IMPLEMENT_MOCK1(onNext);
     IMPLEMENT_MOCK1(onError);
     IMPLEMENT_MOCK0(onComplete);
+    IMPLEMENT_MOCK0(onCancel);
 };
 
 void awaitIdle() {

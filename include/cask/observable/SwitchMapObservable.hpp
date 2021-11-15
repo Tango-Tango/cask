@@ -40,13 +40,7 @@ SwitchMapObservable<TI,TO,E>::SwitchMapObservable(
 template <class TI, class TO, class E>
 CancelableRef SwitchMapObservable<TI,TO,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const {
     auto switchMapObserver = std::make_shared<SwitchMapObserver<TI,TO,E>>(predicate, observer, sched);
-    auto deferred = upstream->subscribe(sched, switchMapObserver);
-    
-    deferred->onCancel([switchMapObserver] {
-        switchMapObserver->cancelRunningSubscription();
-    });
-
-    return deferred;
+    return upstream->subscribe(sched, switchMapObserver);
 }
 
 }

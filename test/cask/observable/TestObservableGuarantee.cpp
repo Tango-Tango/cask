@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 #include "gtest/trompeloeil.hpp"
 #include "cask/Observable.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::Observable;
 using cask::ObservableRef;
@@ -15,12 +16,14 @@ using cask::Task;
 using cask::None;
 using cask::Ack;
 using cask::observable::GuaranteeObserver;
+using cask::scheduler::BenchScheduler;
 
 class MockGuaranteeDownstreamObserver : public trompeloeil::mock_interface<Observer<int,float>> {
 public:
     IMPLEMENT_MOCK1(onNext);
     IMPLEMENT_MOCK1(onError);
     IMPLEMENT_MOCK0(onComplete);
+    IMPLEMENT_MOCK0(onCancel);
 };
 
 TEST(ObservableGuarantee, RunsOnCompletion) {
@@ -93,6 +96,7 @@ TEST(ObservableGuarantee, RunsOnError) {
 }
 
 TEST(ObservableGuarantee, RunsOnSubscriptionCancel) {
+    auto sched = std::make_shared<BenchScheduler>();
     int run_count = 0;
     auto task = Task<None,None>::eval([&run_count]() {
         run_count++;
@@ -104,11 +108,13 @@ TEST(ObservableGuarantee, RunsOnSubscriptionCancel) {
         })
         ->guarantee(task)
         ->last()
-        .failed()
-        .run(Scheduler::global());
+        .run(sched);
+
+    sched->run_ready_tasks();
+    deferred->cancel();
+    sched->run_ready_tasks();
     
     try {
-        deferred->cancel();
         deferred->await();
         FAIL() << "Expected method to throw";
     } catch(std::runtime_error&) {
@@ -160,6 +166,10 @@ TEST(ObservableGuarantee, CancelOnce) {
     });
 
     auto mockDownstream = std::make_shared<MockGuaranteeDownstreamObserver>();
+
+    REQUIRE_CALL(*mockDownstream, onCancel())
+        .RETURN(Task<None,None>::none());
+
     auto observer = std::make_shared<GuaranteeObserver<int,float>>(mockDownstream, task);
     observer->onCancel().run(Scheduler::global())->await();
     observer->onCancel().run(Scheduler::global())->await();

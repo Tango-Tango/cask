@@ -27,6 +27,7 @@ public:
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
+    Task<None,None> onCancel() override;
 private:
     std::weak_ptr<Promise<None,E>> promise;
     std::function<Task<None,E>(const T& value)> predicate;
@@ -70,9 +71,18 @@ Task<None,None> ForeachTaskObserver<T,E>::onError(const E& error) {
 }
 
 template <class T, class E>
-Task<None,None>  ForeachTaskObserver<T,E>::onComplete() {
+Task<None,None> ForeachTaskObserver<T,E>::onComplete() {
     if(auto promiseLock = promise.lock()) {
         promiseLock->success(None());
+    }
+
+    return Task<None,None>::none();
+}
+
+template <class T, class E>
+Task<None,None> ForeachTaskObserver<T,E>::onCancel() {
+    if(auto promiseLock = promise.lock()) {
+        promiseLock->cancel();
     }
 
     return Task<None,None>::none();
