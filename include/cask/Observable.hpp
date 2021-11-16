@@ -129,7 +129,7 @@ public:
      * @param observer The observer to attach to the stream.
      * @return The handle which may be used to cancel computation on the stream.
      */
-    virtual CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const = 0;
+    virtual FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const = 0;
 
     /**
      * Subscribe to the observer - beginning computation of the stream. Ongoing
@@ -146,7 +146,7 @@ public:
      * @param onCancel Provide an error for upstream cancelations. By default does nothing.
      * @return The handle which may be used to cancel computation on the stream.
      */
-    virtual CancelableRef subscribeHandlers(
+    virtual FiberRef<None,None> subscribeHandlers(
         const std::shared_ptr<Scheduler>& sched,
         const std::function<Task<Ack,None>(const T&)>& onNext,
         const std::function<Task<None,None>(const E&)>& onError = [](auto) { return Task<None,None>::none(); },
@@ -460,7 +460,7 @@ ObservableRef<T,E> Observable<T,E>::fromVector(const std::vector<T>& vector) {
 }
 
 template <class T, class E>
-CancelableRef Observable<T,E>::subscribeHandlers(
+FiberRef<None,None> Observable<T,E>::subscribeHandlers(
     const std::shared_ptr<Scheduler>& sched,
     const std::function<Task<Ack,None>(const T&)>& onNext,
     const std::function<Task<None,None>(const E&)>& onError,
