@@ -15,11 +15,12 @@ template <class T1, class T2, class E1, class E2>
 class FiberMap final : public Fiber<T2,E2> {
 public:
     FiberMap(
-        const FiberRef<T1,T2>& parent,
+        const FiberRef<T1,E1>& parent,
         const std::function<T2(const T1&)>& value_transform,
         const std::function<E2(const E1&)>& error_transform
     );
 
+    int getId() override;
     const FiberValue& getRawValue() override;
     std::optional<T2> getValue() override;
     std::optional<E2> getError() override;
@@ -31,14 +32,14 @@ public:
     T2 await() override;
 
 private:
-    FiberRef<T1,T2> parent;
+    FiberRef<T1,E1> parent;
     std::function<T2(const T1&)> value_transform;
     std::function<E2(const E1&)> error_transform;
 };
 
 template <class T1, class T2, class E1, class E2>
 FiberMap<T1,T2,E1,E2>::FiberMap(
-    const FiberRef<T1,T2>& parent,
+    const FiberRef<T1,E1>& parent,
     const std::function<T2(const T1&)>& value_transform,
     const std::function<E2(const E1&)>& error_transform
 )
@@ -46,6 +47,11 @@ FiberMap<T1,T2,E1,E2>::FiberMap(
     , value_transform(value_transform)
     , error_transform(error_transform)
 {}
+
+template <class T1, class T2, class E1, class E2>
+int FiberMap<T1,T2,E1,E2>::getId() {
+    return parent->getId();
+}
 
 template <class T1, class T2, class E1, class E2>
 const FiberValue& FiberMap<T1,T2,E1,E2>::getRawValue() {
@@ -92,8 +98,10 @@ void FiberMap<T1,T2,E1,E2>::onShutdown(const std::function<void()>& callback) {
 
 template <class T1, class T2, class E1, class E2>
 void FiberMap<T1,T2,E1,E2>::onFiberShutdown(const std::function<void(Fiber<T2,E2>*)>& callback) {
-    parent->onFiberShutdown([this, callback] {
-        callback(this);
+    parent->onFiberShutdown([self_weak = this->weak_from_this(), callback](auto) {
+        if(auto self = self_weak.lock()) {
+            callback(self.get());
+        }
     });
 }
 

@@ -7,7 +7,7 @@
 #include "cask/MVar.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
 
-using cask::DeferredRef;
+using cask::FiberRef;
 using cask::Task;
 using cask::MVar;
 using cask::Scheduler;
@@ -200,7 +200,7 @@ TEST(MVar, Read) {
 TEST(MVar, ReadManyTimes) {
     auto sched = std::make_shared<cask::scheduler::BenchScheduler>();
     const static unsigned int iterations = 1000;
-    std::vector<DeferredRef<int, std::string>> reads;
+    std::vector<FiberRef<int, std::string>> reads;
 
     auto mvar = MVar<int, std::string>::create(sched, 123);
     for(unsigned int i = 0; i < iterations; i++) {
@@ -210,8 +210,8 @@ TEST(MVar, ReadManyTimes) {
 
     sched->run_ready_tasks();
 
-    for(auto& deferred : reads) {
-        EXPECT_EQ(deferred->await(), 123);
+    for(auto& fiber : reads) {
+        EXPECT_EQ(fiber->await(), 123);
     }
 }
 

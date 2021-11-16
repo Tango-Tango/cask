@@ -6,7 +6,7 @@
 #include "gtest/gtest.h"
 #include "cask/Ref.hpp"
 
-using cask::DeferredRef;
+using cask::FiberRef;
 using cask::Task;
 using cask::Ref;
 using cask::Scheduler;
@@ -36,7 +36,7 @@ TEST(Ref,Updates) {
 TEST(Ref,ContendedUpdates) {
     auto ref = Ref<std::tuple<int,int>>::create(std::make_tuple(0,0));
 
-    std::vector<DeferredRef<None,std::any>> deferreds;
+    std::vector<FiberRef<None,std::any>> fibers;
 
     for(int i = 0; i < 1000; i++) {
         auto first = ref->update([](auto value) {
@@ -53,12 +53,12 @@ TEST(Ref,ContendedUpdates) {
         .asyncBoundary()
         .run(Scheduler::global());
 
-        deferreds.push_back(first);
-        deferreds.push_back(second);
+        fibers.push_back(first);
+        fibers.push_back(second);
     }
 
-    for(auto& deferred : deferreds) {
-        deferred->await();
+    for(auto& fiber : fibers) {
+        fiber->await();
     }
 
     auto [left, right] = ref->get()

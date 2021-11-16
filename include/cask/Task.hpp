@@ -99,6 +99,17 @@ public:
     constexpr static Task<T,E> deferAction(const std::function<DeferredRef<T,E>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept;
 
     /**
+     * Create a task that, upon evaluation, defers said evalution
+     * to the supplied method. The method is upplied a `Scheduler`
+     * instance and must return a `Deferred` which wraps the ongoing
+     * evaluation.
+     * 
+     * @param predicate The method to defer evalution to.
+     * @return A task wrapping the given deferal function.
+     */
+    constexpr static Task<T,E> deferFiber(const std::function<FiberRef<T,E>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept;
+
+    /**
      * Create a task which wraps the given already created promise. The given
      * task will provide a value when the given promise completes.
      * 
@@ -123,7 +134,7 @@ public:
      * @param sched The scheduler to use when composing these asynchronous operations.
      * @return A deferred which is safeuly completed only when all relevant effects are completed.
      */
-    static DeferredRef<T,E> runCancelableThenPromise(const CancelableRef& cancelable, const PromiseRef<T,E>& promise, const SchedulerRef& sched) noexcept;
+    static FiberRef<T,E> runCancelableThenPromise(const CancelableRef& cancelable, const PromiseRef<T,E>& promise, const SchedulerRef& sched) noexcept;
 
     /**
      * Creates a task that will never finish evaluation.
@@ -140,7 +151,7 @@ public:
      * @param sched The scheduler to use for running of the task.
      * @return A `Deferred` reference to the running computation.
      */
-    DeferredRef<T,E> run(const std::shared_ptr<Scheduler>& scheduler) const;
+    FiberRef<T,E> run(const std::shared_ptr<Scheduler>& scheduler) const;
 
     /**
      * Attempt synchronous execution of this task. Either a synchronous
@@ -441,6 +452,20 @@ constexpr Task<T,E> Task<T,E>::deferAction(const std::function<DeferredRef<T,E>(
 }
 
 template <class T, class E>
+constexpr Task<T,E> Task<T,E>::deferFiber(const std::function<FiberRef<T,E>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept {
+    return Task<T,E>(
+        fiber::FiberOp::async([predicate](auto sched) {
+            auto fiber = predicate(sched)->template mapBoth<Erased,Erased>(
+                [](auto value) { return value; },
+                [](auto error) { return error; }
+            );
+
+            return Deferred<Erased,Erased>::forFiber(fiber);
+        })
+    );
+}
+
+template <class T, class E>
 constexpr Task<T,E> Task<T,E>::forPromise(const PromiseRef<T,E>& promise) noexcept {
     return Task<T,E>(
         fiber::FiberOp::async([promise](auto) {
@@ -453,18 +478,18 @@ constexpr Task<T,E> Task<T,E>::forPromise(const PromiseRef<T,E>& promise) noexce
 }
 
 template <class T, class E>
-DeferredRef<T,E> Task<T,E>::runCancelableThenPromise(const CancelableRef& cancelable, const PromiseRef<T,E>& promise, const SchedulerRef& sched) noexcept {
+FiberRef<T,E> Task<T,E>::runCancelableThenPromise(const CancelableRef& cancelable, const PromiseRef<T,E>& promise, const SchedulerRef& sched) noexcept {
     return Task<None,None>::deferAction([cancelable](auto sched) {
-        std::cout << "runCancelableThenPromise 1" << std::endl;
+            std::cout << "runCancelableThenPromise 1" << std::endl;
             return Deferred<None,None>::forCancelable(cancelable, sched);
         })
         .template flatMapBoth<T,E>(
             [promise](auto) {
-                std::cout << "runCancelableThenPromise 2" << std::endl;
+                std::cout << "runCancelableThenPromise 3" << std::endl;
                 return Task<T,E>::forPromise(promise);
             },
             [promise](auto) {
-                std::cout << "runCancelableThenPromise 3" << std::endl;
+                std::cout << "runCancelableThenPromise 4" << std::endl;
                 return Task<T,E>::forPromise(promise);
             }
         )
@@ -482,9 +507,8 @@ constexpr Task<T,E> Task<T,E>::never() noexcept {
 }
 
 template <class T, class E>
-DeferredRef<T,E> Task<T,E>::run(const std::shared_ptr<Scheduler>& sched) const {
-    auto fiber = Fiber<T,E>::run(op, sched);
-    return Deferred<T,E>::forFiber(fiber);
+FiberRef<T,E> Task<T,E>::run(const std::shared_ptr<Scheduler>& sched) const {
+    return Fiber<T,E>::run(op, sched);
 }
 
 template <class T, class E>

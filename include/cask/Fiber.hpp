@@ -81,7 +81,11 @@ FiberRef<T2,E2> Fiber<T,E>::mapBoth(
     const std::function<T2(const T&)>& value_transform,
     const std::function<E2(const E&)>& error_transform
 ) {
-    return std::make_shared<fiber::FiberMap<T,T2,E,E2>>(this->shared_from_this(), value_transform, error_transform);
+    return std::make_shared<fiber::FiberMap<T,T2,E,E2>>(
+        this->shared_from_this(),
+        value_transform,
+        error_transform
+    );
 }
 
 }
