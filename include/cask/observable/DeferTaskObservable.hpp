@@ -8,7 +8,6 @@
 
 #include "../Observable.hpp"
 #include "../Observer.hpp"
-#include <iostream>
 
 namespace cask::observable {
 
@@ -51,7 +50,6 @@ FiberRef<None,None> DeferTaskObservable<T,E>::subscribe(
 
     return downstreamTask
         .doOnCancel(Task<None,None>::defer([observer] {
-            std::cout << "CANCEL FIRED" << std::endl;
             return observer->onCancel();
         }))
         .run(sched);

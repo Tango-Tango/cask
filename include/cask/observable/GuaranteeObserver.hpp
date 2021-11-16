@@ -78,8 +78,6 @@ Task<None,None> GuaranteeObserver<T,E>::onComplete() {
 
 template <class T, class E>
 Task<None,None> GuaranteeObserver<T,E>::onCancel() {
-    std::cout << "GUARANTEE OBSERVER ONCANCEL" << std::endl;
-
     if(!completed->test_and_set()) {
         return downstream->onCancel().template guarantee<None>(task);
     } else {

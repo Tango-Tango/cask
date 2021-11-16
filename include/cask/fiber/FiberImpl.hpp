@@ -8,7 +8,6 @@
 
 #include <atomic>
 #include <mutex>
-#include <iostream>
 #include <map>
 #include "cask/Deferred.hpp"
 #include "cask/Fiber.hpp"
@@ -204,7 +203,6 @@ template <class T, class E>
 void FiberImpl<T,E>::asyncCancel() {
     FiberState expected = WAITING;
     if(state.compare_exchange_strong(expected, RUNNING)) {
-        std::cout << "ASYNC CANCEL" << std::endl;
         value.setCanceled();
         waitingOn = nullptr;
 
@@ -237,7 +235,6 @@ bool FiberImpl<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& 
 
     FiberState expected = RACING;
     if(state.compare_exchange_strong(expected, RUNNING)) {
-        std::cout << "FIRST RACER FINISHED" << std::endl;
         value = racer->getRawValue();
 
         std::vector<FiberRef<Erased,Erased>> local_racers;
@@ -253,8 +250,6 @@ bool FiberImpl<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& 
             fiber->cancel();
         }
 
-    } else {
-        std::cout << "OTHER RACER FINISHED" << std::endl;
     }
 
     if(no_more_fibers) {
@@ -395,11 +390,9 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
 
             {
                 std::lock_guard<std::mutex> guard(racing_fibers_mutex);
-                std::cout << "HOLDING LOCK" << std::endl;
                 for(auto& racer: *data) {
                     auto fiber = std::make_shared<FiberImpl<Erased,Erased>>(racer);
                     fiber->onFiberShutdown([self_weak = this->weak_from_this(), fiber_weak = std::weak_ptr(fiber), sched_weak = std::weak_ptr(sched)](auto){
-                        std::cout << "RACER SHUTTING DOWN" << std::endl;
                         if(auto self = self_weak.lock()) {
                             if(auto fiber = fiber_weak.lock()) {
                                 if(auto sched = sched_weak.lock()) {
@@ -407,22 +400,14 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
                                     if(casted_self->racerFinished(fiber)) {
                                         casted_self->reschedule(sched);
                                     }
-                                } else {
-                                    std::cout << "COULDNT ACQUIRE SCHED" << std::endl;
                                 }
-                            } else {
-                                std::cout << "COULDNT ACQUIRE FIBER" << std::endl;
                             }
-                        } else {
-                            std::cout << "COULDNT ACQUIRE SELF" << std::endl;
                         }
                     });
                     racing_fibers[fiber->getId()] = fiber;
                     local_racing_fibers.emplace_back(fiber);
                 }
             }
-
-            std::cout << "RELEASED LOCK" << std::endl;
 
             for(auto& racer: local_racing_fibers) {
                 racer->reschedule(sched);
@@ -483,8 +468,6 @@ void FiberImpl<T,E>::cancel() {
         }
     }
 
-    std::cout << "SYNC CANCEL" << std::endl;
-
     if(current_state == WAITING) {
         state.store(WAITING);
         waitingOn->cancel();
@@ -515,18 +498,14 @@ void FiberImpl<T,E>::cancel() {
         state.store(READY);
 
         if(auto sched = last_used_scheduler.lock()) {
-            std::cout << "RESCHEDULE AFTER CANCEL" << std::endl;
             reschedule(sched);
         } else {
-            std::cout << "CANT RESCHEDULE" << std::endl;
             resumeSync();
             if(state.load() == READY) {
                 value.setCanceled();   
                 state.store(CANCELED);  
             }
         }
-    } else {
-        std::cout << "FIBER FINISHED WITH CANCEL" << std::endl;
     }
 }
 

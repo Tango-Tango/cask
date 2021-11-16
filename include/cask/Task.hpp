@@ -480,16 +480,13 @@ constexpr Task<T,E> Task<T,E>::forPromise(const PromiseRef<T,E>& promise) noexce
 template <class T, class E>
 FiberRef<T,E> Task<T,E>::runCancelableThenPromise(const CancelableRef& cancelable, const PromiseRef<T,E>& promise, const SchedulerRef& sched) noexcept {
     return Task<None,None>::deferAction([cancelable](auto sched) {
-            std::cout << "runCancelableThenPromise 1" << std::endl;
             return Deferred<None,None>::forCancelable(cancelable, sched);
         })
         .template flatMapBoth<T,E>(
             [promise](auto) {
-                std::cout << "runCancelableThenPromise 3" << std::endl;
                 return Task<T,E>::forPromise(promise);
             },
             [promise](auto) {
-                std::cout << "runCancelableThenPromise 4" << std::endl;
                 return Task<T,E>::forPromise(promise);
             }
         )
@@ -714,7 +711,6 @@ constexpr Task<T,E> Task<T,E>::doOnCancel(const Task<None,None>& handler) const 
             } else if(fiber_input.isError()) {
                 return fiber::FiberOp::error(fiber_input.underlying());
             } else {
-                std::cout << "DO ON CANCEL" << std::endl;
                 return handler_op->flatMap([](auto) {
                     return fiber::FiberOp::cancel();
                 });
@@ -830,14 +826,12 @@ constexpr Task<T,E> Task<T,E>::guarantee(const Task<T2, E>& task) const noexcept
                     if(guaranteed_value.isError()) {
                         return fiber::FiberOp::error(guaranteed_value.underlying());
                     } else if(guaranteed_value.isCanceled()) {
-                        std::cout << "GUARANTEE CANCEL 1" << std::endl;
                         return fiber::FiberOp::cancel();
                     } else if(fiber_value.isValue()) {
                         return fiber::FiberOp::value(fiber_value.underlying());
                     } else if(fiber_value.isError()) {
                         return fiber::FiberOp::error(fiber_value.underlying());
                     } else {
-                        std::cout << "GUARANTEE CANCEL 2" << std::endl;
                         return fiber::FiberOp::cancel();
                     }
                 });
