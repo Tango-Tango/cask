@@ -5,12 +5,14 @@
 
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::None;
 using cask::Observable;
 using cask::ObservableRef;
 using cask::Scheduler;
 using cask::Task;
+using cask::scheduler::BenchScheduler;
 
 TEST(ObservableForeach, Empty) {
     int counter = 0;
@@ -109,6 +111,7 @@ TEST(ObservableForeach, CompletesGuaranteedEffects) {
 }
 
 TEST(ObservableForeach, RunsCancelCallbacks) {
+    auto sched = std::make_shared<BenchScheduler>();
     int counter = 0;
     int run_count = 0;
     auto task = Task<None,None>::eval([&run_count]() {
@@ -116,19 +119,21 @@ TEST(ObservableForeach, RunsCancelCallbacks) {
         return None();
     });
 
-    auto deferred = Observable<int,std::string>::deferTask([]{
+    auto fiber = Observable<int,std::string>::deferTask([]{
             return Task<int,std::string>::never();
         })
         ->guarantee(task)
         ->foreach([&counter](auto) {
             counter++;
         })
-        .failed()
-        .run(Scheduler::global());
+        .run(sched);
+
+    sched->run_ready_tasks();
+    fiber->cancel();
+    sched->run_ready_tasks();
     
     try {
-        deferred->cancel();
-        deferred->await();
+        fiber->await();
         FAIL() << "Expected method to throw";
     } catch(std::runtime_error&) {
         EXPECT_EQ(run_count, 1);
