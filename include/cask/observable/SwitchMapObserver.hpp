@@ -39,7 +39,7 @@ private:
     std::shared_ptr<std::atomic_bool> error_encountered;
     std::shared_ptr<std::atomic_bool> stopped;
     std::shared_ptr<std::atomic_int> running_id;
-    CancelableRef running_subscription;
+    FiberRef<None,None> running_subscription;
 };
 
 template <class TI, class TO, class E>
@@ -66,7 +66,7 @@ Task<Ack,None> SwitchMapObserver<TI,TO,E>::onNext(const TI& value) {
         int my_id = cancelRunningSubscription();
         downstream_complete->exchange(false);
 
-        CancelableRef next_subscription = predicate(value)->subscribeHandlers(
+        FiberRef<None,None> next_subscription = predicate(value)->subscribeHandlers(
             sched,
             [downstream = downstream, stopped = stopped, running_id = running_id, my_id](const TO& value) {
                 // Provide the value to downstream. If downstream provides a stop, we need to provide that
@@ -175,7 +175,7 @@ int SwitchMapObserver<TI,TO,E>::cancelRunningSubscription() {
     // caller. This will invalidate any processing which may still
     // be running but is uncancelable for whatever reason.
 
-    CancelableRef nullref;
+    FiberRef<None,None> nullref;
     auto observer = std::atomic_exchange(&running_subscription, nullref);
     if(observer != nullptr) {
         observer->cancel();

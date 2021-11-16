@@ -152,7 +152,8 @@ TEST(ObservableSwitchMap, StopsUpstreamOnDownstreamComplete) {
         ->await();
 
     EXPECT_EQ(result.size(), 10);
-    EXPECT_EQ(counter, 10);
+    EXPECT_GE(counter, 10);
+    EXPECT_LE(counter, 11);
     awaitIdle();
 }
 
