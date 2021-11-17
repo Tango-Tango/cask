@@ -152,20 +152,24 @@ const FiberValue& FiberImpl<T,E>::getRawValue() {
 
 template <class T, class E>
 std::optional<T> FiberImpl<T,E>::getValue() {
+    std::optional<T> result;
+
     if(state.load() == COMPLETED && value.isValue()) {
-        return value.underlying().template get<T>();
-    } else {
-        return {};
+        result = value.underlying().template get<T>();
     }
+
+    return result;
 }
 
 template <class T, class E>
 std::optional<E> FiberImpl<T,E>::getError() {
+    std::optional<E> result;
+
     if(state.load() == COMPLETED && value.isError()) {
-        return value.underlying().template get<E>();
-    } else {
-        return {};
+        result = value.underlying().template get<E>();
     }
+
+    return result;
 }
 
 template <class T, class E>
