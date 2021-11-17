@@ -154,8 +154,8 @@ TEST_F(SingleThreadSchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) 
     });
 
     cancelable->onShutdown([&shutdown, &shutdown_mutex] {
-        shutdown_mutex.unlock();
         shutdown = true;
+        shutdown_mutex.unlock();
     });
 
     timer_mutex.lock();

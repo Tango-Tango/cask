@@ -154,8 +154,8 @@ TEST_P(ThreadPoolSchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
     });
 
     cancelable->onShutdown([&shutdown, &shutdown_mutex] {
-        shutdown_mutex.unlock();
         shutdown = true;
+        shutdown_mutex.unlock();
     });
 
     timer_mutex.lock();
