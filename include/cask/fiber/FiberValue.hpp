@@ -6,6 +6,7 @@
 #ifndef _CASK_FIBER_VALUE_H_
 #define _CASK_FIBER_VALUE_H_
 
+#include <optional>
 #include "../Erased.hpp"
 
 namespace cask::fiber {
