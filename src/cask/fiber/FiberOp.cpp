@@ -216,4 +216,4 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
     __builtin_unreachable();
 }
 
-} // namespace cask
+} // namespace cask::fiber

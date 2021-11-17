@@ -88,4 +88,4 @@ const Erased& FiberValue::underlying() const {
 }
 
 
-} // namespace cask
+} // namespace cask::fiber
