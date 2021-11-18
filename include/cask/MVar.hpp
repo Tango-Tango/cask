@@ -90,6 +90,9 @@ public:
      * @return A task that completes when a value has been read.
      */
     Task<T,E> read();
+
+    template <class U>
+    Task<U,E> modify(const std::function<Task<std::tuple<T,U>,E>(const T&)>& predicate);
 private:
     MVar(const std::shared_ptr<Scheduler>& sched);
     explicit MVar(const std::shared_ptr<Scheduler>& sched, const T& initialValue);
@@ -173,6 +176,20 @@ Task<T,E> MVar<T,E>::read() {
             return value;
         });
     });
+}
+
+template <class T, class E>
+template <class U>
+Task<U,E> MVar<T,E>::modify(const std::function<Task<std::tuple<T,U>,E>(const T&)>& predicate) {
+    return take()
+        .template flatMap<std::tuple<T,U>>(predicate)
+        .template flatMap<U>([self = this->shared_from_this()](auto result) {
+            auto updated_state = std::get<0>(result);
+            auto return_value = std::get<1>(result);
+            return self->put(updated_state).template map<U>([return_value](auto) {
+                return return_value;
+            });
+        });
 }
 
 }

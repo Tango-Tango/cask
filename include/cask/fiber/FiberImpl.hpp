@@ -269,6 +269,7 @@ bool FiberImpl<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& 
 
 template <class T, class E>
 void FiberImpl<T,E>::reschedule(const std::shared_ptr<Scheduler>& sched) {
+    last_used_scheduler = sched;
     sched->submit([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)] {
         if(auto self = self_weak.lock()) {
             if(auto sched = sched_weak.lock()) {
@@ -506,8 +507,7 @@ void FiberImpl<T,E>::cancel() {
         } else {
             resumeSync();
             if(state.load() == READY) {
-                value.setCanceled();   
-                state.store(CANCELED);  
+                throw std::runtime_error("Cannot finish processing async cancel without a scheduler.");
             }
         }
     }
