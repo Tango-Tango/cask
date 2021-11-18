@@ -738,17 +738,13 @@ template <class T, class E>
 constexpr Task<T,E> Task<T,E>::recover(const std::function<T(const E&)>& predicate) const noexcept {
     return Task<T,E>(
         op->flatMap([predicate](auto fiber_input) {
-            try {
-                if(fiber_input.isValue()) {
-                    return fiber::FiberOp::value(fiber_input.underlying());
-                } else if(fiber_input.isError()) {
-                    auto input = fiber_input.underlying().template get<E>();
-                    return fiber::FiberOp::value(predicate(input));
-                } else {
-                    return fiber::FiberOp::cancel();
-                }
-            } catch(E& error) {
-                return fiber::FiberOp::value(predicate(error));
+            if(fiber_input.isValue()) {
+                return fiber::FiberOp::value(fiber_input.underlying());
+            } else if(fiber_input.isError()) {
+                auto input = fiber_input.underlying().template get<E>();
+                return fiber::FiberOp::value(predicate(input));
+            } else {
+                return fiber::FiberOp::cancel();
             }
         })
     );
