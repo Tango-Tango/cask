@@ -45,12 +45,6 @@ Task<Ack,None> SwitchMapInternalObserver<T,E>::onNext(const T& value) {
         return downstream->onNext(value).template map<StatefulResult<Ack>>([state](auto ack) {
             switchmap::SwitchMapState updated_state = state;
             updated_state.downstream_ack = ack;
-            if(ack == Continue) {
-                std::cout << "Continue" << std::endl;
-            } else {
-                std::cout << "Stop" << std::endl;
-            }
-            
             return StatefulResult<Ack>({updated_state, ack});
         });
     });
@@ -69,7 +63,18 @@ Task<None,None> SwitchMapInternalObserver<T,E>::onError(const E& error) {
 
 template <class T, class E>
 Task<None,None> SwitchMapInternalObserver<T,E>::onComplete() {
-    return Task<None,None>::none();
+    return stateVar->template modify<None>([downstream = downstream](auto state) {
+        switchmap::SwitchMapState updated_state = state;
+        updated_state.downstream_completed = true;
+
+        if(state.upstream_completed) {
+            return downstream->onComplete().template map<StatefulResult<None>>([updated_state](auto) {
+                return StatefulResult<None>({updated_state, None()});
+            });
+        } else {
+            return Task<StatefulResult<None>,None>::pure({updated_state, None()});
+        }
+    });
 }
 
 template <class T, class E>

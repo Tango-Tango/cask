@@ -116,6 +116,7 @@ Task<StatefulResult<Ack>,None> SwitchMapObserver<TI,TO,E>::onNextUnsafe(const TI
 
         switchmap::SwitchMapState updated_state = state;
         updated_state.subscription = predicate(value)->subscribe(sched, observer);
+        updated_state.downstream_completed = false;
 
         return Task<StatefulResult<Ack>,None>::pure(
             {updated_state, Continue}
@@ -154,35 +155,15 @@ Task<StatefulResult<None>,None> SwitchMapObserver<TI,TO,E>::onErrorUnsafe(const 
 
 template <class TI, class TO, class E>
 Task<StatefulResult<None>,None> SwitchMapObserver<TI,TO,E>::onCompleteUnsafe(const switchmap::SwitchMapState& state) {
-    if(state.subscription) {
-        auto promise = Promise<None,None>::create(sched);
+    switchmap::SwitchMapState updated_state = state;
+    updated_state.upstream_completed = true;
 
-        state.subscription->cancel();
-        state.subscription->onFiberShutdown([promise](auto) {
-            promise->success(None());
+    if(state.downstream_completed) {
+        return downstream->onComplete().template map<StatefulResult<None>>([updated_state](auto) {
+            return StatefulResult<None>({updated_state, None()});
         });
-
-        return Task<None,None>::forPromise(promise)
-            .template flatMap<StatefulResult<None>>([state, self = this->shared_from_this()](auto) {
-                switchmap::SwitchMapState updated_state = state;
-                updated_state.subscription = nullptr;
-
-                auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI,TO,E>>(self);
-                return casted_self->onCompleteUnsafe(updated_state);
-            });
     } else {
-        switchmap::SwitchMapState updated_state = state;
-
-        if(!updated_state.upstream_completed) {
-            updated_state.upstream_completed = true;
-            return downstream->onComplete().template map<StatefulResult<None>>([updated_state](auto) {
-                return StatefulResult<None>({updated_state, None()});
-            });
-        } else {
-            return Task<StatefulResult<None>,None>::pure(
-                {updated_state, None()}
-            );
-        }
+        return Task<StatefulResult<None>,None>::pure({updated_state, None()});
     }
 }
 
