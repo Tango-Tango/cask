@@ -16,6 +16,7 @@ if not meson.is_subproject()
         'cask/TestRef.cpp',
         'cask/TestResource.cpp',
         'cask/TestTask.cpp',
+        'cask/fiber/TestFiberValue.cpp',
         'cask/mvar/TestMVarState.cpp',
         'cask/observable/TestObservableAppendAll.cpp',
         'cask/observable/TestObservableBuffer.cpp',
