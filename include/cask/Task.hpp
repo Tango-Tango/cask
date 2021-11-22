@@ -233,6 +233,11 @@ public:
      */
     constexpr Task<T,E> onError(const std::function<void(const E&)>& handler) const noexcept;
 
+    /**
+     * Execute the given handler if the task is canceled after being started.
+     * 
+     * @return A new `Task` shich runs the given handler on cancels.
+     */
     constexpr Task<T,E> doOnCancel(const Task<None,None>& handler) const noexcept;
 
     /**

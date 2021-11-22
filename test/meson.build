@@ -43,6 +43,7 @@ if not meson.is_subproject()
         'cask/task/TestTaskDefer.cpp',
         'cask/task/TestTaskDeferFiber.cpp',
         'cask/task/TestTaskDelay.cpp',
+        'cask/task/TestTaskDoOnCancel.cpp',
         'cask/task/TestTaskEval.cpp',
         'cask/task/TestTaskFlatMapBoth.cpp',
         'cask/task/TestTaskFlatMapError.cpp',
