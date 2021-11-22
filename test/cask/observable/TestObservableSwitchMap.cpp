@@ -103,7 +103,7 @@ TEST(ObservableSwitchMap, ProducesError) {
 TEST(ObservableSwitchMap, ErrorStopsInfiniteUpstream) {
     auto sched = Scheduler::global();
     int counter = 0;
-    auto result = Observable<int,std::string>::repeatTask(Task<int,std::string>::pure(123).asyncBoundary())
+    auto result = Observable<int,std::string>::repeatTask(Task<int,std::string>::pure(123).delay(1))
         ->switchMap<float>([&counter](auto) {
             counter++;
             return Observable<float,std::string>::raiseError("broke");
