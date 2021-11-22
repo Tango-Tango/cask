@@ -62,6 +62,14 @@ public:
      */
     static DeferredRef<T,E> forPromise(PromiseRef<T,E> promise);
 
+    /**
+     * Create a deferred which whose completion is govered by
+     * the supplied fiber.
+     *
+     * @param promise The fiber which, when complete, should
+     *                also complete this deferred.
+     * @return A deferred instance for the given fiber.
+     */
     static DeferredRef<T,E> forFiber(FiberRef<T,E> promise);
 
     /**

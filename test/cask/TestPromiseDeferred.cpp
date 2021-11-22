@@ -5,6 +5,7 @@
 
 #include "gtest/gtest.h"
 #include "cask/Deferred.hpp"
+#include "cask/Task.hpp"
 #include "cask/None.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
 #include <chrono>
@@ -15,6 +16,7 @@ using cask::Deferred;
 using cask::None;
 using cask::Scheduler;
 using cask::Either;
+using cask::Task;
 using cask::scheduler::BenchScheduler;
 
 TEST(Deferred, PureOnComplete) {
@@ -442,5 +444,92 @@ TEST(Deferred, MapBothAwait) {
     );
 
     EXPECT_EQ(deferred->await(), "works");
+}
+
+TEST(Deferred, FiberValue) {
+    auto result = Either<int, std::string>::left(0);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto fiber = Task<int,std::string>::pure(123).run(sched);
+    auto deferred = Deferred<int,std::string>::forFiber(fiber);
+
+    deferred->onComplete([&result](auto value) { result = value; });
+    sched->run_ready_tasks();
+
+    ASSERT_TRUE(fiber->getValue().has_value());
+    EXPECT_EQ(*(fiber->getValue()), 123);
+
+    ASSERT_TRUE(result.is_left());
+    EXPECT_EQ(result.get_left(), 123);
+}
+
+TEST(Deferred, FiberError) {
+    auto result = Either<int, std::string>::left(0);
+    auto sched = std::make_shared<BenchScheduler>();
+    auto fiber = Task<int,std::string>::raiseError("broke").run(sched);
+    auto deferred = Deferred<int,std::string>::forFiber(fiber);
+
+    deferred->onComplete([&result](auto value) { result = value; });
+    sched->run_ready_tasks();
+
+    ASSERT_TRUE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getError()), "broke");
+
+    ASSERT_TRUE(result.is_right());
+    EXPECT_EQ(result.get_right(), "broke");
+}
+
+TEST(Deferred, FiberCancel) {
+    bool canceled = false;
+    auto sched = std::make_shared<BenchScheduler>();
+    auto fiber = Task<int,std::string>::never().run(sched);
+    auto deferred = Deferred<int,std::string>::forFiber(fiber);
+
+    deferred->onCancel([&canceled] { canceled = true; });
+    sched->run_ready_tasks();
+    deferred->cancel();
+    sched->run_ready_tasks();
+
+    EXPECT_TRUE(fiber->isCanceled());
+    EXPECT_TRUE(canceled);
+}
+
+TEST(Deferred, FiberOnSuccess) {
+    int result = 0;
+    auto sched = std::make_shared<BenchScheduler>();
+    auto fiber = Task<int,std::string>::pure(123).run(sched);
+    auto deferred = Deferred<int,std::string>::forFiber(fiber);
+
+    deferred->onSuccess([&result](auto value) { result = value; });
+    sched->run_ready_tasks();
+
+    ASSERT_TRUE(fiber->getValue().has_value());
+    EXPECT_EQ(*(fiber->getValue()), 123);
+    EXPECT_EQ(result, 123);
+}
+
+TEST(Deferred, FiberOnError) {
+    std::string result = "not broke";
+    auto sched = std::make_shared<BenchScheduler>();
+    auto fiber = Task<int,std::string>::raiseError("broke").run(sched);
+    auto deferred = Deferred<int,std::string>::forFiber(fiber);
+
+    deferred->onError([&result](auto value) { result = value; });
+    sched->run_ready_tasks();
+
+    ASSERT_TRUE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getError()), "broke");
+    EXPECT_EQ(result, "broke");
+}
+
+TEST(Deferred, FiberAwait) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto fiber = Task<int,std::string>::pure(123).run(sched);
+    auto deferred = Deferred<int,std::string>::forFiber(fiber);
+
+    sched->run_ready_tasks();
+
+    ASSERT_TRUE(fiber->getValue().has_value());
+    EXPECT_EQ(*(fiber->getValue()), 123);
+    EXPECT_EQ(deferred->await(), 123);
 }
 
