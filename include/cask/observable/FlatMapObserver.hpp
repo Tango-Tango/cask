@@ -25,6 +25,7 @@ public:
     Task<Ack,None> onNext(const TI& value) override;
     Task<None,None> onError(const E& value) override;
     Task<None,None> onComplete() override;
+    Task<None,None> onCancel() override;
 private:
     std::function<ObservableRef<TO,E>(TI)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
@@ -48,10 +49,14 @@ Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(const TI& value) {
             [downstream = downstream](auto result) {
                 return downstream->onNext(result);
             },
-            [this](auto error) {
-                return onError(error).template map<Ack>([](auto) {
-                    return Stop;
-                });
+            [self_weak = this->weak_from_this()](auto error) {
+                if(auto self = self_weak.lock()) {
+                    return self->onError(error).template map<Ack>([](auto) {
+                        return Stop;
+                    });
+                } else {
+                    return Task<Ack,None>::pure(Stop);
+                }
             }
         )
         ->takeWhileInclusive([](auto ack){
@@ -80,6 +85,15 @@ template <class TI, class TO, class E>
 Task<None,None> FlatMapObserver<TI,TO,E>::onComplete() {
     if(!completed.test_and_set()) {
         return downstream->onComplete();
+    } else {
+        return Task<None,None>::none();
+    }
+}
+
+template <class TI, class TO, class E>
+Task<None,None> FlatMapObserver<TI,TO,E>::onCancel() {
+    if(!completed.test_and_set()) {
+        return downstream->onCancel();
     } else {
         return Task<None,None>::none();
     }

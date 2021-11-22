@@ -25,6 +25,7 @@ public:
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
+    Task<None,None> onCancel() override;
 private:
     std::optional<T> lastValue;
     std::weak_ptr<Promise<std::optional<T>,E>> promise;
@@ -60,6 +61,17 @@ Task<None,None>  LastObserver<T,E>::onComplete() {
     if(!completed.test_and_set()) {
         if(auto promiseLock = promise.lock()) {
             promiseLock->success(lastValue);
+        }
+    }
+
+    return Task<None,None>::none();
+}
+
+template <class T, class E>
+Task<None,None>  LastObserver<T,E>::onCancel() {
+    if(!completed.test_and_set()) {
+        if(auto promiseLock = promise.lock()) {
+            promiseLock->cancel();
         }
     }
 

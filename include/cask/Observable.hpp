@@ -129,7 +129,7 @@ public:
      * @param observer The observer to attach to the stream.
      * @return The handle which may be used to cancel computation on the stream.
      */
-    virtual CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const = 0;
+    virtual FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const = 0;
 
     /**
      * Subscribe to the observer - beginning computation of the stream. Ongoing
@@ -146,12 +146,12 @@ public:
      * @param onCancel Provide an error for upstream cancelations. By default does nothing.
      * @return The handle which may be used to cancel computation on the stream.
      */
-    virtual CancelableRef subscribeHandlers(
+    virtual FiberRef<None,None> subscribeHandlers(
         const std::shared_ptr<Scheduler>& sched,
         const std::function<Task<Ack,None>(const T&)>& onNext,
         const std::function<Task<None,None>(const E&)>& onError = [](auto) { return Task<None,None>::none(); },
         const std::function<Task<None,None>()>& onComplete = [] { return Task<None,None>::none(); },
-        const std::function<void()>& onCancel = [] {}
+        const std::function<Task<None,None>()>& onCancel = [] { return Task<None,None>::none(); }
     ) const;
 
     /**
@@ -460,24 +460,18 @@ ObservableRef<T,E> Observable<T,E>::fromVector(const std::vector<T>& vector) {
 }
 
 template <class T, class E>
-CancelableRef Observable<T,E>::subscribeHandlers(
+FiberRef<None,None> Observable<T,E>::subscribeHandlers(
     const std::shared_ptr<Scheduler>& sched,
     const std::function<Task<Ack,None>(const T&)>& onNext,
     const std::function<Task<None,None>(const E&)>& onError,
     const std::function<Task<None,None>()>& onComplete,
-    const std::function<void()>& onCancel
+    const std::function<Task<None,None>()>& onCancel
 ) const {
     auto observer = std::make_shared<observable::CallbackObserver<T,E>>(
-        onNext, onError, onComplete
+        onNext, onError, onComplete, onCancel
     );
 
-    auto subscription = subscribe(sched, observer);
-
-    subscription->onCancel([onCancel] {
-        return onCancel();
-    });
-
-    return subscription;
+    return subscribe(sched, observer);
 }
 
 template <class T, class E>
@@ -554,33 +548,70 @@ ObservableRef<T,E> Observable<T,E>::filter(const std::function<bool(const T&)>& 
 template <class T, class E>
 Task<None,E> Observable<T,E>::foreach(const std::function<void(const T&)>& predicate) const {
     auto self = this->shared_from_this();
-    return Task<None,E>::deferAction([self = self, predicate](auto sched) {
+    return Task<None,E>::deferFiber([predicate, self = self](auto sched) {
         auto promise = Promise<None,E>::create(sched);
-        auto observer = std::make_shared<observable::ForeachObserver<T,E>>(promise, predicate);
-        auto subscription = self->subscribe(sched, observer);
-        return Task<None,E>::runCancelableThenPromise(subscription, promise, sched);
+
+        return Task<None,None>::deferAction([promise, predicate, self](auto sched) {
+            auto observer = std::make_shared<observable::ForeachObserver<T,E>>(promise, predicate);
+            auto subscription = self->subscribe(sched, observer);
+            return Deferred<None,None>::forFiber(subscription);
+        })
+        .template flatMapBoth<None,E>(
+            [promise](auto) {
+                return Task<None,E>::forPromise(promise);
+            },
+            [promise](auto) {
+                return Task<None,E>::forPromise(promise);
+            }
+        )
+        .run(sched);
     });
 }
 
 template <class T, class E>
 Task<None,E> Observable<T,E>::foreachTask(const std::function<Task<None,E>(const T&)>& predicate) const {
     auto self = this->shared_from_this();
-    return Task<None,E>::deferAction([self = self, predicate](auto sched) {
+
+    return Task<None,E>::deferFiber([predicate, self = self](auto sched) {
         auto promise = Promise<None,E>::create(sched);
-        auto observer = std::make_shared<observable::ForeachTaskObserver<T,E>>(promise, predicate);
-        auto subscription = self->subscribe(sched, observer);
-        return Task<None,E>::runCancelableThenPromise(subscription, promise, sched);
+
+        return Task<None,None>::deferAction([promise, predicate, self](auto sched) {
+            auto observer = std::make_shared<observable::ForeachTaskObserver<T,E>>(promise, predicate);
+            auto subscription = self->subscribe(sched, observer);
+            return Deferred<None,None>::forFiber(subscription);
+        })
+        .template flatMapBoth<None,E>(
+            [promise](auto) {
+                return Task<None,E>::forPromise(promise);
+            },
+            [promise](auto) {
+                return Task<None,E>::forPromise(promise);
+            }
+        )
+        .run(sched);
     });
 }
 
 template <class T, class E>
 Task<std::optional<T>,E> Observable<T,E>::last() const {
     auto self = this->shared_from_this();
-    return Task<std::optional<T>,E>::deferAction([self = self](auto sched) {
+    return Task<std::optional<T>,E>::deferFiber([self = self](auto sched) {
         auto promise = Promise<std::optional<T>,E>::create(sched);
-        auto observer = std::make_shared<observable::LastObserver<T,E>>(promise);
-        auto subscription = self->subscribe(sched, observer);
-        return Task<std::optional<T>,E>::runCancelableThenPromise(subscription, promise, sched);
+
+        return Task<None,None>::deferAction([promise, self](auto sched) {
+            auto observer = std::make_shared<observable::LastObserver<T,E>>(promise);
+            auto subscription = self->subscribe(sched, observer);
+            return Deferred<None,None>::forFiber(subscription);
+        })
+        .template flatMapBoth<std::optional<T>,E>(
+            [promise](auto) {
+                return Task<std::optional<T>,E>::forPromise(promise);
+            },
+            [promise](auto) {
+                return Task<std::optional<T>,E>::forPromise(promise);
+            }
+        )
+        .run(sched);
     });
 }
 
@@ -595,11 +626,24 @@ Task<std::vector<T>,E> Observable<T,E>::take(uint32_t amount) const {
         return Task<std::vector<T>,E>::pure(std::vector<T>());
     } else {
         auto self = this->shared_from_this();
-        return Task<std::vector<T>,E>::deferAction([self = self, amount](auto sched) {
+        
+        return Task<std::vector<T>,E>::deferFiber([amount, self = self](auto sched) {
             auto promise = Promise<std::vector<T>,E>::create(sched);
-            auto observer = std::shared_ptr<Observer<T,E>>(new observable::TakeObserver<T,E>(amount, promise));
-            auto subscription = self->subscribe(sched, observer);
-            return Task<std::vector<T>,E>::runCancelableThenPromise(subscription, promise, sched);
+
+            return Task<None,None>::deferAction([promise, amount, self](auto sched) {
+                auto observer = std::make_shared<observable::TakeObserver<T,E>>(amount, promise);
+                auto subscription = self->subscribe(sched, observer);
+                return Deferred<None,None>::forFiber(subscription);
+            })
+            .template flatMapBoth<std::vector<T>,E>(
+                [promise](auto) {
+                    return Task<std::vector<T>,E>::forPromise(promise);
+                },
+                [promise](auto) {
+                    return Task<std::vector<T>,E>::forPromise(promise);
+                }
+            )
+            .run(sched);
         });
     }
 }

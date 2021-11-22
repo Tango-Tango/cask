@@ -22,6 +22,7 @@ public:
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
+    Task<None,None> onCancel() override;
 private:
     std::function<bool(const T&)> predicate;
     std::shared_ptr<Observer<T,E>> downstream;
@@ -51,6 +52,11 @@ Task<None,None> FilterObserver<T,E>::onError(const E& error) {
 template <class T, class E>
 Task<None,None> FilterObserver<T,E>::onComplete() {
     return downstream->onComplete();
+}
+
+template <class T, class E>
+Task<None,None> FilterObserver<T,E>::onCancel() {
+    return downstream->onCancel();
 }
 
 }

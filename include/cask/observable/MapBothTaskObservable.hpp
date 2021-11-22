@@ -23,7 +23,7 @@ public:
         const std::function<Task<TO,EO>(const TI&)>& successPredicate,
         const std::function<Task<TO,EO>(const EI&)>& errorPredicate
     );
-    CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,EO>>& observer) const override;
+    FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,EO>>& observer) const override;
 private:
     std::shared_ptr<const Observable<TI,EI>> upstream;
     std::function<Task<TO,EO>(const TI&)> successPredicate;
@@ -42,7 +42,7 @@ MapBothTaskObservable<TI,TO,EI,EO>::MapBothTaskObservable(
 {}
 
 template <class TI, class TO, class EI, class EO>
-CancelableRef MapBothTaskObservable<TI,TO,EI,EO>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,EO>>& observer) const {
+FiberRef<None,None> MapBothTaskObservable<TI,TO,EI,EO>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,EO>>& observer) const {
     auto mapObserver = std::make_shared<MapBothTaskObserver<TI,TO,EI,EO>>(successPredicate, errorPredicate, observer);
     return upstream->subscribe(sched, mapObserver);
 }

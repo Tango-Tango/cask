@@ -5,11 +5,13 @@
 
 #include "gtest/gtest.h"
 #include "cask/Task.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 #include <exception>
 
 using cask::None;
 using cask::Scheduler;
 using cask::Task;
+using cask::scheduler::BenchScheduler;
 
 TEST(TaskGuarantee, RunsOnComplete) {
     auto counter = 0;
@@ -40,16 +42,19 @@ TEST(TaskGuarantee, RunsOnError) {
     EXPECT_EQ(counter, 1);
 }
 
-TEST(TaskGuarantee, RunsOnCancel) {
+TEST(TaskGuarantee, RunsOnCancelAfterWaiting) {
+    auto sched = std::make_shared<BenchScheduler>();
     auto counter = 0;
     auto deferred = Task<int>::never()
         .guarantee(Task<None>::eval([&counter] {
             counter++;
             return None();
         }))
-        .run(Scheduler::global());
+        .run(sched);
 
+    sched->run_ready_tasks();
     deferred->cancel();
+    sched->run_ready_tasks();
 
     try {
         deferred->await();
@@ -57,4 +62,25 @@ TEST(TaskGuarantee, RunsOnCancel) {
     } catch(std::runtime_error&) {}
     
     EXPECT_EQ(counter, 1);
+}
+
+TEST(TaskGuarantee, DoesntRunIfTaskNeverReallyStarted) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto counter = 0;
+    auto deferred = Task<int>::never()
+        .guarantee(Task<None>::eval([&counter] {
+            counter++;
+            return None();
+        }))
+        .run(sched);
+
+    deferred->cancel();
+    sched->run_ready_tasks();
+
+    try {
+        deferred->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {}
+    
+    EXPECT_EQ(counter, 0);
 }

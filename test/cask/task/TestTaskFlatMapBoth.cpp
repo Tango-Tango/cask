@@ -21,11 +21,9 @@ TEST(TaskFlatMapBoth, ValueSameErrorTypes) {
         )
         .runSync();
 
-    ASSERT_TRUE(result.is_left());
-
-    auto syncResult = result.get_left();
-    ASSERT_TRUE(syncResult.is_left());
-    EXPECT_EQ(syncResult.get_left(), 184.5f);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->is_left());
+    EXPECT_EQ(result->get_left(), 184.5f);
 }
 
 TEST(TaskFlatMapBoth, ValueDifferentErrorTypes) {
@@ -39,12 +37,10 @@ TEST(TaskFlatMapBoth, ValueDifferentErrorTypes) {
             }
         )
         .runSync();
-
-    ASSERT_TRUE(result.is_left());
-
-    auto syncResult = result.get_left();
-    ASSERT_TRUE(syncResult.is_left());
-    EXPECT_EQ(syncResult.get_left(), 184.5f);
+    
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->is_left());
+    EXPECT_EQ(result->get_left(), 184.5f);
 }
 
 TEST(TaskFlatMapBoth, ErrorSameErrorTypes) {
@@ -59,11 +55,9 @@ TEST(TaskFlatMapBoth, ErrorSameErrorTypes) {
         )
         .runSync();
 
-    ASSERT_TRUE(result.is_left());
-
-    auto syncResult = result.get_left();
-    ASSERT_TRUE(syncResult.is_right());
-    EXPECT_EQ(syncResult.get_right(), "broke-mapped");
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->is_right());
+    EXPECT_EQ(result->get_right(), "broke-mapped");
 }
 
 TEST(TaskFlatMapBoth, ErrorDifferentErrorTypes) {
@@ -78,11 +72,9 @@ TEST(TaskFlatMapBoth, ErrorDifferentErrorTypes) {
         )
         .runSync();
 
-    ASSERT_TRUE(result.is_left());
-
-    auto syncResult = result.get_left();
-    ASSERT_TRUE(syncResult.is_right());
-    EXPECT_EQ(syncResult.get_right().what(), std::string("broke"));
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->is_right());
+    EXPECT_EQ(result->get_right().what(), std::string("broke"));
 }
 
 TEST(TaskFlatMapBoth, ThrowsSameErrorTypes) {
@@ -97,11 +89,9 @@ TEST(TaskFlatMapBoth, ThrowsSameErrorTypes) {
         )
         .runSync();
 
-    ASSERT_TRUE(result.is_left());
-
-    auto syncResult = result.get_left();
-    ASSERT_TRUE(syncResult.is_right());
-    EXPECT_EQ(syncResult.get_right(), "thrown-error-mapped");
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->is_right());
+    EXPECT_EQ(result->get_right(), "thrown-error-mapped");
 }
 
 TEST(TaskFlatMapBoth, ThrowsUpstreamErrorType) {
@@ -116,11 +106,10 @@ TEST(TaskFlatMapBoth, ThrowsUpstreamErrorType) {
         )
         .runSync();
 
-    ASSERT_TRUE(result.is_left());
 
-    auto syncResult = result.get_left();
-    ASSERT_TRUE(syncResult.is_right());
-    EXPECT_EQ(syncResult.get_right().what(), std::string("thrown-error"));
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->is_right());
+    EXPECT_EQ(result->get_right().what(), std::string("thrown-error"));
 }
 
 TEST(TaskFlatMapBoth, ThrowsDownstreamErrorType) {
@@ -135,10 +124,8 @@ TEST(TaskFlatMapBoth, ThrowsDownstreamErrorType) {
         )
         .runSync();
 
-    ASSERT_TRUE(result.is_left());
-
-    auto syncResult = result.get_left();
-    ASSERT_TRUE(syncResult.is_right());
-    EXPECT_EQ(syncResult.get_right().what(), std::string("thrown-error"));
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->is_right());
+    EXPECT_EQ(result->get_right().what(), std::string("thrown-error"));
 }
 

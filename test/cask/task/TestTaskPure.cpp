@@ -11,11 +11,10 @@ using cask::Scheduler;
 
 TEST(TaskPure,EvalutesSync) {
     auto result = Task<int>::pure(123).runSync();
-    ASSERT_TRUE(result.is_left());
-    
-    auto value = result.get_left();
-    ASSERT_TRUE(value.is_left());
-    EXPECT_EQ(value.get_left(), 123);
+
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->is_left());
+    EXPECT_EQ(result->get_left(), 123);
 }
 
 TEST(TaskPure,EvaluatesAsync) {

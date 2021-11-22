@@ -19,7 +19,7 @@ template <class T, class E>
 class GuaranteeObservable final : public Observable<T,E> {
 public:
     GuaranteeObservable(const std::shared_ptr<const Observable<T,E>>& upstream, const Task<None,None>& task);
-    CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
+    FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     std::shared_ptr<const Observable<T,E>> upstream;
     Task<None,None> task;
@@ -32,13 +32,9 @@ GuaranteeObservable<T,E>::GuaranteeObservable(const std::shared_ptr<const Observ
 {}
 
 template <class T, class E>
-CancelableRef GuaranteeObservable<T,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const {
+FiberRef<None,None> GuaranteeObservable<T,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const {
     auto guaranteeObserver = std::make_shared<GuaranteeObserver<T,E>>(observer, task);
-    auto subscription = upstream->subscribe(sched, guaranteeObserver);
-    subscription->onCancel([guaranteeObserver, sched]() {
-        guaranteeObserver->onCancel().run(sched)->await();
-    });
-    return subscription;
+    return upstream->subscribe(sched, guaranteeObserver);
 }
 
 }

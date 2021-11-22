@@ -22,6 +22,7 @@ public:
     IMPLEMENT_MOCK1(onNext);
     IMPLEMENT_MOCK1(onError);
     IMPLEMENT_MOCK0(onComplete);
+    IMPLEMENT_MOCK0(onCancel);
 };
 
 void awaitIdle() {
@@ -102,7 +103,7 @@ TEST(ObservableSwitchMap, ProducesError) {
 TEST(ObservableSwitchMap, ErrorStopsInfiniteUpstream) {
     auto sched = Scheduler::global();
     int counter = 0;
-    auto result = Observable<int,std::string>::repeatTask(Task<int,std::string>::pure(123).asyncBoundary())
+    auto result = Observable<int,std::string>::repeatTask(Task<int,std::string>::pure(123).delay(1))
         ->switchMap<float>([&counter](auto) {
             counter++;
             return Observable<float,std::string>::raiseError("broke");
@@ -141,7 +142,7 @@ TEST(ObservableSwitchMap, CancelStopsInfiniteUpstream) {
 TEST(ObservableSwitchMap, StopsUpstreamOnDownstreamComplete) {
     auto sched = Scheduler::global();
     int counter = 0;
-    auto result = Observable<int,std::string>::repeatTask(Task<int,std::string>::pure(123))
+    auto result = Observable<int,std::string>::repeatTask(Task<int,std::string>::pure(123).delay(1))
         ->switchMap<float>([&counter](auto) {
             counter++;
             return Observable<float,std::string>::pure(123 * 1.5f);
@@ -151,29 +152,7 @@ TEST(ObservableSwitchMap, StopsUpstreamOnDownstreamComplete) {
         ->await();
 
     EXPECT_EQ(result.size(), 10);
-    EXPECT_EQ(counter, 10);
-    awaitIdle();
-}
-
-TEST(ObservableSwitchMap, IgnoresRepeatedErrors) {
-    int counter = 0;
-
-    auto mockDownstream = std::make_shared<MockSwitchMapDownstreamObserver>();
-    REQUIRE_CALL(*mockDownstream, onError("broke"))
-        .LR_SIDE_EFFECT(counter++)
-        .RETURN(Task<None,None>::none());
-    
-    auto observer = std::make_shared<SwitchMapObserver<int,float,std::string>>(
-        [](auto value) {
-            return Observable<float,std::string>::pure(value * 1.5f);
-        },
-        mockDownstream,
-        Scheduler::global()
-    );
-
-    observer->onError("broke").run(Scheduler::global())->await();
-    observer->onError("broke").run(Scheduler::global())->await();
-
-    EXPECT_EQ(counter, 1);
+    EXPECT_GE(counter, 10);
+    EXPECT_LE(counter, 11);
     awaitIdle();
 }

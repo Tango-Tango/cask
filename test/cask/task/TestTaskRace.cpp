@@ -5,45 +5,60 @@
 
 #include "gtest/gtest.h"
 #include "cask/Task.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::None;
 using cask::Task;
-using cask::Scheduler;
+using cask::scheduler::BenchScheduler;
 
-TEST(Task, LeftValue) {
-    auto sched = Scheduler::global();
-    auto task = Task<int,None>::pure(123).raceWith(Task<float,None>::never());
-    auto result = task.run(sched)->await();
-    EXPECT_EQ(result.get_left(), 123);
+TEST(TaskRace, LeftValue) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto task = Task<int,None>::pure(123).raceWith(Task<int,None>::never());
+    auto result = task.run(sched);
+
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, LeftError) {
-    auto sched = Scheduler::global();
-    auto task = Task<int,std::string>::raiseError("boom").raceWith(Task<float,std::string>::never());
-    auto result = task.failed().run(sched)->await();
-    EXPECT_EQ(result, "boom");
+TEST(TaskRace, LeftError) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto task = Task<int,std::string>::raiseError("boom").raceWith(Task<int,std::string>::never());
+    auto result = task.failed().run(sched);
+
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(result->await(), "boom");
 }
 
-TEST(Task, RightValue) {
-    auto sched = Scheduler::global();
-    auto task = Task<float,None>::never().raceWith(Task<int,None>::pure(123));
-    auto result = task.run(sched)->await();
-    EXPECT_EQ(result.get_right(), 123);
+TEST(TaskRace, RightValue) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto task = Task<int,None>::never().raceWith(Task<int,None>::pure(123));
+    auto result = task.run(sched);
+
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, RightError) {
-    auto sched = Scheduler::global();
-    auto task = Task<float,std::string>::never().raceWith(Task<int,std::string>::raiseError("boom"));
-    auto result = task.failed().run(sched)->await();
-    EXPECT_EQ(result, "boom");
+TEST(TaskRace, RightError) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto task = Task<int,std::string>::never().raceWith(Task<int,std::string>::raiseError("boom"));
+    auto result = task.failed().run(sched);
+
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(result->await(), "boom");
 }
 
-TEST(Task, Cancelled) {
-    auto sched = Scheduler::global();
-    auto task = Task<float,None>::never().raceWith(Task<float,None>::never());
+TEST(TaskRace, Cancelled) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto task = Task<int,None>::never().raceWith(Task<int,None>::never());
     auto deferred = task.run(sched);
 
+    sched->run_ready_tasks();
     deferred->cancel();
+    sched->run_ready_tasks();
 
     try {
         deferred->await();

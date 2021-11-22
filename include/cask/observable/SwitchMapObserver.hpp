@@ -7,8 +7,13 @@
 #define _CASK_SWITCH_MAP_OBSERVER_H_
 
 #include "../Observer.hpp"
+#include "../MVar.hpp"
+#include "switchmap/SwitchMapState.hpp"
 
 namespace cask::observable {
+
+template <class U>
+using StatefulResult = std::tuple<switchmap::SwitchMapState,U>;
 
 /**
  * Represents an observer that transforms each event received on a stream to a new value and emits the
@@ -26,20 +31,24 @@ public:
     Task<Ack,None> onNext(const TI& value) override;
     Task<None,None> onError(const E& value) override;
     Task<None,None> onComplete() override;
-
-    int cancelRunningSubscription();
+    Task<None,None> onCancel() override;
 private:
     std::function<ObservableRef<TO,E>(TI)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
     std::shared_ptr<Scheduler> sched;
+    std::shared_ptr<MVar<switchmap::SwitchMapState,None>> stateVar;
 
-    std::shared_ptr<std::atomic_bool> upstream_complete;
-    std::shared_ptr<std::atomic_bool> downstream_complete;
-    std::shared_ptr<std::atomic_bool> error_encountered;
-    std::shared_ptr<std::atomic_bool> stopped;
-    std::shared_ptr<std::atomic_int> running_id;
-    CancelableRef running_subscription;
+    Task<StatefulResult<Ack>,None> onNextUnsafe(const TI& value, const switchmap::SwitchMapState& state);
+    Task<StatefulResult<None>,None> onErrorUnsafe(const E& value, const switchmap::SwitchMapState& state);
+    Task<StatefulResult<None>,None> onCompleteUnsafe(const switchmap::SwitchMapState& state);
+    Task<StatefulResult<None>,None> onCancelUnsafe(const switchmap::SwitchMapState& state);
 };
+
+}
+
+#include "switchmap/SwitchMapInternalObserver.hpp"
+
+namespace cask::observable {
 
 template <class TI, class TO, class E>
 SwitchMapObserver<TI,TO,E>::SwitchMapObserver(
@@ -49,108 +58,138 @@ SwitchMapObserver<TI,TO,E>::SwitchMapObserver(
     : predicate(predicate)
     , downstream(downstream)
     , sched(sched)
-    , upstream_complete(std::make_shared<std::atomic_bool>(false))
-    , downstream_complete(std::make_shared<std::atomic_bool>(true))
-    , error_encountered(std::make_shared<std::atomic_bool>(false))
-    , stopped(std::make_shared<std::atomic_bool>(false))
-    , running_id(std::make_shared<std::atomic_int>(0))
-    , running_subscription(nullptr)
+    , stateVar(MVar<switchmap::SwitchMapState,None>::create(sched, {}))
 {}
 
 template <class TI, class TO, class E>
 Task<Ack,None> SwitchMapObserver<TI,TO,E>::onNext(const TI& value) {
-    if(upstream_complete->load() || error_encountered->load() || stopped->load()) {
-        return Task<Ack,None>::pure(Stop);
-    } else {
-        int my_id = cancelRunningSubscription();
-        downstream_complete->exchange(false);
-
-        CancelableRef next_subscription = predicate(value)->subscribeHandlers(
-            sched,
-            [downstream = downstream, stopped = stopped, running_id = running_id, my_id](const TO& value) {
-                // Provide the value to downstream. If downstream provides a stop, we need to provide that
-                // stop upstream at the next opportunity. If this subscription is no longer valid (because
-                // the ID doesn't match the running ID) then go ahead and provide back a Stop.
-
-                if(running_id->load() == my_id) {
-                    return downstream->onNext(value)
-                        .template map<Ack>([stopped](auto ack) {
-                            if(ack == Stop) {
-                                stopped->exchange(true);
-                            }
-                            return ack;
-                        });
-                } else {
-                    return Task<Ack,None>::pure(Stop);
-                }
-            },
-            [downstream = downstream, error_encountered = error_encountered, running_id = running_id, my_id](const E& error) {
-                // Provide the error to downstream if an error has not already been provided and this
-                // subscription is still valid (because the ID matches the running ID).
-
-                if(running_id->load() == my_id && !error_encountered->exchange(true)) {
-                    return downstream->onError(error);
-                } else {
-                    return Task<None,None>::none();
-                }
-            },
-            [downstream = downstream, upstream_complete = upstream_complete, downstream_complete = downstream_complete, running_id = running_id, my_id] {
-                // If both upstream is already complete and this subscription is still valid
-                // (because the ID matches the running ID) then push the complete to downstream.
-
-                if(running_id->load() == my_id && !downstream_complete->exchange(true) && upstream_complete->load()) {
-                    return downstream->onComplete();
-                } else {
-                    return Task<None,None>::none();
-                }
-            }
-        );
-
-        std::atomic_exchange(&running_subscription, next_subscription);
-        return Task<Ack,None>::pure(Continue);
-    }
+    return stateVar->template modify<Ack>([self = this->shared_from_this(), value](auto state) {
+        auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI,TO,E>>(self);
+        return casted_self->onNextUnsafe(value, state);
+    });
 }
 
 template <class TI, class TO, class E>
 Task<None,None> SwitchMapObserver<TI,TO,E>::onError(const E& error) {
-    // When upstream provides an error we push that error downstream if
-    // and error has not already been provided. We also cancel the ongoing
-    // background computation.
-
-    if(!error_encountered->exchange(true)) {
-        cancelRunningSubscription();
-        return downstream->onError(error);
-    } else {
-        return Task<None,None>::none();
-    }
+    return stateVar->template modify<None>([self = this->shared_from_this(), error](auto state) {
+        auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI,TO,E>>(self);
+        return casted_self->onErrorUnsafe(error, state);
+    });
 }
 
 template <class TI, class TO, class E>
 Task<None,None> SwitchMapObserver<TI,TO,E>::onComplete() {
-    // When upstream completes we must _also_ wait for the inner
-    // subscription to complete before calling onComplete downstream.
+    return stateVar->template modify<None>([self = this->shared_from_this()](auto state) {
+        auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI,TO,E>>(self);
+        return casted_self->onCompleteUnsafe(state);
+    });
+}
 
-    if(!upstream_complete->exchange(true) && downstream_complete->load()) {
-        return downstream->onComplete();
+template <class TI, class TO, class E>
+Task<None,None> SwitchMapObserver<TI,TO,E>::onCancel() {
+    return stateVar->template modify<None>([self = this->shared_from_this()](auto state) {
+        auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI,TO,E>>(self);
+        return casted_self->onCancelUnsafe(state);
+    });
+}
+
+template <class TI, class TO, class E>
+Task<StatefulResult<Ack>,None> SwitchMapObserver<TI,TO,E>::onNextUnsafe(const TI& value, const switchmap::SwitchMapState& state) {
+    if(state.subscription && state.downstream_ack == Continue) {
+        auto promise = Promise<None,None>::create(sched);
+
+        state.subscription->cancel();
+        state.subscription->onFiberShutdown([promise](auto) {
+            promise->success(None());
+        });
+
+        return Task<None,None>::forPromise(promise)
+            .template flatMap<StatefulResult<Ack>>([value, state, self = this->shared_from_this()](auto) {
+                switchmap::SwitchMapState updated_state = state;
+                updated_state.subscription = nullptr;
+
+                auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI,TO,E>>(self);
+                return casted_self->onNextUnsafe(value, updated_state);
+            });
+    } else if(state.downstream_ack == Continue) {
+        auto observer = std::make_shared<switchmap::SwitchMapInternalObserver<TO,E>>(downstream, stateVar);
+
+        switchmap::SwitchMapState updated_state = state;
+        updated_state.subscription = predicate(value)->subscribe(sched, observer);
+        updated_state.downstream_completed = false;
+
+        return Task<StatefulResult<Ack>,None>::pure(
+            {updated_state, Continue}
+        );
     } else {
-        return Task<None,None>::none();
+        return Task<StatefulResult<Ack>,None>::pure(
+            {state, Stop}
+        );
     }
 }
 
 template <class TI, class TO, class E>
-int SwitchMapObserver<TI,TO,E>::cancelRunningSubscription() {
-    // Cancel the running observer by atomically replacing its
-    // ref with nullptr - and then calling cancel on it. We'll
-    // also increment the running_id and return the new ID to the
-    // caller. This will invalidate any processing which may still
-    // be running but is uncancelable for whatever reason.
+Task<StatefulResult<None>,None> SwitchMapObserver<TI,TO,E>::onErrorUnsafe(const E& error, const switchmap::SwitchMapState& state) {
+    if(state.subscription) {
+        auto promise = Promise<None,None>::create(sched);
 
-    CancelableRef nullref;
-    auto observer = std::atomic_exchange(&running_subscription, nullref);
-    if(observer != nullptr) {
-        observer->cancel();
+        state.subscription->cancel();
+        state.subscription->onFiberShutdown([promise](auto) {
+            promise->success(None());
+        });
+
+        return Task<None,None>::forPromise(promise)
+            .template flatMap<StatefulResult<None>>([error, state, self = this->shared_from_this()](auto) {
+                switchmap::SwitchMapState updated_state = state;
+                updated_state.subscription = nullptr;
+
+                auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI,TO,E>>(self);
+                return casted_self->onErrorUnsafe(error, updated_state);
+            });
+    } else {
+        return downstream->onError(error).template map<StatefulResult<None>>([state](auto) {
+            return StatefulResult<None>({state, None()});
+        });
     }
-    return ++(*running_id);
+}
+
+template <class TI, class TO, class E>
+Task<StatefulResult<None>,None> SwitchMapObserver<TI,TO,E>::onCompleteUnsafe(const switchmap::SwitchMapState& state) {
+    switchmap::SwitchMapState updated_state = state;
+    updated_state.upstream_completed = true;
+
+    if(state.downstream_completed) {
+        return downstream->onComplete().template map<StatefulResult<None>>([updated_state](auto) {
+            return StatefulResult<None>({updated_state, None()});
+        });
+    } else {
+        return Task<StatefulResult<None>,None>::pure({updated_state, None()});
+    }
+}
+
+template <class TI, class TO, class E>
+Task<StatefulResult<None>,None> SwitchMapObserver<TI,TO,E>::onCancelUnsafe(const switchmap::SwitchMapState& state) {
+    if(state.subscription) {
+        auto promise = Promise<None,None>::create(sched);
+
+        state.subscription->cancel();
+        state.subscription->onFiberShutdown([promise](auto) {
+            promise->success(None());
+        });
+
+        return Task<None,None>::forPromise(promise)
+            .template flatMap<StatefulResult<None>>([state, self = this->shared_from_this()](auto) {
+                switchmap::SwitchMapState updated_state = state;
+                updated_state.subscription = nullptr;
+
+                auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI,TO,E>>(self);
+                return casted_self->onCancelUnsafe(updated_state);
+            });
+    } else {
+        return downstream->onCancel().template map<StatefulResult<None>>([state](auto) {
+            return StatefulResult<None>({state, None()});
+        });
+    }
 }
 
 }

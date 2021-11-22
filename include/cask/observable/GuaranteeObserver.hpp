@@ -23,26 +23,26 @@ public:
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
-    Task<None,None> onCancel();
+    Task<None,None> onCancel() override;
 
 private:
     std::shared_ptr<Observer<T,E>> downstream;
     Task<None,None> task;
     std::shared_ptr<Scheduler> sched;
-    std::atomic_flag completed;
+    std::shared_ptr<std::atomic_flag> completed;
 };
 
 template <class T, class E>
 GuaranteeObserver<T,E>::GuaranteeObserver(const std::shared_ptr<Observer<T,E>>& downstream, const Task<None,None>& task)
     : downstream(downstream)
     , task(task)
-    , completed(false)
+    , completed(std::make_shared<std::atomic_flag>(false))
 {}
 
 template <class T, class E>
 Task<Ack,None> GuaranteeObserver<T,E>::onNext(const T& value) {
-    return downstream->onNext(value).template flatMap<Ack>([this](auto ack) {
-        if(ack == cask::Stop && !completed.test_and_set()) {
+    return downstream->onNext(value).template flatMap<Ack>([task = task, completed = completed](auto ack) {
+        if(ack == cask::Stop && !completed->test_and_set()) {
             return task.template map<Ack>([](auto) {
                 return cask::Stop;
             });
@@ -54,7 +54,7 @@ Task<Ack,None> GuaranteeObserver<T,E>::onNext(const T& value) {
 
 template <class T, class E>
 Task<None,None> GuaranteeObserver<T,E>::onError(const E& error) {
-    if(!completed.test_and_set()) {
+    if(!completed->test_and_set()) {
         return downstream->onError(error)
             .template flatMap<None>([task = task](auto) {
                 return task;
@@ -66,7 +66,7 @@ Task<None,None> GuaranteeObserver<T,E>::onError(const E& error) {
 
 template <class T, class E>
 Task<None,None> GuaranteeObserver<T,E>::onComplete() {
-    if(!completed.test_and_set()) {
+    if(!completed->test_and_set()) {
         return downstream->onComplete()
             .template flatMap<None>([task = task](auto) {
                 return task;
@@ -78,8 +78,8 @@ Task<None,None> GuaranteeObserver<T,E>::onComplete() {
 
 template <class T, class E>
 Task<None,None> GuaranteeObserver<T,E>::onCancel() {
-    if(!completed.test_and_set()) {
-        return task;
+    if(!completed->test_and_set()) {
+        return downstream->onCancel().template guarantee<None>(task);
     } else {
         return Task<None,None>::none();
     }

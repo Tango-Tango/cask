@@ -99,7 +99,7 @@ template <class T, class E>
 bool Queue<T,E>::tryPut(const T& value) {
     using IntermediateResult = std::tuple<bool,std::function<void()>>;
 
-    auto result = stateRef->template modify<IntermediateResult>([value](auto state) {
+    auto result_opt = stateRef->template modify<IntermediateResult>([value](auto state) {
         auto result = state.tryPut(value);
         auto nextState = std::get<0>(result);
         auto completed = std::get<1>(result);
@@ -114,9 +114,11 @@ bool Queue<T,E>::tryPut(const T& value) {
     })
     .runSync();
 
-    // The operation above is guaranteed to run synchronously and without error
-    // so  we just need to unwrap the result here.
-    return result.get_left().get_left();
+    if(result_opt && result_opt->is_left()) {
+        return result_opt->get_left();
+    } else {
+        return false;
+    }
 }
 
 template <class T, class E>

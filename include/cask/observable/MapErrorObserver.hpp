@@ -22,6 +22,7 @@ public:
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const EI& error) override;
     Task<None,None> onComplete() override;
+    Task<None,None> onCancel() override;
 private:
     std::function<EO(EI)> predicate;
     std::shared_ptr<Observer<T,EO>> downstream;
@@ -48,6 +49,11 @@ Task<None,None> MapErrorObserver<T,EI,EO>::onError(const EI& error) {
 template <class T, class EI, class EO>
 Task<None,None> MapErrorObserver<T,EI,EO>::onComplete() {
     return downstream->onComplete();
+}
+
+template <class T, class EI, class EO>
+Task<None,None> MapErrorObserver<T,EI,EO>::onCancel() {
+    return downstream->onCancel();
 }
 
 }

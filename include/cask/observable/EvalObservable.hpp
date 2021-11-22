@@ -14,7 +14,7 @@ template <class T, class E>
 class EvalObservable final : public Observable<T,E> {
 public:
     explicit EvalObservable(const std::function<T()>& predicate);
-    CancelableRef subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
+    FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 
 private:
     std::function<T()> predicate;
@@ -26,7 +26,7 @@ EvalObservable<T,E>::EvalObservable(const std::function<T()>& predicate)
 {}
 
 template <class T, class E>
-CancelableRef EvalObservable<T,E>::subscribe(
+FiberRef<None,None> EvalObservable<T,E>::subscribe(
     const std::shared_ptr<Scheduler>& sched,
     const std::shared_ptr<Observer<T,E>>& observer) const
 {
@@ -35,6 +35,7 @@ CancelableRef EvalObservable<T,E>::subscribe(
             .template flatMap<None>([observer](auto) {
                 return observer->onComplete();
             })
+            .doOnCancel(Task<None,None>::defer([observer] { return observer->onCancel(); }))
             .run(sched);
     } catch(E& error) {
         return observer->onError(error).run(sched);

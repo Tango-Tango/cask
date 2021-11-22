@@ -12,11 +12,10 @@ using cask::None;
 
 TEST(TaskNone,EvalutesSync) {
     auto result = Task<>::none().runSync();
-    ASSERT_TRUE(result.is_left());
-    
-    auto value = result.get_left();
-    ASSERT_TRUE(value.is_left());
-    EXPECT_EQ(value.get_left(), None());
+
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->is_left());
+    EXPECT_EQ(result->get_left(), None());
 }
 
 TEST(TaskNone,EvaluatesAsync) {

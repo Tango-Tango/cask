@@ -21,6 +21,7 @@ TEST(TestTaskDelay, DelaysExecution) {
 
     EXPECT_EQ(counter, 0);
 
+    sched->run_ready_tasks();
     sched->advance_time(9);
     sched->run_ready_tasks();
     EXPECT_EQ(counter, 0);
@@ -28,6 +29,8 @@ TEST(TestTaskDelay, DelaysExecution) {
     sched->advance_time(1);
     sched->run_ready_tasks();
     EXPECT_EQ(counter, 1);
+    sched->run_ready_tasks();
+    EXPECT_TRUE(sched->isIdle());
 }
 
 TEST(TestTaskDelay, CancelsExecution) {
@@ -38,7 +41,9 @@ TEST(TestTaskDelay, CancelsExecution) {
         .delay(10)
         .run(sched);
 
+    sched->run_ready_tasks();
     EXPECT_EQ(sched->num_timers(), 1);
+
     deferred->cancel();
     EXPECT_EQ(sched->num_timers(), 0);
 }

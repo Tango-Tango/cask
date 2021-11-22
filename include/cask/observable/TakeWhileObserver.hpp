@@ -27,6 +27,7 @@ public:
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
+    Task<None,None> onCancel() override;
 private:
     ObserverRef<T,E> downstream;
     std::function<bool(const T&)> predicate;
@@ -53,8 +54,12 @@ Task<Ack,None> TakeWhileObserver<T,E>::onNext(const T& value) {
     } else {
         if(inclusive) {
             return downstream->onNext(value)
-                .template flatMap<None>([this](auto) {
-                    return onComplete();
+                .template flatMap<None>([self_weak = this->weak_from_this()](auto) {
+                    if(auto self = self_weak.lock()) {
+                        return self->onComplete();
+                    } else {
+                        return Task<None,None>::none();
+                    }
                 })
                 .template map<Ack>([](auto) {
                     return Stop;
@@ -80,6 +85,15 @@ template <class T, class E>
 Task<None,None> TakeWhileObserver<T,E>::onComplete() {
     if(!completed.test_and_set()) {
         return downstream->onComplete();
+    } else {
+        return Task<None,None>::none();
+    }
+}
+
+template <class T, class E>
+Task<None,None> TakeWhileObserver<T,E>::onCancel() {
+    if(!completed.test_and_set()) {
+        return downstream->onCancel();
     } else {
         return Task<None,None>::none();
     }

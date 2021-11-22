@@ -11,17 +11,7 @@ using cask::Scheduler;
 
 TEST(TaskNever,EvalutesSync) {
     auto result = Task<int,float>::never().runSync();
-    ASSERT_TRUE(result.is_right());
-
-    auto continuation = result.get_right();
-    auto deferred = continuation.run(Scheduler::global());
-
-    deferred->cancel();
-
-    try {
-        deferred->await();
-        FAIL() << "Excepted operation to throw.";
-    } catch(std::runtime_error& error) {}
+    ASSERT_FALSE(result.has_value());
 }
 
 TEST(TaskNever,EvalutesAsync) {

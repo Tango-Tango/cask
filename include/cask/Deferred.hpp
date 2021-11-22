@@ -8,10 +8,17 @@
 
 #include <memory>
 #include <functional>
-#include "Promise.hpp"
 #include <exception>
 
+#include "Promise.hpp"
+
 namespace cask {
+
+template <class T, class E>
+class Fiber;
+
+template <class T, class E>
+using FiberRef = std::shared_ptr<Fiber<T,E>>;
 
 template <class T, class E>
 class Deferred;
@@ -56,6 +63,16 @@ public:
     static DeferredRef<T,E> forPromise(PromiseRef<T,E> promise);
 
     /**
+     * Create a deferred which whose completion is govered by
+     * the supplied fiber.
+     *
+     * @param promise The fiber which, when complete, should
+     *                also complete this deferred.
+     * @return A deferred instance for the given fiber.
+     */
+    static DeferredRef<T,E> forFiber(FiberRef<T,E> promise);
+
+    /**
      * Create a value-less deferred which completes when the given cancelable
      * shuts down.
      * 
@@ -66,58 +83,17 @@ public:
     static DeferredRef<None,None> forCancelable(CancelableRef cancelable, SchedulerRef sched);
 
     /**
-     * Properly chain this deferred to another promise which is
-     * relying on its results. This not only chains normal values
-     * an errors from this source to its downstream promise - but
-     * also properly communicates cancellations from the downstream
-     * promise back to this deferred.
-     *
-     * Don't try and do this on your own. You'll create memory leaks.
-     * Use this method whenever chaining together promises rather
-     * that using the `onComplete` and `onCancel` methods to do it
-     * yourself.
-     *
-     * @param downstream The downstream promise that should be completed
-     *                   based on the results of this deferred and
-     *                   the provided transform methods.
-     * @param transformDownstream Transform the result of this deferred (which
-     *                            may be either a value or error) into its
-     *                            downstream representation.
+     * Create a new deferred which maps both the value and error results of
+     * this deferred to new values or errors using a pair of provided transformers.
+     * 
+     * @param value_transform The transformer to run on success value results.
+     * @param error_transform The transfomer to run on error results.
+     * @return A deferred which presents the transformed values and errors.
      */
     template <class T2, class E2>
-    void chainDownstream(
-        PromiseRef<T2,E2> downstream,
-        std::function<Either<T2,E2>(Either<T,E>)> transformDownstream
-    );
-
-    /**
-     * Properly chain this deferred to another promise which is
-     * relying on its results. This not only chains normal values
-     * an errors from this source to its downstream promise - but
-     * also properly communicates cancellations from the downstream
-     * promise back to this deferred.
-     *
-     * Don't try and do this on your own. You'll create memory leaks.
-     * Use this method whenever chaining together promises rather
-     * that using the `onComplete` and `onCancel` methods to do it
-     * yourself.
-     *
-     * This implementation differs from `chainDownstream` in that it
-     * allows a downstream transform to also provide an asynchronous
-     * result.
-     *
-     * @param downstream The downstream promise that should be completed
-     *                   based on the results of this deferred and
-     *                   the provided transform methods.
-     * @param transformDownstream Transform the result of this deferred (which
-     *                            may be either a value or error) into its
-     *                            downstream representation. The results of this
-     *                            transform will be provided asynchronously.
-     */
-    template <class T2, class E2>
-    void chainDownstreamAsync(
-        PromiseRef<T2,E2> downstream,
-        std::function<DeferredRef<T2,E2>(Either<T,E>)> transformDownstream
+    DeferredRef<T2,E2> mapBoth(
+        std::function<T2(const T&)> value_transform,
+        std::function<E2(const E&)> error_transform
     );
 
     /**
@@ -158,6 +134,8 @@ public:
 
 }
 
+#include "deferred/FiberDeferred.hpp"
+#include "deferred/MapDeferred.hpp"
 #include "deferred/PromiseDeferred.hpp"
 #include "deferred/PureDeferred.hpp"
 #include "deferred/PureErrorDeferred.hpp"
@@ -185,6 +163,12 @@ DeferredRef<T,E> Deferred<T,E>::forPromise(PromiseRef<T,E> promise) {
 }
 
 template<class T, class E>
+DeferredRef<T,E> Deferred<T,E>::forFiber(FiberRef<T,E> fiber) {
+    return std::make_shared<deferred::FiberDeferred<T,E>>(fiber);
+}
+
+
+template<class T, class E>
 DeferredRef<None,None> Deferred<T,E>::forCancelable(CancelableRef cancelable, SchedulerRef sched) {
     auto promise = Promise<cask::None,cask::None>::create(sched);
 
@@ -200,48 +184,16 @@ DeferredRef<None,None> Deferred<T,E>::forCancelable(CancelableRef cancelable, Sc
 }
 
 template<class T, class E>
-template<class T2, class E2>
-void Deferred<T,E>::chainDownstream(
-    PromiseRef<T2,E2> downstream,
-    std::function<Either<T2,E2>(Either<T,E>)> transform
-) {
-    auto upstream = this->shared_from_this();
-
-    downstream->onCancel([upstream]() {
-        upstream->cancel();
-    });
-
-    upstream->onComplete([downstreamWeak = std::weak_ptr<Promise<T2,E2>>(downstream), transform](Either<T,E> result) {
-        auto transformResult = transform(result);
-
-        if(auto downstream = downstreamWeak.lock()) {
-            downstream->complete(transformResult);
-        }
-    });
-}
-
-template<class T, class E>
 template <class T2, class E2>
-void Deferred<T,E>::chainDownstreamAsync(
-    PromiseRef<T2,E2> downstream,
-    std::function<DeferredRef<T2,E2>(Either<T,E>)> transform
+DeferredRef<T2,E2> Deferred<T,E>::mapBoth(
+    std::function<T2(const T&)> value_transform,
+    std::function<E2(const E&)> error_transform
 ) {
-    auto upstream = this->shared_from_this();
-
-    downstream->onCancel([upstream]() {
-        upstream->cancel();
-    });
-
-    upstream->onComplete([downstreamWeak = std::weak_ptr<Promise<T2,E2>>(downstream), transform](Either<T,E> result) {
-        DeferredRef<T2,E2> asyncTransformResult = transform(result);
-
-        if(auto downstream = downstreamWeak.lock()) {
-            asyncTransformResult->template chainDownstream<T2,E2>(
-                downstream,
-                [](auto result){ return result; }
-            );
-        }
-    });
+    return std::make_shared<deferred::MapDeferred<T,T2,E,E2>>(
+        this->shared_from_this(),
+        value_transform,
+        error_transform
+    );
 }
 
 }

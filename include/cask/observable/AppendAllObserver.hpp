@@ -23,6 +23,7 @@ public:
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
+    Task<None,None> onCancel() override;
 private:
     std::shared_ptr<Scheduler> sched;
     std::shared_ptr<Observer<T,E>> downstream;
@@ -78,6 +79,11 @@ Task<None,None> AppendAllObserver<T,E>::onComplete() {
                 return Task<None,None>::none();
             }
         });
+}
+
+template <class T, class E>
+Task<None,None> AppendAllObserver<T,E>::onCancel() {
+    return downstream->onCancel();
 }
 
 }
