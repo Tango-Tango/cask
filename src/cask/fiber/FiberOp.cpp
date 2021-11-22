@@ -9,69 +9,6 @@
 
 namespace cask::fiber {
 
-FiberOp::FiberOp(const FiberOp& other) noexcept
-    : std::enable_shared_from_this<FiberOp>(other)
-    , opType(other.opType)
-{
-    switch(opType) {
-        case VALUE:
-        case ERROR:
-            data.constantData = new ConstantData(*(other.data.constantData));
-        break;
-        case THUNK:
-            data.thunkData = new ThunkData(*(other.data.thunkData));
-        break;
-        case ASYNC:
-            data.asyncData = new AsyncData(*(other.data.asyncData));
-        break;
-        case FLATMAP:
-            data.flatMapData = new FlatMapData(*(other.data.flatMapData));
-        break;
-        case DELAY:
-            data.delayData = new DelayData(*(other.data.delayData));
-        break;
-        case RACE:
-            data.raceData = new RaceData(*(other.data.raceData));
-        break;
-        case CANCEL:
-        break;
-    }
-}
-
-FiberOp::FiberOp(FiberOp&& other) noexcept
-    : opType(other.opType)
-{
-    switch(opType) {
-        case VALUE:
-        case ERROR:
-            data.constantData = other.data.constantData;
-            other.data.constantData = nullptr;
-        break;
-        case THUNK:
-            data.thunkData = other.data.thunkData;
-            other.data.thunkData = nullptr;
-        break;
-        case ASYNC:
-            data.asyncData = other.data.asyncData;
-            other.data.asyncData = nullptr;
-        break;
-        case FLATMAP:
-            data.flatMapData = other.data.flatMapData;
-            other.data.flatMapData = nullptr;
-        break;
-        case DELAY:
-            data.delayData = other.data.delayData;
-            other.data.delayData = nullptr;
-        break;
-        case RACE:
-            data.raceData = other.data.raceData;
-            other.data.raceData = nullptr;
-        break;
-        case CANCEL:
-        break;
-    }
-}
-
 FiberOp::FiberOp(AsyncData* async) noexcept
     : opType(ASYNC)
 {
@@ -142,12 +79,6 @@ FiberOp::~FiberOp() {
         case CANCEL:
         break;
     }
-}
-
-FiberOp& FiberOp::operator=(const FiberOp& other) {
-    this->opType = other.opType;
-    this->data = other.data;
-    return *this;
 }
 
 std::shared_ptr<const FiberOp> FiberOp::value(const Erased& v) noexcept {

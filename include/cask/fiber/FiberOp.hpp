@@ -15,6 +15,7 @@
 #include "../None.hpp"
 #include "../Either.hpp"
 #include "../Erased.hpp"
+#include "../Scheduler.hpp"
 
 namespace cask {
 
@@ -42,10 +43,16 @@ enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE, CANCEL };
  *   1. `Value` represents a pure value which does not need to be computed.
  *   2. `Error` represents an errors which should halt execution.
  *   3. `Thunk` represents a lazily-evaluated method which returns a `Value`.
- *   4. `Defer` represents an asynchronous operation.
+ *   4. `Async` represents an asynchronous operation.
  *   5. `FlatMap` represents a composite program which takes the results
  *      from one program (the input) and provides it to another program (
  *      the predicate) which returns a new and likely transformed result.
+ *   6. `Delay` represents a timed delay after which a fiber should resume
+ *      execution.
+ *   7. `Race` represents the parallel execution of several operations of
+ *      which the result is provided for the first operation which completes
+ *      and all other operations are canceled.
+ *   6. `Cancel` represents the cancelation of evaluation for the fiber.
  */
 class FiberOp final : public std::enable_shared_from_this<FiberOp> {
 public:
@@ -85,11 +92,9 @@ public:
     std::shared_ptr<const FiberOp> flatMap(const FlatMapPredicate& predicate) const noexcept;
 
     /**
-     * Construct a trampoline op of the given type. Should be called by
-     * subsclasses to instantiate the proper operation type.
+     * Construct a fiber op of the given type. Should not be called directly and instead
+     * users should use the static construction methods provided.
      */
-    FiberOp(const FiberOp& other) noexcept;
-    FiberOp(FiberOp&& other) noexcept;
     FiberOp(AsyncData* async) noexcept;
     FiberOp(ConstantData* constant) noexcept;
     FiberOp(ThunkData* thunk) noexcept;
@@ -97,9 +102,6 @@ public:
     FiberOp(DelayData* delay) noexcept;
     FiberOp(RaceData* race) noexcept;
     FiberOp(bool cancel_flag) noexcept;
-
-
-    FiberOp& operator=(const FiberOp&);
 
     union {
         AsyncData* asyncData;
