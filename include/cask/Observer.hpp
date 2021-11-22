@@ -52,9 +52,12 @@ using ObserverRef = std::shared_ptr<Observer<T,E>>;
  *   4. Callers may call `onComplete` 0 or 1 times. Once `onComplete` is
  *      called the caller must not call `onNext` again.
  *   5. Callers may call `onError` 0 or 1 times. After `onError` is called
- *      it must not be called again. Callers must also not call `onComplete`
- *      or `onNext` after this point.
- *   6. If an observer reports an error upstream via its task result, the
+ *      it must not be called again. Callers must also not call `onComplete`,
+ *      `onCancel`, or `onNext` after this point.
+ *   6. Callers may call `onCancel` 0 or 1 times. After `onCancel` is called
+ *      it must not be called again. Callers must also not call `onComplete`,
+ *      `onError`, or `onNext` after this point.
+ *   7. If an observer reports an error upstream via its task result, the
  *      upstream task must not call `onError` on the observer which reported
  *      that error.
  * 
@@ -74,12 +77,19 @@ public:
      */
     virtual Task<Ack,None> onNext(const T& value) = 0;
 
+    /**
+     * Provide an error which should terminate processing.
+     */
     virtual Task<None,None> onError(const E& error) = 0;
 
     /**
      * Handle stream close because all events have been processed.
      */
     virtual Task<None,None> onComplete() = 0;
+
+    /**
+     * Handle mid-stream cancelation of the running fiber.
+     */
     virtual Task<None,None> onCancel() = 0;
 
     virtual ~Observer() = default;

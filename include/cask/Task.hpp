@@ -28,12 +28,12 @@ namespace cask {
  * (via `flatMap`) without performing said recursion on the stack or worrying about
  * tail call optimizations. This can make writing recursive algorithms _far_ easier.
  * 
- * To evaluate a Task (or its composition) use the `evaluate` method which returns
- * a `Deferred`. At this point the computation is running and when a result is
- * available it will be provided there. At this point the evaluation is ongoing
- * and can result in side effects throughout the system. As a result, it's recommended
- * to evalute a task as close to the "end of the world" (i.e. the edge of your
- * application) as possible.
+ * To evaluate a Task (or its composition) use the `run` method which returns
+ * a `Fiber`. At this point the computation is running and when a result is
+ * available it will be provided there. As part of evaluation the resulting `Fiber`
+ * may also be executing side effects. As a result, it's recommended to evalute a
+ * task as close to the "end of the world" (i.e. the edge of your application) as
+ * possible.
  * 
  * A Task can be evaluated as many times as you want. Each evaluation will execute
  * independently and will re-compute the entire composition of tasks.
@@ -127,21 +127,18 @@ public:
 
     /**
      * Trigger execution of this task on the given scheduler. Results
-     * of the run can be observed via the returned `Deferred`
-     * instance.
+     * of the run can be observed via the returned `Fiber` instance.
      * 
      * @param sched The scheduler to use for running of the task.
-     * @return A `Deferred` reference to the running computation.
+     * @return A `Fiber` reference to the running computation.
      */
     FiberRef<T,E> run(const std::shared_ptr<Scheduler>& scheduler) const;
 
     /**
      * Attempt synchronous execution of this task. Either a synchronous
-     * result will be provided or a task which, when run with a scheduler,
-     * will provide an asynchronous result.
+     * result will be provided or no result will be provided at all.
      * 
-     * @return A value, an error, or a Task representing the asynchronous
-     *         continuation of this computation.
+     * @return A value, an error, or no result.
      */
     std::optional<Either<T,E>> runSync() const;
 
