@@ -89,7 +89,7 @@ public:
 
     /**
      * Create a task that, upon evaluation, defers said evalution
-     * to the supplied method. The method is upplied a `Scheduler`
+     * to the supplied method. The method is supplied a `Scheduler`
      * instance and must return a `Deferred` which wraps the ongoing
      * evaluation.
      * 
@@ -100,8 +100,8 @@ public:
 
     /**
      * Create a task that, upon evaluation, defers said evalution
-     * to the supplied method. The method is upplied a `Scheduler`
-     * instance and must return a `Deferred` which wraps the ongoing
+     * to the supplied method. The method is supplied a `Scheduler`
+     * instance and must return a `Fiber` which represents the ongoing
      * evaluation.
      * 
      * @param predicate The method to defer evalution to.

@@ -41,6 +41,7 @@ if not meson.is_subproject()
         'cask/scheduler/TestThreadPoolScheduler.cpp',
         'cask/task/TestTaskAssignment.cpp',
         'cask/task/TestTaskDefer.cpp',
+        'cask/task/TestTaskDeferFiber.cpp',
         'cask/task/TestTaskDelay.cpp',
         'cask/task/TestTaskEval.cpp',
         'cask/task/TestTaskFlatMapBoth.cpp',
