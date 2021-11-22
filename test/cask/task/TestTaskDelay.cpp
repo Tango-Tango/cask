@@ -15,7 +15,7 @@ TEST(TestTaskDelay, DelaysExecution) {
     int counter = 0;
     auto sched = std::make_shared<BenchScheduler>();
 
-    auto deferred = Task<int>::eval([&counter] { return counter++; })
+    auto fiber = Task<int>::eval([&counter] { return counter++; })
         .delay(10)
         .run(sched);
 
@@ -37,13 +37,16 @@ TEST(TestTaskDelay, CancelsExecution) {
     int counter = 0;
     auto sched = std::make_shared<BenchScheduler>();
 
-    auto deferred = Task<int>::eval([&counter] { return counter++; })
+    auto fiber = Task<int>::eval([&counter] { return counter++; })
         .delay(10)
         .run(sched);
 
     sched->run_ready_tasks();
     EXPECT_EQ(sched->num_timers(), 1);
 
-    deferred->cancel();
+    fiber->cancel();
+    sched->run_ready_tasks();
     EXPECT_EQ(sched->num_timers(), 0);
+    EXPECT_TRUE(fiber->isCanceled());
 }
+

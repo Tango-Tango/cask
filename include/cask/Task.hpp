@@ -726,8 +726,12 @@ constexpr Task<T2,E> Task<T,E>::dematerialize() const noexcept {
 template <class T, class E>
 constexpr Task<T,E> Task<T,E>::delay(uint32_t milliseconds) const noexcept {
     return Task<T,E>(
-        fiber::FiberOp::delay(milliseconds)->flatMap([op = this->op](auto) {
-            return op;
+        fiber::FiberOp::delay(milliseconds)->flatMap([op = this->op](auto result) {
+            if(result.isCanceled()) {
+                return fiber::FiberOp::cancel();
+            } else {
+                return op;
+            }
         })
     );
 }
