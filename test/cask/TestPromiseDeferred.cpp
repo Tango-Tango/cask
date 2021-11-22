@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 #include "cask/Deferred.hpp"
 #include "cask/None.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 #include <chrono>
 #include <thread>
 
@@ -14,6 +15,7 @@ using cask::Deferred;
 using cask::None;
 using cask::Scheduler;
 using cask::Either;
+using cask::scheduler::BenchScheduler;
 
 TEST(Deferred, PureOnComplete) {
     Either<int,float> result = Either<int,float>::left(0);
@@ -357,3 +359,88 @@ TEST(Deferred, DoesntAllowMultipleErrors) {
         EXPECT_EQ(message, "Promise already completed with an error.");
     }
 }
+
+TEST(Deferred, MapBothValue) {
+    Either<std::string, std::runtime_error> result = Either<std::string, std::runtime_error>::left("dont work");
+    auto deferred = Deferred<int,float>::pure(123)->mapBoth<std::string, std::runtime_error>(
+        [](auto) { return "works"; },
+        [](auto) { return std::runtime_error("broke"); }
+    );
+
+    deferred->onComplete([&result](auto value) {
+        result = value;
+    });
+
+    EXPECT_EQ(result.get_left(), "works");
+}
+
+TEST(Deferred, MapBothError) {
+    Either<std::string, std::runtime_error> result = Either<std::string, std::runtime_error>::left("dont work");
+    auto deferred = Deferred<int,float>::raiseError(1.23f)->mapBoth<std::string, std::runtime_error>(
+        [](auto) { return "works"; },
+        [](auto) { return std::runtime_error("broke"); }
+    );
+
+    deferred->onComplete([&result](auto value) {
+        result = value;
+    });
+
+    EXPECT_EQ(result.get_right().what(), std::string("broke"));
+}
+
+TEST(Deferred, MapBothCancels) {
+    auto sched = std::make_shared<BenchScheduler>();
+    bool canceled = false;
+
+    auto promise = Promise<int,float>::create(sched);
+    auto deferred = Deferred<int,float>::forPromise(promise)->mapBoth<std::string, std::runtime_error>(
+        [](auto) { return "works"; },
+        [](auto) { return std::runtime_error("broke"); }
+    );
+
+    deferred->onCancel([&canceled] {
+        canceled = true;
+    });
+
+    deferred->cancel();
+
+    EXPECT_TRUE(canceled);
+}
+
+TEST(Deferred, MapBothOnSuccess) {
+    std::string result = "dont work";
+    auto deferred = Deferred<int,float>::pure(123)->mapBoth<std::string, std::runtime_error>(
+        [](auto) { return "works"; },
+        [](auto) { return std::runtime_error("broke"); }
+    );
+
+    deferred->onSuccess([&result](auto value) {
+        result = value;
+    });
+
+    EXPECT_EQ(result, "works");
+}
+
+TEST(Deferred, MapBothOnError) {
+    std::runtime_error result("not broke");
+    auto deferred = Deferred<int,float>::raiseError(1.23f)->mapBoth<std::string, std::runtime_error>(
+        [](auto) { return "works"; },
+        [](auto) { return std::runtime_error("broke"); }
+    );
+
+    deferred->onError([&result](auto value) {
+        result = value;
+    });
+
+    EXPECT_EQ(result.what(), std::string("broke"));
+}
+
+TEST(Deferred, MapBothAwait) {
+    auto deferred = Deferred<int,float>::pure(123)->mapBoth<std::string, std::runtime_error>(
+        [](auto) { return "works"; },
+        [](auto) { return std::runtime_error("broke"); }
+    );
+
+    EXPECT_EQ(deferred->await(), "works");
+}
+

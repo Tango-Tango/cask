@@ -74,6 +74,14 @@ public:
      */
     static DeferredRef<None,None> forCancelable(CancelableRef cancelable, SchedulerRef sched);
 
+    /**
+     * Create a new deferred which maps both the value and error results of
+     * this deferred to new values or errors using a pair of provided transformers.
+     * 
+     * @param value_transform The transformer to run on success value results.
+     * @param error_transform The transfomer to run on error results.
+     * @return A deferred which presents the transformed values and errors.
+     */
     template <class T2, class E2>
     DeferredRef<T2,E2> mapBoth(
         std::function<T2(const T&)> value_transform,
