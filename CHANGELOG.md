@@ -5,6 +5,18 @@ in this file. This project follows [semantic versioning](https://semver.org/).
 
 ## 11.0
 - Add `Fiber` as a replacement for the `TrampolineRunLoop`.
+- Add the `forFiber` method to `Deferred`.
+- Add the `modify` method to `MVar`.
+- Add the `onCancel` method to the `Observer` contract.
+- Add the `deferFiber` and `doOnCancel` methods to `Task`.
+- Modify the `Observable::subscribe` and `Observable::subscribeHandlers` methods to return a `Fiber`.
+- Modify the `Task::run` method to return a `Fiber`.
+- Modify the `Task::runSync` method to return either a result or no value.
+- Modify the `Task::raceWith` method to not accept an extra type parameter for the raced task.
+- Remove the `TrampolineRunLoop` and `TrampolineOp` classes that have been replaced with `Fiber`,
+  `FiberOp` and `FiberValue`.
+- Remove the `chainDownstream` and `chainDownstreamAsync` methods from `Deferred`.
+- Remove the `runCancelableThenPromise` method from `Task`.
 - Remove mutex blocking of the cancel callback in `guarantee`.
 - Remove the `Deferred:chainDownstream` and `Deferred:chainDownstreamAsync` methods
   which could lead memory.
