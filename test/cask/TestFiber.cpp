@@ -274,4 +274,33 @@ TEST(TestFiber, RacesSeveralPureValuesSync) {
     EXPECT_FALSE(result.has_value());
 }
 
+TEST(TestFiber, MapBothValue) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto op = FiberOp::value(123);
+    auto fiber = Fiber<int,std::string>::run(op, sched)
+        ->template mapBoth<std::string,int>(
+            [](auto) { return "success"; },
+            [](auto) { return 1337; }
+        );
 
+    sched->run_ready_tasks();
+
+    EXPECT_TRUE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getValue()), "success");
+}
+
+TEST(TestFiber, MapBothError) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto op = FiberOp::error(std::string("broke"));
+    auto fiber = Fiber<int,std::string>::run(op, sched)
+        ->template mapBoth<std::string,int>(
+            [](auto) { return "success"; },
+            [](auto) { return 1337; }
+        );
+
+    sched->run_ready_tasks();
+
+    EXPECT_TRUE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getError()), 1337);
+}
