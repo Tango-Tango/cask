@@ -91,6 +91,16 @@ public:
      */
     Task<T,E> read();
 
+    /**
+     * Modify the stored value using the given mutator function which
+     * also provides a return value for the original caller.
+     *
+     * @param predicate The mutator method which returns updated state
+     *                  as the first element of a tuple and a value
+     *                  for the caller as the second element.
+     * @return A task which will update the stored value and then provide
+     *         the return value provided by the predicate function.
+     */
     template <class U>
     Task<U,E> modify(const std::function<Task<std::tuple<T,U>,E>(const T&)>& predicate);
 private:

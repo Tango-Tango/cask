@@ -251,3 +251,25 @@ TEST(MVar, TryPutPendingTakes) {
     EXPECT_EQ(secondTake->await(), 2);
     EXPECT_EQ(thirdTake->await(), 3);
 }
+
+TEST(MVar, Modify) {
+    auto sched = std::make_shared<cask::scheduler::BenchScheduler>();
+    auto mvar = MVar<int, std::string>::create(sched, 123);
+
+    auto fiber = mvar->template modify<float>([](auto value) {
+            int updated_state = value * 2;
+            float result = value * 1.5f;
+            std::tuple<int,float> both = {updated_state, result};
+            return Task<std::tuple<int,float>,std::string>::pure(both);
+        })
+        .run(sched);
+    
+    
+    sched->run_ready_tasks();
+    EXPECT_EQ(fiber->await(), 184.5);
+
+    auto afterFiber = mvar->take().run(sched);
+    sched->run_ready_tasks();
+    EXPECT_EQ(afterFiber->await(), 246);
+
+}
