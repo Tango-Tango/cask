@@ -488,8 +488,12 @@ constexpr Task<T,E> Task<T,E>::asyncBoundary() const noexcept {
             auto promise = Promise<Erased,Erased>::create(sched);
             promise->success(Erased());
             return Deferred<Erased,Erased>::forPromise(promise);
-        })->flatMap([op = op](auto) {
-            return op;
+        })->flatMap([op = op](auto fiber_value) {
+            if(fiber_value.isCanceled()) {
+                return fiber::FiberOp::cancel();
+            } else {
+                return op;
+            }
         })
     );
 }
