@@ -99,6 +99,6 @@ Task<None,None> TakeWhileObserver<T,E>::onCancel() {
     }
 }
 
-}
+} // namespace cask::observable
 
 #endif

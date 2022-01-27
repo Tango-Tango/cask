@@ -37,6 +37,6 @@ FiberRef<None,None> BufferObservable<T,E>::subscribe(
     return upstream->subscribe(sched, bufferObserver);
 }
 
-}
+} // namespace cask::observable
 
 #endif

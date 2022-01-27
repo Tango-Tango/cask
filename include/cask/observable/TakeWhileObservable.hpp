@@ -39,6 +39,6 @@ FiberRef<None,None> TakeWhileObservable<T,E>::subscribe(const std::shared_ptr<Sc
     return upstream->subscribe(sched, takeWhileObserver);
 }
 
-}
+} // namespace cask::observable
 
 #endif

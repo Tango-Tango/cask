@@ -86,6 +86,6 @@ Task<None,None> AppendAllObserver<T,E>::onCancel() {
     return downstream->onCancel();
 }
 
-}
+} // namespace cask::observable
 
 #endif

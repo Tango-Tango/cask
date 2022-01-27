@@ -113,6 +113,6 @@ ListRef<T> ListEntry<T>::dropWhile(const std::function<bool(const T&)>& predicat
     return entry;
 }
 
-}
+} // namespace cask::list
 
 #endif

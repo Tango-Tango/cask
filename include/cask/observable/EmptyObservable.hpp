@@ -27,6 +27,6 @@ FiberRef<None,None> EmptyObservable<T,E>::subscribe(
     return observer->onComplete().run(sched);
 }
 
-}
+} // namespace cask::observable
 
 #endif

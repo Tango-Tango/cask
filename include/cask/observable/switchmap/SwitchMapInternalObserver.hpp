@@ -82,6 +82,6 @@ Task<None,None> SwitchMapInternalObserver<T,E>::onCancel() {
     return Task<None,None>::none();
 }
 
-}
+} // namespace cask::observable::switchmap
 
 #endif

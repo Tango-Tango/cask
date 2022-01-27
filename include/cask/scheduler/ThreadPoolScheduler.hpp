@@ -27,7 +27,7 @@ public:
      * @param poolSize The number of threads to use - defaults to matching
      *                 the number of hardware threads available in the system.
      */
-    ThreadPoolScheduler(int poolSize = std::thread::hardware_concurrency());
+    explicit ThreadPoolScheduler(unsigned int poolSize = std::thread::hardware_concurrency());
 
     /**
      * Destruct the scheduler. Destruction waits for all running and timer
@@ -79,6 +79,6 @@ private:
     };
 };
 
-}
+} // namespace cask::scheduler
 
 #endif

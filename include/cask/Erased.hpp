@@ -34,12 +34,12 @@ public:
 
     template <typename T,
               std::enable_if_t<!std::is_same<T,Erased>::value, bool> = true>
-    Erased(const T& value) noexcept;
+    Erased(const T& value) noexcept; // NOLINT(google-explicit-constructor)
 
     template <typename T,
               typename T2 = typename std::remove_const<typename std::remove_reference<T>::type>::type,
               std::enable_if_t<!std::is_same<T2,Erased>::value, bool> = true>
-    Erased(T&& value) noexcept;
+    Erased(T&& value) noexcept; // NOLINT(google-explicit-constructor,bugprone-forwarding-reference-overload)
 
     Erased& operator=(const Erased& other) noexcept;
     Erased& operator=(Erased&& other) noexcept;
@@ -97,7 +97,7 @@ inline Erased::Erased(const T& value) noexcept
 {}
 
 template <typename T, typename T2, std::enable_if_t<!std::is_same<T2,Erased>::value, bool>>
-inline Erased::Erased(T&& value) noexcept {
+inline Erased::Erased(T&& value) noexcept {  // NOLINT(google-explicit-constructor,bugprone-forwarding-reference-overload)
     data = new T2(value);
     deleter = [](void* ptr) -> void { delete static_cast<T2*>(ptr);};
     copier = [](void* ptr) -> void* { return new T2(*(static_cast<T2*>(ptr))); };
@@ -182,25 +182,29 @@ inline Erased::Erased(Erased&& other) noexcept
     other.data = nullptr;
 }
 
-inline Erased& Erased::operator=(const Erased& other) noexcept  {
-    reset();
-    if(other.data != nullptr) {
-        this->deleter = other.deleter;
-        this->copier = other.copier;
-        this->data = other.copier(other.data);
-        this->info = other.info;
+inline Erased& Erased::operator=(const Erased& other) noexcept {
+    if(this != &other) {
+        reset();
+        if(other.data != nullptr) {
+            this->deleter = other.deleter;
+            this->copier = other.copier;
+            this->data = other.copier(other.data);
+            this->info = other.info;
+        }
     }
     return *this;
 }
 
 inline Erased& Erased::operator=(Erased&& other) noexcept  {
-    reset();
-    if(other.data != nullptr) {
-        this->deleter = other.deleter;
-        this->copier = other.copier;
-        this->data = other.data;
-        this->info = other.info;
-        other.data = nullptr;
+    if(this != &other) {
+        reset();
+        if(other.data != nullptr) {
+            this->deleter = other.deleter;
+            this->copier = other.copier;
+            this->data = other.data;
+            this->info = other.info;
+            other.data = nullptr;
+        }
     }
     return *this;
 }
@@ -223,6 +227,6 @@ inline Erased::~Erased() {
     }
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks): delete is happening within the deleter lambda
 
-}
+} // namespace cask
 
 #endif

@@ -19,7 +19,7 @@ enum FiberState { READY, RUNNING, WAITING, DELAYED, RACING, COMPLETED, CANCELED 
 template <class T, class E>
 class FiberImpl final : public Fiber<T,E> {
 public:
-    FiberImpl(const std::shared_ptr<const FiberOp>& op);
+    explicit FiberImpl(const std::shared_ptr<const FiberOp>& op);
     ~FiberImpl();
 
     FiberState getState();
@@ -364,7 +364,7 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
         op = data->first;
     }
     break;
-    case DELAY:
+    case DELAY: // NOLINT(bugprone-branch-clone): When not async the linter picks this and RACE up as duplicate branches
     {
         suspended = true;
         if constexpr(Async) {
@@ -388,7 +388,6 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
     {
         suspended = true;
         if constexpr(Async) {
-            
             state.store(RACING);
             const FiberOp::RaceData* data = op->data.raceData;
             std::vector<std::shared_ptr<FiberImpl<Erased,Erased>>> local_racing_fibers;
@@ -574,6 +573,6 @@ T FiberImpl<T,E>::await() {
     }
 }
 
-}
+} // namespace cask::fiber
 
 #endif

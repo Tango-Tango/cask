@@ -104,7 +104,7 @@ public:
     template <class U>
     Task<U,E> modify(const std::function<Task<std::tuple<T,U>,E>(const T&)>& predicate);
 private:
-    MVar(const std::shared_ptr<Scheduler>& sched);
+    explicit MVar(const std::shared_ptr<Scheduler>& sched);
     explicit MVar(const std::shared_ptr<Scheduler>& sched, const T& initialValue);
 
     std::shared_ptr<Ref<mvar::MVarState<T,E>,E>> stateRef;
@@ -202,6 +202,6 @@ Task<U,E> MVar<T,E>::modify(const std::function<Task<std::tuple<T,U>,E>(const T&
         });
 }
 
-}
+} // namespace cask
 
 #endif

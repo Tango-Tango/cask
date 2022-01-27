@@ -95,6 +95,6 @@ public:
     virtual ~Observer() = default;
 };
 
-}
+} // namespace cask
 
 #endif

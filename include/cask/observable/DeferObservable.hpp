@@ -37,6 +37,6 @@ FiberRef<None,None> DeferObservable<T,E>::subscribe(
     }
 }
 
-}
+} // namespace cask::observable
 
 #endif

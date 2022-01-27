@@ -81,6 +81,6 @@ T FiberDeferred<T,E>::await() {
     return fiber->await();
 }
 
-}
+} // namespace cask::deferred
 
 #endif

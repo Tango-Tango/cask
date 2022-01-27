@@ -37,6 +37,6 @@ FiberRef<None,None> AppendAllObservable<T,E>::subscribe(
     return first->subscribe(sched, appendObserver);
 }
 
-}
+} // namespace cask::observable
 
 #endif

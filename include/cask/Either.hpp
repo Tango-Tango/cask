@@ -91,9 +91,9 @@ public:
     constexpr R get_right() const;
 
     constexpr Either<L,R>(const Either<L,R>&) = default;
-    constexpr Either<L,R>(Either<L,R>&&) = default;
+    constexpr Either<L,R>(Either<L,R>&&) noexcept = default;
     constexpr Either<L,R>& operator=(const Either<L,R>&) = default;
-    constexpr Either<L,R>& operator=(Either<L,R>&&) = default;
+    constexpr Either<L,R>& operator=(Either<L,R>&&) noexcept = default;
 
 private:
     constexpr Either() = default;
@@ -149,6 +149,6 @@ constexpr R Either<L,R>::get_right() const {
     return *rightValue;
 }
 
-}
+} // namespace cask
 
 #endif

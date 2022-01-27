@@ -119,14 +119,14 @@ Task<U,E> Ref<T,E>::modify(std::function<std::tuple<T,U>(T&)> predicate) {
         auto exchangeCompleted = std::atomic_compare_exchange_weak(&(self->data), &initial, updatedRef);
         return std::make_tuple(exchangeCompleted, result);
     }).restartUntil([](InternalResult resultPair) {
-        auto [exchangeCompleted, result] = resultPair;
+        const auto& exchangeCompleted = std::get<0>(resultPair);
         return exchangeCompleted;
     }).template map<U>([](InternalResult resultPair) {
-        auto [exchangeCompleted, result] = resultPair;
+        const auto& result = std::get<1>(resultPair);
         return result;
     });
 }
 
-}
+} // namespace cask
 
 #endif

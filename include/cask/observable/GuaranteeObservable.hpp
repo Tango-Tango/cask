@@ -37,6 +37,6 @@ FiberRef<None,None> GuaranteeObservable<T,E>::subscribe(const std::shared_ptr<Sc
     return upstream->subscribe(sched, guaranteeObserver);
 }
 
-}
+} // namespace cask::observable
 
 #endif

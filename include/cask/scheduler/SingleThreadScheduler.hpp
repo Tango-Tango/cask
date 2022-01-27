@@ -89,6 +89,6 @@ private:
 
 };
 
-}
+} // namespace cask::scheduler
 
 #endif

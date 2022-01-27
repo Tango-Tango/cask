@@ -9,8 +9,6 @@
 #include "../Observable.hpp"
 #include "../Observer.hpp"
 
-using namespace std::placeholders;
-
 namespace cask::observable {
 
 template <class T, class E>
@@ -62,12 +60,12 @@ Task<Ack,None> VectorObservable<T,E>::pushEvent(
     } else if(lastAck == Continue) {
         auto value = source[i];
         return observer->onNext(value)
-            .template flatMap<Ack>(std::bind(pushEvent, i + 1, source, sched, observer, _1));
+            .template flatMap<Ack>(std::bind(pushEvent, i + 1, source, sched, observer, std::placeholders::_1));
     } else {
         return Task<Ack,None>::pure(Stop);
     }
 }
 
-}
+} // namespace cask::observable
 
 #endif

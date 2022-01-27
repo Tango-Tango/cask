@@ -109,7 +109,8 @@ template <class T, class E>
 template <class T2>
 constexpr Task<T2,E> Resource<T,E>::use(std::function<Task<T2,E>(T)> userTask) const noexcept {
     return allocated.template flatMap<T2>([userTask](auto result) {
-        auto [value, release] = result;
+        const auto& value = std::get<0>(result);
+        const auto& release = std::get<1>(result);
         return userTask(value).template guarantee<None>(release);
     });
 }
@@ -119,7 +120,8 @@ template <class T2>
 constexpr Resource<T2,E> Resource<T,E>::map(std::function<T2(T)> predicate) const noexcept {
     return Resource<T2,E>(
         allocated.template map<typename Resource<T2,E>::AllocatedResource>([predicate](auto result) {
-            auto [value, release] = result;
+            const auto& value = std::get<0>(result);
+            const auto& release = std::get<1>(result);
             auto newValue = predicate(value);
             return std::make_tuple(newValue, release);
         })
@@ -131,7 +133,8 @@ template <class E2>
 constexpr Resource<T,E2> Resource<T,E>::mapError(std::function<E2(E)> predicate) const noexcept {
     return Resource<T,E2>(
         allocated.template map<typename Resource<T,E2>::AllocatedResource>([predicate](auto result) {
-            auto [value, release] = result;
+            const auto& value = std::get<0>(result);
+            const auto& release = std::get<1>(result);
             return std::make_tuple(
                 value,
                 release.template mapError<E2>(predicate)
@@ -156,7 +159,8 @@ constexpr Resource<T2,E> Resource<T,E>::flatMap(std::function<Resource<T2,E>(T)>
 
             std::function<TargetResource(TargetResource)> innerCompose =
                 [outerRelease](auto innerAllocated) {
-                    auto [innerValue, innerRelease] = innerAllocated;
+                    const auto& innerValue = std::get<0>(innerAllocated);
+                    const auto& innerRelease = std::get<1>(innerAllocated);
                     Task<None,E> fullRelease = innerRelease.template flatMap<None>([outerRelease](auto) { return outerRelease; });
                     return std::make_tuple(innerValue, fullRelease);
                 };
@@ -173,6 +177,6 @@ constexpr Resource<T2,E> Resource<T,E>::flatMap(std::function<Resource<T2,E>(T)>
     return Resource<T2,E>(result);
 }
 
-}
+} // namespace cask
 
 #endif

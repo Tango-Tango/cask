@@ -114,6 +114,6 @@ T2 FiberMap<T1,T2,E1,E2>::await() {
     }
 }
 
-}
+} // namespace cask::fiber
 
 #endif

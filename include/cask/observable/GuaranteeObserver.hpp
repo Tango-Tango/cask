@@ -85,6 +85,6 @@ Task<None,None> GuaranteeObserver<T,E>::onCancel() {
     }
 }
 
-}
+} // namespace cask::observable
 
 #endif

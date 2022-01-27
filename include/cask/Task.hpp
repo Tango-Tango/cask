@@ -369,7 +369,9 @@ constexpr Task<T,E>::Task(Task<T,E>&& other) noexcept
 
 template <class T, class E>
 constexpr Task<T,E>& Task<T,E>::operator=(const Task<T,E>& other) noexcept{
-    this->op = other.op;
+    if(this != &other) {
+        this->op = other.op;
+    }
     return *this;
 }
 
@@ -793,14 +795,12 @@ constexpr Task<T,E> Task<T,E>::guarantee(const Task<T2, E>& task) const noexcept
                 return guaranteed_op->flatMap([fiber_value](auto guaranteed_value) {
                     if(guaranteed_value.isError()) {
                         return fiber::FiberOp::error(guaranteed_value.underlying());
-                    } else if(guaranteed_value.isCanceled()) {
+                    } else if(guaranteed_value.isCanceled() || fiber_value.isCanceled()) {
                         return fiber::FiberOp::cancel();
                     } else if(fiber_value.isValue()) {
                         return fiber::FiberOp::value(fiber_value.underlying());
-                    } else if(fiber_value.isError()) {
-                        return fiber::FiberOp::error(fiber_value.underlying());
                     } else {
-                        return fiber::FiberOp::cancel();
+                        return fiber::FiberOp::error(fiber_value.underlying());
                     }
                 });
             }
@@ -814,6 +814,6 @@ constexpr Task<T,E> Task<T,E>::timeout(uint32_t milliseconds, const E& error) co
     return raceWith(timeoutTask);
 }
 
-}
+} // namespace cask
 
 #endif

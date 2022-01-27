@@ -149,7 +149,7 @@ public:
     );
 };
 
-}
+} // namespace cask
 
 #include "cask/fiber/FiberImpl.hpp"
 #include "cask/fiber/FiberMap.hpp"
@@ -190,6 +190,6 @@ FiberRef<T2,E2> Fiber<T,E>::mapBoth(
     );
 }
 
-}
+} // namespace cask
 
 #endif

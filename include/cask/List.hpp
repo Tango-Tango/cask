@@ -98,7 +98,7 @@ public:
     virtual ~List() = default;
 };
 
-}
+} // namespace cask
 
 #include "list/Nil.hpp"
 
@@ -109,6 +109,6 @@ ListRef<T> List<T>::empty() {
     return list::Nil<T>::create();
 }
 
-}
+} // namespace cask
 
 #endif
