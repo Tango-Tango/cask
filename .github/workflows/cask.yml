@@ -40,7 +40,7 @@ jobs:
     - name: Install Apt Development Dependencies
       run: sudo apt-get install -y ninja-build build-essential python3-pip gcovr clang
     - name: Install Python Development Dependencies
-      run: sudo python3 -m pip install meson==0.57.0
+      run: sudo python3 -m pip install meson==0.61.1
     - name: Run the Pre-Build Release Stage
       run: |
         git config user.name engineering-at-tangotango
@@ -100,7 +100,7 @@ jobs:
     - name: Install Apt Development Dependencies
       run: sudo apt-get install -y ninja-build python3-pip gcovr cppcheck clang clang-tidy
     - name: Install Python Development Dependencies
-      run: sudo python3 -m pip install meson==0.57.0
+      run: sudo python3 -m pip install meson==0.61.1
     - name: Run the Pre-Build Release Stage
       run: |
         git config user.name engineering-at-tangotango
