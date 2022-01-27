@@ -65,6 +65,6 @@ T PureErrorDeferred<T,E>::await() {
     throw error;
 }
 
-}
+} // namespace cask::deferred
 
 #endif

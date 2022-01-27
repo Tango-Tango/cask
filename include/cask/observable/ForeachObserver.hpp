@@ -75,6 +75,6 @@ Task<None,None>  ForeachObserver<T,E>::onCancel() {
     return Task<None,None>::none();
 }
 
-}
+} // namespace cask::observable
 
 #endif

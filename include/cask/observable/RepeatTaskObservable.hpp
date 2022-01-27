@@ -52,6 +52,6 @@ FiberRef<None,None> RepeatTaskObservable<T,E>::subscribe(const std::shared_ptr<S
         .run(sched);
 }
 
-}
+} // namespace cask::observable
 
 #endif

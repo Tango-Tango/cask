@@ -146,7 +146,7 @@ public:
      * @param onCancel Provide an error for upstream cancelations. By default does nothing.
      * @return The handle which may be used to cancel computation on the stream.
      */
-    virtual FiberRef<None,None> subscribeHandlers(
+    FiberRef<None,None> subscribeHandlers(
         const std::shared_ptr<Scheduler>& sched,
         const std::function<Task<Ack,None>(const T&)>& onNext,
         const std::function<Task<None,None>(const E&)>& onError = [](auto) { return Task<None,None>::none(); },
@@ -383,7 +383,7 @@ public:
     virtual ~Observable();
 };
 
-}
+} // namespace cask
 
 #include "observable/AppendAllObservable.hpp"
 #include "observable/BufferObservable.hpp"
@@ -669,6 +669,6 @@ ObservableRef<T,E> Observable<T,E>::guarantee(const Task<None,None>& task) const
 template <class T, class E>
 Observable<T,E>::~Observable() {}
 
-}
+} // namespace cask
 
 #endif

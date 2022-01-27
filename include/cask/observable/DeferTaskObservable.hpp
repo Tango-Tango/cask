@@ -55,6 +55,6 @@ FiberRef<None,None> DeferTaskObservable<T,E>::subscribe(
         .run(sched);
 }
 
-}
+} // namespace cask::observable
 
 #endif

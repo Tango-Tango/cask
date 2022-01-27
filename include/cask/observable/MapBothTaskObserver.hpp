@@ -104,6 +104,6 @@ Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onCancel() {
     }
 }
 
-}
+} // namespace cask::observable
 
 #endif

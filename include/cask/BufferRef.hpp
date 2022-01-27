@@ -9,6 +9,6 @@ namespace cask {
 template <class T>
 using BufferRef = std::shared_ptr<std::vector<T>>;
 
-}
+} // namespace cask
 
 #endif

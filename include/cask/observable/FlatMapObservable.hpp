@@ -41,6 +41,6 @@ FiberRef<None,None> FlatMapObservable<TI,TO,E>::subscribe(const std::shared_ptr<
     return upstream->subscribe(sched, flatMapObserver);
 }
 
-}
+} // namespace cask::observable
 
 #endif

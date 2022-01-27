@@ -39,6 +39,6 @@ private:
     bool canceled;
 };
 
-}
+} // namespace cask::fiber
 
 #endif

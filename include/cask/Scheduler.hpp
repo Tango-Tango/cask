@@ -70,6 +70,6 @@ public:
     virtual ~Scheduler() = default;
 };
 
-}
+} // namespace cask
 
 #endif

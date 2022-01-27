@@ -21,17 +21,36 @@ endif
 dependencies = []
 
 # Setup the doxygen docs task
-run_target('docs', command : ['doxygen', meson.source_root() + '/Doxyfile'])
+doxygen = find_program('doxygen', required : false)
+if doxygen.found()
+    run_target('docs', command : [
+        doxygen,
+        meson.project_source_root() + '/Doxyfile'
+    ])
+endif
 
 # Setup cppcheck
-run_target('cppcheck', command : [
-    'cppcheck',
-    '-q',
-    '-j', num_cpu_threads,
-    '--enable=all',
-    '--project=' + join_paths(meson.build_root(), 'compile_commands.json'),
-    '--error-exitcode=1'
-])
+cppcheck = find_program('cppcheck', required : false)
+if cppcheck.found()
+    run_target('cppcheck', command : [
+        cppcheck,
+        '-q',
+        '-j', num_cpu_threads,
+        '--enable=all',
+        '--project=' + join_paths(meson.project_build_root(), 'compile_commands.json'),
+        '--error-exitcode=1'
+    ])
+endif
+
+# Setup clang-tidy
+run_clang_tidy = find_program('run-clang-tidy', required: false)
+if run_clang_tidy.found()
+    run_target('clang-tidy', command: [
+        run_clang_tidy,
+        '-config=',
+        '-quiet'
+    ])
+endif
 
 # Setup the 'cask' project structure
 includes = include_directories('include')

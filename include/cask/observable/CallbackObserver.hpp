@@ -64,7 +64,6 @@ Task<None,None>CallbackObserver<T,E>::onCancel() {
     return onCancelHdl();
 }
 
-
-}
+} // namespace cask::observable
 
 #endif

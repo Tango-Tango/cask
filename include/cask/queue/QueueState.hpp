@@ -147,6 +147,6 @@ std::tuple<QueueState<T,E>,Task<T,E>> QueueState<T,E>::take() const {
     }
 }
 
-}
+} // namespace cask::queue
 
 #endif

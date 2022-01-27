@@ -21,6 +21,6 @@ constexpr inline bool operator==(const None&, const None&) {
     return true;
 }
 
-}
+} // namespace cask
 
 #endif

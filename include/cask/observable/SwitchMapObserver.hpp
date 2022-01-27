@@ -44,7 +44,7 @@ private:
     Task<StatefulResult<None>,None> onCancelUnsafe(const switchmap::SwitchMapState& state);
 };
 
-}
+} // namespace cask::observable
 
 #include "switchmap/SwitchMapInternalObserver.hpp"
 
@@ -192,6 +192,6 @@ Task<StatefulResult<None>,None> SwitchMapObserver<TI,TO,E>::onCancelUnsafe(const
     }
 }
 
-}
+} // namespace cask::observable
 
 #endif

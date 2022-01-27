@@ -42,6 +42,6 @@ FiberRef<None,None> EvalObservable<T,E>::subscribe(
     }
 }
 
-}
+} // namespace cask::observable
 
 #endif

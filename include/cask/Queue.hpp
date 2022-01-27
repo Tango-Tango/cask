@@ -131,6 +131,6 @@ Task<T,E> Queue<T,E>::take() {
         });
 }
 
-}
+} // namespace cask
 
 #endif

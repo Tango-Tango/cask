@@ -99,6 +99,6 @@ Task<None,None> FlatMapObserver<TI,TO,E>::onCancel() {
     }
 }
 
-}
+} // namespace cask::observable
 
 #endif

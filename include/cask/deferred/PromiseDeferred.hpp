@@ -113,6 +113,6 @@ T PromiseDeferred<T,E>::await() {
     }
 }
 
-}
+} // namespace cask::deferred
 
 #endif

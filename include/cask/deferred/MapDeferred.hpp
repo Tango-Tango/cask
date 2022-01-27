@@ -93,6 +93,6 @@ T2 MapDeferred<T1,T2,E1,E2>::await() {
     }
 }
 
-}
+} // namespace cask::deferred
 
 #endif

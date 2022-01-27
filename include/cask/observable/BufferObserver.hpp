@@ -75,6 +75,6 @@ Task<None,None> BufferObserver<T,E>::onCancel() {
     return downstream->onCancel();
 }
 
-}
+} // namespace cask::observable
 
 #endif

@@ -59,6 +59,6 @@ Task<None,None> FilterObserver<T,E>::onCancel() {
     return downstream->onCancel();
 }
 
-}
+} // namespace cask::observable
 
 #endif

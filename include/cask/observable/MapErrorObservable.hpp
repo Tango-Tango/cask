@@ -37,6 +37,6 @@ FiberRef<None,None> MapErrorObservable<T,EI,EO>::subscribe(const std::shared_ptr
     return upstream->subscribe(sched, mapObserver);
 }
 
-}
+} // namespace cask::observable
 
 #endif

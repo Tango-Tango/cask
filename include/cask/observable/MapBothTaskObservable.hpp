@@ -47,6 +47,6 @@ FiberRef<None,None> MapBothTaskObservable<TI,TO,EI,EO>::subscribe(const std::sha
     return upstream->subscribe(sched, mapObserver);
 }
 
-}
+} // namespace cask::observable
 
 #endif

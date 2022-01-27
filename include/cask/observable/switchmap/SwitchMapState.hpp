@@ -25,6 +25,6 @@ struct SwitchMapState {
     {}
 };
 
-}
+} // namespace cask::observable::switchmap
 
 #endif

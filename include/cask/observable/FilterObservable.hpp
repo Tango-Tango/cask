@@ -37,6 +37,6 @@ FiberRef<None,None> FilterObservable<T,E>::subscribe(const std::shared_ptr<Sched
     return upstream->subscribe(sched, filterObserver);
 }
 
-}
+} // namespace cask::observable
 
 #endif

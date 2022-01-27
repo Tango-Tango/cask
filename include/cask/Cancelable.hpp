@@ -57,6 +57,6 @@ public:
     void onShutdown(const std::function<void()>&) override {}
 };
 
-}
+} // namespace cask
 
 #endif

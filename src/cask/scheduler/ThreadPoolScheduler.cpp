@@ -8,7 +8,7 @@
 
 namespace cask::scheduler {
 
-ThreadPoolScheduler::ThreadPoolScheduler(int poolSize)
+ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
     : running(true)
     , readyQueueMutex()
     , dataInQueue()
@@ -20,7 +20,7 @@ ThreadPoolScheduler::ThreadPoolScheduler(int poolSize)
     , timerThread()
     , ticks(0)
 {
-    for(int i =0; i < poolSize; i++) {
+    for(unsigned int i =0; i < poolSize; i++) {
         std::thread poolThread(std::bind(&ThreadPoolScheduler::run, this));
         runThreads.push_back(std::move(poolThread));
     }

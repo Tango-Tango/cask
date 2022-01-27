@@ -73,6 +73,6 @@ T PureDeferred<T,E>::await() {
     return value;
 }
 
-}
+} // namespace cask::deferred
 
 #endif

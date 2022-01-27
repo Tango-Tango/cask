@@ -80,7 +80,7 @@ public:
      * @param sched The scheduler use for the result deferred.
      * @return A deferred which completes with the given cancelable shuts down.
      */
-    static DeferredRef<None,None> forCancelable(CancelableRef cancelable, SchedulerRef sched);
+    static DeferredRef<None,None> forCancelable(const CancelableRef& cancelable, const SchedulerRef& sched);
 
     /**
      * Create a new deferred which maps both the value and error results of
@@ -132,7 +132,7 @@ public:
     virtual ~Deferred() {};
 };
 
-}
+} // namespace cask
 
 #include "deferred/FiberDeferred.hpp"
 #include "deferred/MapDeferred.hpp"
@@ -169,7 +169,7 @@ DeferredRef<T,E> Deferred<T,E>::forFiber(FiberRef<T,E> fiber) {
 
 
 template<class T, class E>
-DeferredRef<None,None> Deferred<T,E>::forCancelable(CancelableRef cancelable, SchedulerRef sched) {
+DeferredRef<None,None> Deferred<T,E>::forCancelable(const CancelableRef& cancelable, const SchedulerRef& sched) {
     auto promise = Promise<cask::None,cask::None>::create(sched);
 
     cancelable->onCancel([promise]() {
@@ -196,6 +196,6 @@ DeferredRef<T2,E2> Deferred<T,E>::mapBoth(
     );
 }
 
-}
+} // namespace cask
 
 #endif

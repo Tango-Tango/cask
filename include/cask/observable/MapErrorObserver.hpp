@@ -56,6 +56,6 @@ Task<None,None> MapErrorObserver<T,EI,EO>::onCancel() {
     return downstream->onCancel();
 }
 
-}
+} // namespace cask::observable
 
 #endif

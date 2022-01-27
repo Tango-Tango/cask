@@ -43,6 +43,6 @@ FiberRef<None,None> SwitchMapObservable<TI,TO,E>::subscribe(const std::shared_pt
     return upstream->subscribe(sched, switchMapObserver);
 }
 
-}
+} // namespace cask::observable
 
 #endif

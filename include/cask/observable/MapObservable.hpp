@@ -37,6 +37,6 @@ FiberRef<None,None> MapObservable<TI,TO,E>::subscribe(const std::shared_ptr<Sche
     return upstream->subscribe(sched, mapObserver);
 }
 
-}
+} // namespace cask::observable
 
 #endif

@@ -118,7 +118,7 @@ Promise<T,E>::Promise(std::shared_ptr<Scheduler> sched)
     , mutex()
     , completeCallbacks()
     , cancelCallbacks()
-    , sched(sched)
+    , sched(std::move(sched))
 {}
 
 template <class T, class E>
@@ -241,6 +241,6 @@ void Promise<T,E>::onComplete(std::function<void(Either<T,E>)> callback) {
     }
 }
 
-}
+} // namespace cask
 
 #endif

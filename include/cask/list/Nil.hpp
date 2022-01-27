@@ -27,7 +27,7 @@ public:
     ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) const override;
 };
 
-}
+} // namespace cask::list
 
 #include "ListEntry.hpp"
 
@@ -73,6 +73,6 @@ ListRef<T> Nil<T>::dropWhile(const std::function<bool(const T&)>&) const {
     return this->shared_from_this();
 }
 
-}
+} // namespace cask::list
 
 #endif

@@ -81,7 +81,6 @@ Task<None,None> TakeObserver<T,E>::onCancel() {
     return Task<None,None>::none();
 }
 
-
-}
+} // namespace cask::observable
 
 #endif

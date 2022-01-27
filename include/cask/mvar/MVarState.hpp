@@ -33,9 +33,7 @@ public:
 
     std::tuple<MVarState<T,E>,Task<T,E>> take() const;
 
-    
-    
-    MVarState(const std::shared_ptr<Scheduler>& sched);
+    explicit MVarState(const std::shared_ptr<Scheduler>& sched);
     MVarState(const std::shared_ptr<Scheduler>& sched, const T& initialValue);
     MVarState(const std::shared_ptr<Scheduler>& sched, const std::optional<T>& valueOpt, const ListRef<PendingPut>& pendingPuts, const ListRef<PromiseRef<T,E>>& pendingTakes);
     MVarState(std::shared_ptr<Scheduler>&& sched, std::optional<T>&& valueOpt, ListRef<PendingPut>&& pendingPuts, ListRef<PromiseRef<T,E>>&& pendingTakes);
@@ -156,6 +154,6 @@ std::tuple<MVarState<T,E>,Task<T,E>> MVarState<T,E>::take() const {
     }
 }
 
-}
+} // namespace cask::mvar
 
 #endif
