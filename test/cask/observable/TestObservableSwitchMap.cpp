@@ -7,6 +7,7 @@
 #include "gtest/gtest.h"
 #include "gtest/trompeloeil.hpp"
 #include "cask/Observable.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::Observable;
 using cask::ObservableRef;
@@ -16,6 +17,7 @@ using cask::Task;
 using cask::None;
 using cask::Ack;
 using cask::observable::SwitchMapObserver;
+using cask::scheduler::BenchScheduler;
 
 class MockSwitchMapDownstreamObserver : public trompeloeil::mock_interface<Observer<float,std::string>> {
 public:
@@ -155,4 +157,31 @@ TEST(ObservableSwitchMap, StopsUpstreamOnDownstreamComplete) {
     EXPECT_GE(counter, 10);
     EXPECT_LE(counter, 11);
     awaitIdle();
+}
+
+TEST(ObservableSwitchMap, CompletionWaitsForSubscriptionComplete) {
+    auto sched = std::make_shared<BenchScheduler>();
+    int counter = 0;
+    auto fiber = Observable<int,std::string>::fromVector(std::vector<int>{ 1 , 2, 3 })
+        ->switchMap<int>([&counter](auto value) {
+            counter++;
+            return Observable<int,std::string>::deferTask([value] {
+                return Task<int,std::string>::pure(value * 2).delay(1);
+            });
+        })
+        ->take(3)
+        .run(sched);
+
+    sched->run_ready_tasks();
+    EXPECT_FALSE(fiber->getValue().has_value());
+
+    sched->advance_time(1);
+    sched->run_ready_tasks();
+    EXPECT_TRUE(fiber->getValue().has_value());
+
+    auto result = fiber->await();
+
+    ASSERT_EQ(result.size(), 1);
+    EXPECT_EQ(counter, 3);
+    EXPECT_GE(result[0], 6);
 }
