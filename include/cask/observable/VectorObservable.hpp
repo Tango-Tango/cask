@@ -52,18 +52,21 @@ Task<Ack,None> VectorObservable<T,E>::pushEvent(
     std::shared_ptr<Observer<T,E>> observer,
     Ack lastAck
 ) {
-    if(i >= source.size()) {
-        return observer->onComplete()
-            .template map<Ack>([](auto) {
-                return Stop;
-            });
-    } else if(lastAck == Continue) {
-        auto value = source[i];
-        return observer->onNext(value)
-            .template flatMap<Ack>(std::bind(pushEvent, i + 1, source, sched, observer, std::placeholders::_1));
-    } else {
-        return Task<Ack,None>::pure(Stop);
-    }
+    return Task<Ack, None>::defer([i, source, sched, observer, lastAck] {
+        if(i >= source.size()) {
+            return observer->onComplete()
+                .template map<Ack>([](auto) {
+                    return Stop;
+                });
+        } else if(lastAck == Continue) {
+            return observer->onNext(source[i])
+                .template flatMap<Ack>([i, source, sched, observer](auto ack) {
+                    return pushEvent(i + 1, source, sched, observer, ack);
+                });
+        } else {
+            return Task<Ack,None>::pure(Stop);
+        }
+    });
 }
 
 } // namespace cask::observable

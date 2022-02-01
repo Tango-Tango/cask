@@ -122,6 +122,15 @@ public:
     static ObservableRef<T,E> fromVector(const std::vector<T>& vector);
 
     /**
+     * Create an observable who never emits any elements and which
+     * never completes.
+     * 
+     * @return A new observable which will never emit a value, error,
+     *         or completion.
+     */
+    static ObservableRef<T,E> never();
+
+    /**
      * Subscribe to the observer - beginning computation of the stream. Ongoing
      * computation may be cancled by using the returned cancelation handle.
      * 
@@ -174,6 +183,17 @@ public:
      * @return An observable which emits buffered items.
      */
     ObservableRef<BufferRef<T>,E> buffer(uint32_t size) const;
+
+    /**
+     * Concatenate another observable to the end of this one. An alias
+     * for appendAll with the same semantics as that operator.
+     * 
+     * @param other The observable to concatenate to this one.
+     * @return A new observable which emits the events from this observable
+     *         first and then, on completion, subscribes to and emits events
+     *         from the next one.
+     */
+    ObservableRef<T,E> concat(const ObservableRef<T,E>& other) const;
 
     /**
      * Transform each element of the stream using the provided transforming predicate
@@ -460,6 +480,13 @@ ObservableRef<T,E> Observable<T,E>::fromVector(const std::vector<T>& vector) {
 }
 
 template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::never() {
+    return Observable<T,E>::deferTask([] {
+        return Task<T,E>::never();
+    });
+}
+
+template <class T, class E>
 FiberRef<None,None> Observable<T,E>::subscribeHandlers(
     const std::shared_ptr<Scheduler>& sched,
     const std::function<Task<Ack,None>(const T&)>& onNext,
@@ -484,6 +511,12 @@ template <class T, class E>
 std::shared_ptr<Observable<BufferRef<T>,E>> Observable<T,E>::buffer(uint32_t size) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::BufferObservable<T,E>>(self, size);
+}
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::concat(const ObservableRef<T,E>& other) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::AppendAllObservable<T,E>>(self, other);
 }
 
 template <class T, class E>

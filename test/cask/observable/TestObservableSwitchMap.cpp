@@ -162,6 +162,7 @@ TEST(ObservableSwitchMap, StopsUpstreamOnDownstreamComplete) {
 TEST(ObservableSwitchMap, CompletionWaitsForSubscriptionComplete) {
     auto sched = std::make_shared<BenchScheduler>();
     int counter = 0;
+
     auto fiber = Observable<int,std::string>::fromVector(std::vector<int>{ 1 , 2, 3 })
         ->switchMap<int>([&counter](auto value) {
             counter++;
@@ -184,4 +185,25 @@ TEST(ObservableSwitchMap, CompletionWaitsForSubscriptionComplete) {
     ASSERT_EQ(result.size(), 1);
     EXPECT_EQ(counter, 3);
     EXPECT_GE(result[0], 6);
+}
+
+TEST(ObservableSwitchMap, CancelInnerObservable) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto fiber = Observable<int,std::string>::fromVector(std::vector<int>{ 1 , 2, 3 })
+        ->appendAll(Observable<int,std::string>::never())
+        ->switchMap<int>([](auto value) {
+            return Observable<int,std::string>::deferTask([value] {
+                return Task<int,std::string>::pure(value * 2).delay(1);
+            });
+        })
+        ->take(3)
+        .run(sched);
+
+    sched->run_ready_tasks();
+    EXPECT_FALSE(fiber->getValue().has_value());
+
+    fiber->cancel();
+    sched->run_ready_tasks();
+
+    EXPECT_TRUE(fiber->isCanceled());
 }
