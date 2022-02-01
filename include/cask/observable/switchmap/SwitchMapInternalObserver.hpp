@@ -65,7 +65,7 @@ template <class T, class E>
 Task<None,None> SwitchMapInternalObserver<T,E>::onComplete() {
     return stateVar->template modify<None>([downstream = downstream](auto state) {
         switchmap::SwitchMapState updated_state = state;
-        updated_state.downstream_completed = true;
+        updated_state.subscription_completed = true;
 
         if(state.upstream_completed) {
             return downstream->onComplete().template map<StatefulResult<None>>([updated_state](auto) {

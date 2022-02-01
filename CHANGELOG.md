@@ -3,6 +3,10 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 11.1
+- Add the `Observable::never` operator.
+- Add the `Observable::concat` operator as an alias for `Observable::appendAll`.
+
 ## 11.0
 - Add `Fiber` as a replacement for the `TrampolineRunLoop`.
 - Add the `forFiber` method to `Deferred`.

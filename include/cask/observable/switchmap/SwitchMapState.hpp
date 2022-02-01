@@ -15,13 +15,13 @@ struct SwitchMapState {
     FiberRef<None,None> subscription;
     Ack downstream_ack;
     bool upstream_completed;
-    bool downstream_completed;
+    bool subscription_completed;
 
     SwitchMapState()
         : subscription(nullptr)
         , downstream_ack(Continue)
         , upstream_completed(false)
-        , downstream_completed(true)
+        , subscription_completed(true)
     {}
 };
 
