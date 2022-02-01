@@ -22,8 +22,8 @@ private:
     static Task<Ack,None> pushEvent(
         unsigned int i,
         const std::vector<T>& source,
-        std::shared_ptr<Scheduler> sched,
-        std::shared_ptr<Observer<T,E>> observer,
+        const std::shared_ptr<Scheduler>& sched,
+        const std::shared_ptr<Observer<T,E>>& observer,
         Ack lastAck
     );
 };
@@ -48,8 +48,8 @@ template <class T, class E>
 Task<Ack,None> VectorObservable<T,E>::pushEvent(
     unsigned int i,
     const std::vector<T>& source,
-    std::shared_ptr<Scheduler> sched,
-    std::shared_ptr<Observer<T,E>> observer,
+    const std::shared_ptr<Scheduler>& sched,
+    const std::shared_ptr<Observer<T,E>>& observer,
     Ack lastAck
 ) {
     return Task<Ack, None>::defer([i, source, sched, observer, lastAck] {
