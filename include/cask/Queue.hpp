@@ -63,6 +63,14 @@ public:
      * @return A task that completes when a value has been taken.
      */
     Task<T,E> take();
+
+    /**
+     * Attempt to take a value from the Queue. If the queue is
+     * currently empty then no value will be provided.
+     *
+     * @return A value or nothing.
+     */
+    std::optional<T> tryTake();
 private:
     Queue(const std::shared_ptr<Scheduler>& sched, uint32_t max_size);
     explicit Queue(const std::shared_ptr<Scheduler>& sched, const T& initialValue);
@@ -129,6 +137,32 @@ Task<T,E> Queue<T,E>::take() {
         .template flatMap<T>([](auto task) {
             return task;
         });
+}
+
+template <class T, class E>
+std::optional<T> Queue<T,E>::tryTake() {
+    using IntermediateResult = std::tuple<std::optional<T>,std::function<void()>>;
+
+    auto result_opt = stateRef->template modify<IntermediateResult>([](auto state) {
+        auto result = state.tryTake();
+        auto nextState = std::get<0>(result);
+        auto valueOpt = std::get<1>(result);
+        auto thunk = std::get<2>(result);
+        return std::make_tuple(nextState, std::make_tuple(valueOpt, thunk));
+    })
+    .template map<std::optional<T>>([](IntermediateResult result) {
+        auto valueOpt = std::get<0>(result);
+        auto thunk = std::get<1>(result);
+        thunk();
+        return valueOpt;
+    })
+    .runSync();
+
+    if(result_opt && result_opt->is_left()) {
+        return result_opt->get_left();
+    } else {
+        return std::optional<T>();
+    }
 }
 
 } // namespace cask

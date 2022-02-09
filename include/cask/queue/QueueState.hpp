@@ -30,6 +30,7 @@ public:
 
     std::tuple<QueueState<T,E>,bool,std::function<void()>> tryPut(const T& value) const;
     std::tuple<QueueState<T,E>,Task<None,E>> put(const T& value) const;
+    std::tuple<QueueState<T,E>,std::optional<T>,std::function<void()>> tryTake() const;
     std::tuple<QueueState<T,E>,Task<T,E>> take() const;
     
     QueueState(const std::shared_ptr<Scheduler>& sched, uint32_t max_size);
@@ -116,7 +117,7 @@ std::tuple<QueueState<T,E>,Task<None,E>> QueueState<T,E>::put(const T& value) co
 }
 
 template <class T, class E>
-std::tuple<QueueState<T,E>,Task<T,E>> QueueState<T,E>::take() const {
+std::tuple<QueueState<T,E>,std::optional<T>,std::function<void()>> QueueState<T,E>::tryTake() const {
     auto filteredPuts = pendingPuts->dropWhile([](auto pending) {
         auto promise = std::get<0>(pending);
         return promise->isCancelled();
@@ -125,7 +126,8 @@ std::tuple<QueueState<T,E>,Task<T,E>> QueueState<T,E>::take() const {
     if(!values->is_empty()) {
         return std::make_tuple(
             QueueState(sched, max_size, values->tail(), filteredPuts, pendingTakes),
-            Task<T,E>::pure(*(values->head()))
+            values->head(),
+            []{}
         );
     } else if(!filteredPuts->is_empty()) {
         auto pending = *(filteredPuts->head());
@@ -133,15 +135,36 @@ std::tuple<QueueState<T,E>,Task<T,E>> QueueState<T,E>::take() const {
         auto value = std::get<1>(pending);
         return std::make_tuple(
             QueueState(sched, max_size, values, filteredPuts->tail(), pendingTakes),
-            Task<T,E>::eval([putPromise, value] {
+            std::optional<T>(value),
+            [putPromise] {
                 putPromise->success(None());
-                return value;
-            })
+            }
         );
+    } else {
+        return std::make_tuple(
+            QueueState(sched, max_size, values, filteredPuts, pendingTakes),
+            std::optional<T>(),
+            []{}
+        );
+    }
+}
+
+template <class T, class E>
+std::tuple<QueueState<T,E>,Task<T,E>> QueueState<T,E>::take() const {
+    auto result = tryTake();
+    auto nextState = std::get<0>(result);
+    auto valueOpt = std::get<1>(result);
+    auto thunk = std::get<2>(result);
+
+    if(valueOpt.has_value()) {
+        return std::make_tuple(nextState, Task<T,E>::eval([thunk, value = *valueOpt] {
+            thunk();
+            return value;
+        }));
     } else {
         auto promise = Promise<T,E>::create(sched);
         return std::make_tuple(
-            QueueState(sched, max_size, values, filteredPuts, pendingTakes->append(promise)),
+            QueueState(nextState.sched, nextState.max_size, nextState.values, nextState.pendingPuts, pendingTakes->append(promise)),
             Task<T,E>::forPromise(promise)
         );
     }
