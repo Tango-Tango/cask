@@ -231,3 +231,48 @@ TEST(Queue, TryPutPendingTakes) {
     EXPECT_EQ(secondTake->await(), 2);
     EXPECT_EQ(thirdTake->await(), 3);
 }
+
+TEST(Queue, TryTakeEmpty) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto queue = Queue<int,std::string>::empty(sched, 1);
+
+    ASSERT_FALSE(queue->tryTake().has_value());
+}
+
+TEST(Queue, TryTakeHasValue) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto queue = Queue<int,std::string>::empty(sched, 1);
+
+    ASSERT_TRUE(queue->tryPut(1));
+
+    auto value_opt = queue->tryTake();
+    ASSERT_TRUE(value_opt.has_value());
+    EXPECT_EQ(*value_opt, 1);
+}
+
+TEST(Queue, TryTakePendingPuts) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto queue = Queue<int,std::string>::empty(sched, 1);
+
+    ASSERT_TRUE(queue->tryPut(1));
+    auto pendingPut = queue->put(2).run(sched);
+
+    sched->run_ready_tasks();
+
+    {
+        auto value_opt = queue->tryTake();
+        ASSERT_TRUE(value_opt.has_value());
+        EXPECT_EQ(*value_opt, 1);
+    }
+
+    {
+        auto value_opt = queue->tryTake();
+        ASSERT_TRUE(value_opt.has_value());
+        EXPECT_EQ(*value_opt, 2);
+    }
+
+    sched->run_ready_tasks();
+    pendingPut->await();
+}
+
+

@@ -3,6 +3,10 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 11.2
+- Add the `Queue::tryTake` method to allow for atomic takes on the queue without
+  pending in the scheduler.
+
 ## 11.1
 - Add the `Observable::never` operator.
 - Add the `Observable::concat` operator as an alias for `Observable::appendAll`.
