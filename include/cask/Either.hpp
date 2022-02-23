@@ -26,7 +26,7 @@ public:
      * @param left The left value to hold.
      * @return An either holding the left result.
      */
-    constexpr static Either<L,R> left(const L& left);
+    constexpr static Either<L, R> left(const L& left);
 
     /**
      * Construct an either holding a left value.
@@ -34,7 +34,7 @@ public:
      * @param left The left value to hold.
      * @return An either holding the left result.
      */
-    constexpr static Either<L,R> left(const L&& left);
+    constexpr static Either<L, R> left(const L&& left);
 
     /**
      * Construct an either holding a right value.
@@ -42,7 +42,7 @@ public:
      * @param left The right value to hold.
      * @return An either holding the right result.
      */
-    constexpr static Either<L,R> right(const R& right);
+    constexpr static Either<L, R> right(const R& right);
 
     /**
      * Construct an either holding a right value.
@@ -50,7 +50,7 @@ public:
      * @param left The right value to hold.
      * @return An either holding the right result.
      */
-    constexpr static Either<L,R> right(const R&& right);
+    constexpr static Either<L, R> right(const R&& right);
 
     /**
      * Check if this either is holding the left result. If true
@@ -90,10 +90,10 @@ public:
      */
     constexpr R get_right() const;
 
-    constexpr Either<L,R>(const Either<L,R>&) = default;
-    constexpr Either<L,R>(Either<L,R>&&) noexcept = default;
-    constexpr Either<L,R>& operator=(const Either<L,R>&) = default;
-    constexpr Either<L,R>& operator=(Either<L,R>&&) noexcept = default;
+    constexpr Either<L, R>(const Either<L, R>&) = default;
+    constexpr Either<L, R>(Either<L, R>&&) noexcept = default;
+    constexpr Either<L, R>& operator=(const Either<L, R>&) = default;
+    constexpr Either<L, R>& operator=(Either<L, R>&&) noexcept = default;
 
 private:
     constexpr Either() = default;
@@ -102,50 +102,50 @@ private:
 };
 
 template <class L, class R>
-constexpr Either<L,R> Either<L,R>::left(const L& left) {
-    Either<L,R> either;
+constexpr Either<L, R> Either<L, R>::left(const L& left) {
+    Either<L, R> either;
     either.leftValue = left;
     return either;
 }
 
 template <class L, class R>
-constexpr Either<L,R> Either<L,R>::left(const L&& left) {
-    Either<L,R> either;
+constexpr Either<L, R> Either<L, R>::left(const L&& left) {
+    Either<L, R> either;
     either.leftValue = std::move(left);
     return either;
 }
 
 template <class L, class R>
-constexpr Either<L,R> Either<L,R>::right(const R& right) {
-    Either<L,R> either;
+constexpr Either<L, R> Either<L, R>::right(const R& right) {
+    Either<L, R> either;
     either.rightValue = right;
     return either;
 }
 
 template <class L, class R>
-constexpr Either<L,R> Either<L,R>::right(const R&& right) {
-    Either<L,R> either;
+constexpr Either<L, R> Either<L, R>::right(const R&& right) {
+    Either<L, R> either;
     either.rightValue = std::move(right);
     return either;
 }
 
 template <class L, class R>
-constexpr bool Either<L,R>::is_left() const {
+constexpr bool Either<L, R>::is_left() const {
     return leftValue.has_value();
 }
 
 template <class L, class R>
-constexpr bool Either<L,R>::is_right() const {
+constexpr bool Either<L, R>::is_right() const {
     return rightValue.has_value();
 }
 
 template <class L, class R>
-constexpr L Either<L,R>::get_left() const {
+constexpr L Either<L, R>::get_left() const {
     return *leftValue;
 }
 
 template <class L, class R>
-constexpr R Either<L,R>::get_right() const {
+constexpr R Either<L, R>::get_right() const {
     return *rightValue;
 }
 

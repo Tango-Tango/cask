@@ -3,9 +3,9 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Task.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "gtest/gtest.h"
 
 using cask::None;
 using cask::Task;
@@ -15,9 +15,11 @@ TEST(TestTaskDelay, DelaysExecution) {
     int counter = 0;
     auto sched = std::make_shared<BenchScheduler>();
 
-    auto fiber = Task<int>::eval([&counter] { return counter++; })
-        .delay(10)
-        .run(sched);
+    auto fiber = Task<int>::eval([&counter] {
+                     return counter++;
+                 })
+                     .delay(10)
+                     .run(sched);
 
     EXPECT_EQ(counter, 0);
 
@@ -37,9 +39,11 @@ TEST(TestTaskDelay, CancelsExecution) {
     int counter = 0;
     auto sched = std::make_shared<BenchScheduler>();
 
-    auto fiber = Task<int>::eval([&counter] { return counter++; })
-        .delay(10)
-        .run(sched);
+    auto fiber = Task<int>::eval([&counter] {
+                     return counter++;
+                 })
+                     .delay(10)
+                     .run(sched);
 
     sched->run_ready_tasks();
     EXPECT_EQ(sched->num_timers(), 1);
@@ -49,4 +53,3 @@ TEST(TestTaskDelay, CancelsExecution) {
     EXPECT_EQ(sched->num_timers(), 0);
     EXPECT_TRUE(fiber->isCanceled());
 }
-

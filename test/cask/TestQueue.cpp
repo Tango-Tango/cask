@@ -3,25 +3,23 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Queue.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "gtest/gtest.h"
 
 using cask::DeferredRef;
-using cask::Task;
+using cask::None;
 using cask::Queue;
 using cask::Scheduler;
-using cask::None;
+using cask::Task;
 using cask::scheduler::BenchScheduler;
 
 TEST(Queue, Empty) {
     auto sched = std::make_shared<BenchScheduler>();
     auto mvar = Queue<int, std::string>::empty(sched, 1);
 
-    auto takeOrTimeout = mvar->take()
-        .raceWith(Task<int,std::string>::raiseError("timeout").delay(1))
-        .failed()
-        .run(sched);
+    auto takeOrTimeout =
+        mvar->take().raceWith(Task<int, std::string>::raiseError("timeout").delay(1)).failed().run(sched);
 
     sched->run_ready_tasks();
     sched->advance_time(1);
@@ -49,7 +47,7 @@ TEST(Queue, ResolvesPendingTakesInOrder) {
 
     auto firstTake = mvar->take().run(sched);
     auto secondTake = mvar->take().run(sched);
-    
+
     auto firstPut = mvar->put(1).run(sched);
     auto secondPut = mvar->put(2).run(sched);
 
@@ -110,15 +108,15 @@ TEST(Queue, InterleavePutsAndTakes) {
 }
 
 TEST(Queue, InterleavesTakesAndPuts) {
-    auto sched = std::make_shared<BenchScheduler>();    
+    auto sched = std::make_shared<BenchScheduler>();
     auto mvar = Queue<int>::empty(sched, 1);
 
     auto firstTake = mvar->take().run(sched);
     auto firstPut = mvar->put(1).run(sched);
-    
+
     auto secondTake = mvar->take().run(sched);
     auto secondPut = mvar->put(2).run(sched);
-    
+
     auto thirdTake = mvar->take().run(sched);
     auto thirdPut = mvar->put(3).run(sched);
 
@@ -135,7 +133,7 @@ TEST(Queue, InterleavesTakesAndPuts) {
 
 TEST(Queue, CleanupCanceledPut) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto mvar = Queue<int,std::string>::empty(sched, 1);
+    auto mvar = Queue<int, std::string>::empty(sched, 1);
 
     auto firstPut = mvar->put(1).run(sched);
     auto secondPut = mvar->put(2).run(sched);
@@ -157,7 +155,7 @@ TEST(Queue, CleanupCanceledPut) {
 
 TEST(Queue, CleanupCanceledTake) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto mvar = Queue<int,std::string>::empty(sched, 1);
+    auto mvar = Queue<int, std::string>::empty(sched, 1);
 
     auto firstTake = mvar->take().run(sched);
     auto secondTake = mvar->take().run(sched);
@@ -181,7 +179,7 @@ TEST(Queue, CleanupCanceledTake) {
 
 TEST(Queue, TryPutEmpty) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto mvar = Queue<int,std::string>::empty(sched, 1);
+    auto mvar = Queue<int, std::string>::empty(sched, 1);
 
     ASSERT_TRUE(mvar->tryPut(1));
     ASSERT_FALSE(mvar->tryPut(2));
@@ -194,15 +192,15 @@ TEST(Queue, TryPutEmpty) {
 
 TEST(Queue, TryPutFillQueue) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto mvar = Queue<int,std::string>::empty(sched, 5);
+    auto mvar = Queue<int, std::string>::empty(sched, 5);
 
-    for(unsigned int i = 0; i < 5; i++) {
+    for (unsigned int i = 0; i < 5; i++) {
         ASSERT_TRUE(mvar->tryPut(i));
     }
 
     ASSERT_FALSE(mvar->tryPut(6));
 
-    for(unsigned int i = 0; i < 5; i++) {
+    for (unsigned int i = 0; i < 5; i++) {
         auto take = mvar->take().run(sched);
         sched->run_ready_tasks();
         ASSERT_EQ(take->await(), i);
@@ -211,7 +209,7 @@ TEST(Queue, TryPutFillQueue) {
 
 TEST(Queue, TryPutPendingTakes) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto mvar = Queue<int,std::string>::empty(sched, 1);
+    auto mvar = Queue<int, std::string>::empty(sched, 1);
 
     auto firstTake = mvar->take().run(sched);
     auto secondTake = mvar->take().run(sched);
@@ -234,14 +232,14 @@ TEST(Queue, TryPutPendingTakes) {
 
 TEST(Queue, TryTakeEmpty) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto queue = Queue<int,std::string>::empty(sched, 1);
+    auto queue = Queue<int, std::string>::empty(sched, 1);
 
     ASSERT_FALSE(queue->tryTake().has_value());
 }
 
 TEST(Queue, TryTakeHasValue) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto queue = Queue<int,std::string>::empty(sched, 1);
+    auto queue = Queue<int, std::string>::empty(sched, 1);
 
     ASSERT_TRUE(queue->tryPut(1));
 
@@ -252,7 +250,7 @@ TEST(Queue, TryTakeHasValue) {
 
 TEST(Queue, TryTakePendingPuts) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto queue = Queue<int,std::string>::empty(sched, 1);
+    auto queue = Queue<int, std::string>::empty(sched, 1);
 
     ASSERT_TRUE(queue->tryPut(1));
     auto pendingPut = queue->put(2).run(sched);
@@ -274,5 +272,3 @@ TEST(Queue, TryTakePendingPuts) {
     sched->run_ready_tasks();
     pendingPut->await();
 }
-
-

@@ -3,26 +3,23 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/MVar.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "gtest/gtest.h"
 
 using cask::FiberRef;
-using cask::Task;
 using cask::MVar;
-using cask::Scheduler;
 using cask::None;
+using cask::Scheduler;
+using cask::Task;
 
 TEST(MVar, Empty) {
     auto sched = std::make_shared<cask::scheduler::BenchScheduler>();
     auto mvar = MVar<int, std::string>::empty(sched);
 
-    auto takeOrTimeout = mvar->take()
-        .raceWith(Task<int,std::string>::raiseError("timeout").delay(1))
-        .failed()
-        .run(sched);
-    
-    
+    auto takeOrTimeout =
+        mvar->take().raceWith(Task<int, std::string>::raiseError("timeout").delay(1)).failed().run(sched);
+
     sched->run_ready_tasks();
     sched->advance_time(1);
     sched->run_ready_tasks();
@@ -55,7 +52,7 @@ TEST(MVar, ResolvesPendingTakesInOrder) {
 
     auto firstTake = mvar->take().run(sched);
     auto secondTake = mvar->take().run(sched);
-    
+
     auto firstPut = mvar->put(1).run(sched);
     auto secondPut = mvar->put(2).run(sched);
 
@@ -121,10 +118,10 @@ TEST(MVar, InterleavesTakesAndPuts) {
 
     auto firstTake = mvar->take().run(sched);
     auto firstPut = mvar->put(1).run(sched);
-    
+
     auto secondTake = mvar->take().run(sched);
     auto secondPut = mvar->put(2).run(sched);
-    
+
     auto thirdTake = mvar->take().run(sched);
     auto thirdPut = mvar->put(3).run(sched);
 
@@ -141,7 +138,7 @@ TEST(MVar, InterleavesTakesAndPuts) {
 
 TEST(MVar, CleanupCanceledPut) {
     auto sched = std::make_shared<cask::scheduler::BenchScheduler>();
-    auto mvar = MVar<int,std::string>::empty(sched);
+    auto mvar = MVar<int, std::string>::empty(sched);
 
     auto firstPut = mvar->put(1).run(sched);
     auto secondPut = mvar->put(2).run(sched);
@@ -163,7 +160,7 @@ TEST(MVar, CleanupCanceledPut) {
 
 TEST(MVar, CleanupCanceledTake) {
     auto sched = std::make_shared<cask::scheduler::BenchScheduler>();
-    auto mvar = MVar<int,std::string>::empty(sched);
+    auto mvar = MVar<int, std::string>::empty(sched);
 
     auto firstTake = mvar->take().run(sched);
     auto secondTake = mvar->take().run(sched);
@@ -203,21 +200,21 @@ TEST(MVar, ReadManyTimes) {
     std::vector<FiberRef<int, std::string>> reads;
 
     auto mvar = MVar<int, std::string>::create(sched, 123);
-    for(unsigned int i = 0; i < iterations; i++) {
+    for (unsigned int i = 0; i < iterations; i++) {
         auto deferred = mvar->read().run(sched);
         reads.push_back(deferred);
     }
 
     sched->run_ready_tasks();
 
-    for(auto& fiber : reads) {
+    for (auto& fiber : reads) {
         EXPECT_EQ(fiber->await(), 123);
     }
 }
 
 TEST(MVar, TryPutEmpty) {
     auto sched = std::make_shared<cask::scheduler::BenchScheduler>();
-    auto mvar = MVar<int,std::string>::empty(sched);
+    auto mvar = MVar<int, std::string>::empty(sched);
 
     ASSERT_TRUE(mvar->tryPut(1));
     ASSERT_FALSE(mvar->tryPut(2));
@@ -231,7 +228,7 @@ TEST(MVar, TryPutEmpty) {
 
 TEST(MVar, TryPutPendingTakes) {
     auto sched = std::make_shared<cask::scheduler::BenchScheduler>();
-    auto mvar = MVar<int,std::string>::empty(sched);
+    auto mvar = MVar<int, std::string>::empty(sched);
 
     auto firstTake = mvar->take().run(sched);
     auto secondTake = mvar->take().run(sched);
@@ -257,19 +254,17 @@ TEST(MVar, Modify) {
     auto mvar = MVar<int, std::string>::create(sched, 123);
 
     auto fiber = mvar->template modify<float>([](auto value) {
-            int updated_state = value * 2;
-            float result = value * 1.5f;
-            std::tuple<int,float> both = {updated_state, result};
-            return Task<std::tuple<int,float>,std::string>::pure(both);
-        })
-        .run(sched);
-    
-    
+                         int updated_state = value * 2;
+                         float result = value * 1.5f;
+                         std::tuple<int, float> both = {updated_state, result};
+                         return Task<std::tuple<int, float>, std::string>::pure(both);
+                     })
+                     .run(sched);
+
     sched->run_ready_tasks();
     EXPECT_EQ(fiber->await(), 184.5);
 
     auto afterFiber = mvar->take().run(sched);
     sched->run_ready_tasks();
     EXPECT_EQ(afterFiber->await(), 246);
-
 }

@@ -10,20 +10,17 @@ namespace cask::fiber {
 FiberValue::FiberValue()
     : value()
     , error(false)
-    , canceled(false)
-{}
+    , canceled(false) {}
 
 FiberValue::FiberValue(const Erased& value, bool error, bool canceled)
     : value(value)
     , error(error)
-    , canceled(canceled)
-{}
+    , canceled(canceled) {}
 
 FiberValue::FiberValue(Erased&& value, bool error, bool canceled)
     : value(value)
     , error(error)
-    , canceled(canceled)
-{}
+    , canceled(canceled) {}
 
 bool FiberValue::isValue() const {
     return !error && !canceled && value.has_value();
@@ -68,7 +65,7 @@ void FiberValue::setCanceled() {
 }
 
 std::optional<Erased> FiberValue::getValue() const {
-    if(isValue()) {
+    if (isValue()) {
         return value;
     } else {
         return {};
@@ -76,7 +73,7 @@ std::optional<Erased> FiberValue::getValue() const {
 }
 
 std::optional<Erased> FiberValue::getError() const {
-    if(isError()) {
+    if (isError()) {
         return value;
     } else {
         return {};
@@ -86,6 +83,5 @@ std::optional<Erased> FiberValue::getError() const {
 const Erased& FiberValue::underlying() const {
     return value;
 }
-
 
 } // namespace cask::fiber

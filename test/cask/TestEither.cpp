@@ -3,13 +3,13 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Either.hpp"
+#include "gtest/gtest.h"
 
 using cask::Either;
 
 TEST(Either, Left) {
-    auto either = Either<int,float>::left(123);
+    auto either = Either<int, float>::left(123);
 
     EXPECT_TRUE(either.is_left());
     EXPECT_FALSE(either.is_right());
@@ -17,7 +17,7 @@ TEST(Either, Left) {
 }
 
 TEST(Either, Right) {
-    auto either = Either<int,double>::right(4.56);
+    auto either = Either<int, double>::right(4.56);
 
     EXPECT_FALSE(either.is_left());
     EXPECT_TRUE(either.is_right());

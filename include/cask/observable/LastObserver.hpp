@@ -3,12 +3,11 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-
 #ifndef _CASK_LAST_OBSERVER_H_
 #define _CASK_LAST_OBSERVER_H_
 
-#include "../Observer.hpp"
 #include "../Deferred.hpp"
+#include "../Observer.hpp"
 
 namespace cask::observable {
 
@@ -18,64 +17,64 @@ namespace cask::observable {
  * was empty). Normally obtained by using `Observer<T>::last()`.
  */
 template <class T, class E>
-class LastObserver final : public Observer<T,E> {
+class LastObserver final : public Observer<T, E> {
 public:
-    explicit LastObserver(const std::weak_ptr<Promise<std::optional<T>,E>>& promise);
+    explicit LastObserver(const std::weak_ptr<Promise<std::optional<T>, E>>& promise);
 
-    Task<Ack,None> onNext(const T& value) override;
-    Task<None,None> onError(const E& error) override;
-    Task<None,None> onComplete() override;
-    Task<None,None> onCancel() override;
+    Task<Ack, None> onNext(const T& value) override;
+    Task<None, None> onError(const E& error) override;
+    Task<None, None> onComplete() override;
+    Task<None, None> onCancel() override;
+
 private:
     std::optional<T> lastValue;
-    std::weak_ptr<Promise<std::optional<T>,E>> promise;
+    std::weak_ptr<Promise<std::optional<T>, E>> promise;
     std::atomic_flag completed;
 };
 
 template <class T, class E>
-LastObserver<T,E>::LastObserver(const std::weak_ptr<Promise<std::optional<T>,E>>& promise)
+LastObserver<T, E>::LastObserver(const std::weak_ptr<Promise<std::optional<T>, E>>& promise)
     : lastValue()
     , promise(promise)
-    , completed(false)
-{}
+    , completed(false) {}
 
 template <class T, class E>
-Task<Ack, None> LastObserver<T,E>::onNext(const T& value) {
+Task<Ack, None> LastObserver<T, E>::onNext(const T& value) {
     lastValue = value;
-    return Task<Ack,None>::pure(Continue);
+    return Task<Ack, None>::pure(Continue);
 }
 
 template <class T, class E>
-Task<None,None> LastObserver<T,E>::onError(const E& error) {
-    if(!completed.test_and_set()) {
-        if(auto promiseLock = promise.lock()) {
+Task<None, None> LastObserver<T, E>::onError(const E& error) {
+    if (!completed.test_and_set()) {
+        if (auto promiseLock = promise.lock()) {
             promiseLock->error(error);
         }
     }
 
-    return Task<None,None>::none();
+    return Task<None, None>::none();
 }
 
 template <class T, class E>
-Task<None,None>  LastObserver<T,E>::onComplete() {
-    if(!completed.test_and_set()) {
-        if(auto promiseLock = promise.lock()) {
+Task<None, None> LastObserver<T, E>::onComplete() {
+    if (!completed.test_and_set()) {
+        if (auto promiseLock = promise.lock()) {
             promiseLock->success(lastValue);
         }
     }
 
-    return Task<None,None>::none();
+    return Task<None, None>::none();
 }
 
 template <class T, class E>
-Task<None,None>  LastObserver<T,E>::onCancel() {
-    if(!completed.test_and_set()) {
-        if(auto promiseLock = promise.lock()) {
+Task<None, None> LastObserver<T, E>::onCancel() {
+    if (!completed.test_and_set()) {
+        if (auto promiseLock = promise.lock()) {
             promiseLock->cancel();
         }
     }
 
-    return Task<None,None>::none();
+    return Task<None, None>::none();
 }
 
 } // namespace cask::observable

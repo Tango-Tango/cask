@@ -53,7 +53,7 @@ jobs:
       run: meson test --verbose
     - name: Generate Coverage Reports
       if: ${{ matrix.target == 'debug' }}
-      run: ninja coverage -C build_${{ matrix.target }}
+      run: ninja coverage-report-text -C build_${{ matrix.target }}
   
   build-mac:
     name: Mac Build and Test
@@ -108,7 +108,9 @@ jobs:
         ./automatic_release.py -u engineering-at-tangotango -o Tango-Tango -r cask -s pre-build
     - name: Generate the Build Environment
       run: ./regenerate_env.sh clang
-    - name: Run clang-tidy
+    - name: Clang Format Check
+      run: ninja clang-format-check -C build_clang
+    - name: Clang Tidy
       run: ninja clang-tidy -C build_clang
   
   release:

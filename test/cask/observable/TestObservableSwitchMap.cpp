@@ -3,23 +3,23 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include <thread>
-#include "gtest/gtest.h"
-#include "gtest/trompeloeil.hpp"
 #include "cask/Observable.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "gtest/gtest.h"
+#include "gtest/trompeloeil.hpp"
+#include <thread>
 
+using cask::Ack;
+using cask::None;
 using cask::Observable;
 using cask::ObservableRef;
 using cask::Observer;
 using cask::Scheduler;
 using cask::Task;
-using cask::None;
-using cask::Ack;
 using cask::observable::SwitchMapObserver;
 using cask::scheduler::BenchScheduler;
 
-class MockSwitchMapDownstreamObserver : public trompeloeil::mock_interface<Observer<float,std::string>> {
+class MockSwitchMapDownstreamObserver : public trompeloeil::mock_interface<Observer<float, std::string>> {
 public:
     IMPLEMENT_MOCK1(onNext);
     IMPLEMENT_MOCK1(onError);
@@ -31,8 +31,8 @@ void awaitIdle() {
     const static std::chrono::milliseconds sleep_time(1);
 
     int num_retries = 60000;
-    while(num_retries > 0) {
-        if(Scheduler::global()->isIdle()) {
+    while (num_retries > 0) {
+        if (Scheduler::global()->isIdle()) {
             return;
         } else {
             std::this_thread::sleep_for(sleep_time);
@@ -46,12 +46,12 @@ void awaitIdle() {
 TEST(ObservableSwitchMap, Empty) {
     auto sched = Scheduler::global();
     auto result = Observable<int>::empty()
-        ->switchMap<float>([](auto value) {
-            return Observable<float>::pure(value * 1.5);
-        })
-        ->last()
-        .run(sched)
-        ->await();
+                      ->switchMap<float>([](auto value) {
+                          return Observable<float>::pure(value * 1.5);
+                      })
+                      ->last()
+                      .run(sched)
+                      ->await();
 
     EXPECT_TRUE(!result.has_value());
     awaitIdle();
@@ -60,12 +60,12 @@ TEST(ObservableSwitchMap, Empty) {
 TEST(ObservableSwitchMap, Pure) {
     auto sched = Scheduler::global();
     auto result = Observable<int>::pure(123)
-        ->switchMap<float>([](auto value) {
-            return Observable<float>::pure(value * 1.5);
-        })
-        ->last()
-        .run(sched)
-        ->await();
+                      ->switchMap<float>([](auto value) {
+                          return Observable<float>::pure(value * 1.5);
+                      })
+                      ->last()
+                      .run(sched)
+                      ->await();
 
     EXPECT_TRUE(result.has_value());
     EXPECT_EQ(*result, 184.5);
@@ -74,14 +74,14 @@ TEST(ObservableSwitchMap, Pure) {
 
 TEST(ObservableSwitchMap, UpstreamError) {
     auto sched = Scheduler::global();
-    auto result = Observable<int,std::string>::raiseError("broke")
-        ->switchMap<float>([](auto value) {
-            return Observable<float,std::string>::pure(value * 1.5);
-        })
-        ->last()
-        .failed()
-        .run(sched)
-        ->await();
+    auto result = Observable<int, std::string>::raiseError("broke")
+                      ->switchMap<float>([](auto value) {
+                          return Observable<float, std::string>::pure(value * 1.5);
+                      })
+                      ->last()
+                      .failed()
+                      .run(sched)
+                      ->await();
 
     EXPECT_EQ(result, "broke");
     awaitIdle();
@@ -89,14 +89,14 @@ TEST(ObservableSwitchMap, UpstreamError) {
 
 TEST(ObservableSwitchMap, ProducesError) {
     auto sched = Scheduler::global();
-    auto result = Observable<int,std::string>::pure(123)
-        ->switchMap<float>([](auto) {
-            return Observable<float,std::string>::raiseError("broke");
-        })
-        ->last()
-        .failed()
-        .run(sched)
-        ->await();
+    auto result = Observable<int, std::string>::pure(123)
+                      ->switchMap<float>([](auto) {
+                          return Observable<float, std::string>::raiseError("broke");
+                      })
+                      ->last()
+                      .failed()
+                      .run(sched)
+                      ->await();
 
     EXPECT_EQ(result, "broke");
     awaitIdle();
@@ -105,15 +105,15 @@ TEST(ObservableSwitchMap, ProducesError) {
 TEST(ObservableSwitchMap, ErrorStopsInfiniteUpstream) {
     auto sched = Scheduler::global();
     int counter = 0;
-    auto result = Observable<int,std::string>::repeatTask(Task<int,std::string>::pure(123).delay(1))
-        ->switchMap<float>([&counter](auto) {
-            counter++;
-            return Observable<float,std::string>::raiseError("broke");
-        })
-        ->last()
-        .failed()
-        .run(sched)
-        ->await();
+    auto result = Observable<int, std::string>::repeatTask(Task<int, std::string>::pure(123).delay(1))
+                      ->switchMap<float>([&counter](auto) {
+                          counter++;
+                          return Observable<float, std::string>::raiseError("broke");
+                      })
+                      ->last()
+                      .failed()
+                      .run(sched)
+                      ->await();
 
     EXPECT_EQ(result, "broke");
     EXPECT_EQ(counter, 1);
@@ -122,21 +122,20 @@ TEST(ObservableSwitchMap, ErrorStopsInfiniteUpstream) {
 
 TEST(ObservableSwitchMap, CancelStopsInfiniteUpstream) {
     auto sched = Scheduler::global();
-    auto deferred = Observable<int,std::string>::repeatTask(
-            Task<int,std::string>::pure(123).delay(10)
-        )
-        ->switchMap<float>([](auto) {
-            return Observable<float,std::string>::pure(1.23f);
-        })
-        ->completed()
-        .run(sched);
+    auto deferred = Observable<int, std::string>::repeatTask(Task<int, std::string>::pure(123).delay(10))
+                        ->switchMap<float>([](auto) {
+                            return Observable<float, std::string>::pure(1.23f);
+                        })
+                        ->completed()
+                        .run(sched);
 
     deferred->cancel();
 
     try {
         deferred->await();
         FAIL() << "Expected method to throw";
-    } catch(std::runtime_error&) {}
+    } catch (std::runtime_error&) {
+    }
 
     awaitIdle();
 }
@@ -144,14 +143,14 @@ TEST(ObservableSwitchMap, CancelStopsInfiniteUpstream) {
 TEST(ObservableSwitchMap, StopsUpstreamOnDownstreamComplete) {
     auto sched = Scheduler::global();
     int counter = 0;
-    auto result = Observable<int,std::string>::repeatTask(Task<int,std::string>::pure(123).delay(1))
-        ->switchMap<float>([&counter](auto) {
-            counter++;
-            return Observable<float,std::string>::pure(123 * 1.5f);
-        })
-        ->take(10)
-        .run(sched)
-        ->await();
+    auto result = Observable<int, std::string>::repeatTask(Task<int, std::string>::pure(123).delay(1))
+                      ->switchMap<float>([&counter](auto) {
+                          counter++;
+                          return Observable<float, std::string>::pure(123 * 1.5f);
+                      })
+                      ->take(10)
+                      .run(sched)
+                      ->await();
 
     EXPECT_EQ(result.size(), 10);
     EXPECT_GE(counter, 10);
@@ -163,15 +162,15 @@ TEST(ObservableSwitchMap, CompletionWaitsForSubscriptionComplete) {
     auto sched = std::make_shared<BenchScheduler>();
     int counter = 0;
 
-    auto fiber = Observable<int,std::string>::fromVector(std::vector<int>{ 1 , 2, 3 })
-        ->switchMap<int>([&counter](auto value) {
-            counter++;
-            return Observable<int,std::string>::deferTask([value] {
-                return Task<int,std::string>::pure(value * 2).delay(1);
-            });
-        })
-        ->take(3)
-        .run(sched);
+    auto fiber = Observable<int, std::string>::fromVector(std::vector<int>{1, 2, 3})
+                     ->switchMap<int>([&counter](auto value) {
+                         counter++;
+                         return Observable<int, std::string>::deferTask([value] {
+                             return Task<int, std::string>::pure(value * 2).delay(1);
+                         });
+                     })
+                     ->take(3)
+                     .run(sched);
 
     sched->run_ready_tasks();
     EXPECT_FALSE(fiber->getValue().has_value());
@@ -189,15 +188,15 @@ TEST(ObservableSwitchMap, CompletionWaitsForSubscriptionComplete) {
 
 TEST(ObservableSwitchMap, CancelInnerObservable) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto fiber = Observable<int,std::string>::fromVector(std::vector<int>{ 1 , 2, 3 })
-        ->appendAll(Observable<int,std::string>::never())
-        ->switchMap<int>([](auto value) {
-            return Observable<int,std::string>::deferTask([value] {
-                return Task<int,std::string>::pure(value * 2).delay(1);
-            });
-        })
-        ->take(3)
-        .run(sched);
+    auto fiber = Observable<int, std::string>::fromVector(std::vector<int>{1, 2, 3})
+                     ->appendAll(Observable<int, std::string>::never())
+                     ->switchMap<int>([](auto value) {
+                         return Observable<int, std::string>::deferTask([value] {
+                             return Task<int, std::string>::pure(value * 2).delay(1);
+                         });
+                     })
+                     ->take(3)
+                     .run(sched);
 
     sched->run_ready_tasks();
     EXPECT_FALSE(fiber->getValue().has_value());

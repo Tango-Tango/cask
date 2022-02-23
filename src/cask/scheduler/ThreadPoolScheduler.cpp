@@ -18,9 +18,8 @@ ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
     , timers()
     , runThreads()
     , timerThread()
-    , ticks(0)
-{
-    for(unsigned int i =0; i < poolSize; i++) {
+    , ticks(0) {
+    for (unsigned int i = 0; i < poolSize; i++) {
         std::thread poolThread(std::bind(&ThreadPoolScheduler::run, this));
         runThreads.push_back(std::move(poolThread));
     }
@@ -31,15 +30,17 @@ ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
 ThreadPoolScheduler::~ThreadPoolScheduler() {
     running = false;
 
-    for(auto& thread: runThreads) {
+    for (auto& thread : runThreads) {
         try {
             thread.join();
-        } catch(const std::system_error& error) {}
+        } catch (const std::system_error& error) {
+        }
     }
 
     try {
         timerThread.join();
-    } catch(const std::system_error& error) {}
+    } catch (const std::system_error& error) {
+    }
 }
 
 void ThreadPoolScheduler::submit(const std::function<void()>& task) {
@@ -52,7 +53,7 @@ void ThreadPoolScheduler::submit(const std::function<void()>& task) {
 
 void ThreadPoolScheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
     std::lock_guard<std::mutex> guard(readyQueueMutex);
-    for(auto& task: tasks) {
+    for (auto& task : tasks) {
         readyQueue.emplace(task);
         dataInQueue.notify_one();
     }
@@ -65,13 +66,9 @@ CancelableRef ThreadPoolScheduler::submitAfter(int64_t milliseconds, const std::
     auto id = next_id++;
     auto tasks = timers.find(executionTick);
     auto entry = std::make_tuple(id, task);
-    auto cancelable = std::make_shared<CancelableTimer>(
-        this->shared_from_this(),
-        executionTick,
-        id
-    );
+    auto cancelable = std::make_shared<CancelableTimer>(this->shared_from_this(), executionTick, id);
 
-    if(tasks == timers.end()) {
+    if (tasks == timers.end()) {
         std::vector<TimerEntry> taskVector = {entry};
         timers[executionTick] = taskVector;
     } else {
@@ -91,20 +88,22 @@ void ThreadPoolScheduler::run() {
     std::function<void()> task;
     bool idling = true;
 
-    while(running) {
+    while (running) {
         readyQueueLock.lock();
 
-        if(!idling && readyQueue.empty()) {
+        if (!idling && readyQueue.empty()) {
             idling = true;
             idleThreads++;
         }
 
-        if(dataInQueue.wait_for(readyQueueLock, max_wait_time, [this](){return !readyQueue.empty(); })) {
-            if(idling) {
+        if (dataInQueue.wait_for(readyQueueLock, max_wait_time, [this]() {
+                return !readyQueue.empty();
+            })) {
+            if (idling) {
                 idling = false;
                 idleThreads--;
             }
-            
+
             task = readyQueue.front();
             readyQueue.pop();
             readyQueueLock.unlock();
@@ -118,11 +117,11 @@ void ThreadPoolScheduler::run() {
 void ThreadPoolScheduler::timer() {
     const static std::chrono::milliseconds sleep_time(10);
 
-    while(running) {
+    while (running) {
         auto before = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(sleep_time);
         auto after = std::chrono::steady_clock::now();
-        
+
         auto delta = after - before;
         auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
 
@@ -132,15 +131,15 @@ void ThreadPoolScheduler::timer() {
             int64_t previous_ticks = ticks;
             ticks += milliseconds;
 
-            for(int64_t i = previous_ticks; i <= ticks; i++) {
+            for (int64_t i = previous_ticks; i <= ticks; i++) {
                 auto tasks = timers.find(i);
-                if(tasks != timers.end()) {
+                if (tasks != timers.end()) {
                     std::vector<std::function<void()>> submittedTasks;
                     auto entries = tasks->second;
 
                     submittedTasks.reserve(entries.size());
 
-                    for(auto& entry : entries) {
+                    for (auto& entry : entries) {
                         submittedTasks.emplace_back(std::get<1>(entry));
                     }
 
@@ -152,39 +151,37 @@ void ThreadPoolScheduler::timer() {
     }
 }
 
-ThreadPoolScheduler::CancelableTimer::CancelableTimer(
-    const std::shared_ptr<ThreadPoolScheduler>& parent,
-    int64_t time_slot,
-    int64_t id
-)   : parent(parent)
+ThreadPoolScheduler::CancelableTimer::CancelableTimer(const std::shared_ptr<ThreadPoolScheduler>& parent,
+                                                      int64_t time_slot,
+                                                      int64_t id)
+    : parent(parent)
     , time_slot(time_slot)
     , id(id)
     , callbacks()
     , callback_mutex()
-    , canceled(false)
-{}
+    , canceled(false) {}
 
 void ThreadPoolScheduler::CancelableTimer::cancel() {
-    if(canceled) {
+    if (canceled) {
         return;
     } else {
         std::lock_guard<std::mutex> parent_guard(parent->timerMutex);
         std::lock_guard<std::mutex> self_guard(callback_mutex);
         auto tasks = parent->timers.find(time_slot);
-        if(tasks != parent->timers.end()) {
+        if (tasks != parent->timers.end()) {
             std::vector<TimerEntry> filteredEntries;
             auto entries = tasks->second;
 
-            for(auto& entry : entries) {
+            for (auto& entry : entries) {
                 auto entry_id = std::get<0>(entry);
-                if(entry_id != id) {
+                if (entry_id != id) {
                     filteredEntries.emplace_back(entry);
                 } else {
                     canceled = true;
                 }
             }
 
-            if(filteredEntries.size() > 0) {
+            if (filteredEntries.size() > 0) {
                 parent->timers[time_slot] = filteredEntries;
             } else {
                 parent->timers.erase(time_slot);
@@ -192,15 +189,15 @@ void ThreadPoolScheduler::CancelableTimer::cancel() {
         }
     }
 
-    if(canceled) {
-        for(auto& cb : callbacks) {
+    if (canceled) {
+        for (auto& cb : callbacks) {
             cb();
         }
     }
 }
 
 void ThreadPoolScheduler::CancelableTimer::onCancel(const std::function<void()>& callback) {
-    if(canceled) {
+    if (canceled) {
         callback();
     } else {
         std::lock_guard<std::mutex> guard(callback_mutex);
@@ -216,14 +213,14 @@ void ThreadPoolScheduler::CancelableTimer::onShutdown(const std::function<void()
         std::lock_guard<std::mutex> self_guard(callback_mutex);
         auto tasks = parent->timers.find(time_slot);
 
-        if(tasks != parent->timers.end()) {
+        if (tasks != parent->timers.end()) {
             std::vector<TimerEntry> newEntries;
             auto entries = tasks->second;
 
-            for(auto& entry : entries) {
+            for (auto& entry : entries) {
                 auto entryId = std::get<0>(entry);
                 auto entryCallback = std::get<1>(entry);
-                if(entryId != id) {
+                if (entryId != id) {
                     newEntries.emplace_back(entry);
                 } else {
                     found = true;
@@ -238,7 +235,7 @@ void ThreadPoolScheduler::CancelableTimer::onShutdown(const std::function<void()
         }
     }
 
-    if(!found) {
+    if (!found) {
         shutdownCallback();
     }
 }

@@ -3,28 +3,26 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Task.hpp"
+#include "gtest/gtest.h"
 
-using cask::Task;
 using cask::Scheduler;
+using cask::Task;
 
-TEST(TaskRaiseError,EvalutesSync) {
-    auto result = Task<int,float>::raiseError(1.23).runSync();
+TEST(TaskRaiseError, EvalutesSync) {
+    auto result = Task<int, float>::raiseError(1.23).runSync();
 
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->is_right());
     EXPECT_EQ(result->get_right(), 1.23f);
 }
 
-TEST(TaskRaiseError,EvaluatesAsync) {
+TEST(TaskRaiseError, EvaluatesAsync) {
     try {
-        Task<int,float>::raiseError(1.23)
-            .run(Scheduler::global())
-            ->await();
-        
+        Task<int, float>::raiseError(1.23).run(Scheduler::global())->await();
+
         FAIL() << "Excepted operation to throw.";
-    } catch(float& error) {
+    } catch (float& error) {
         EXPECT_EQ(error, 1.23f);
     }
 }

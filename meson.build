@@ -42,6 +42,31 @@ if cppcheck.found()
     ])
 endif
 
+# Setup gcovr and a "smarter" coverage report option
+gcovr = find_program('gcovr', required: false)
+if get_option('b_coverage') and gcovr.found()
+    run_target('coverage-report-html', command: [
+        gcovr,
+        '-f', join_paths(meson.project_source_root(), 'src'),
+        '-f', join_paths(meson.project_source_root(), 'include'),
+        '--exclude-unreachable-branches',
+        '--exclude-throw-branches',
+        '--root=' + join_paths(meson.project_source_root()),
+        '-s',
+        '--html-details',
+        '-o', join_paths(meson.project_build_root(), 'meson-logs', 'coverage.html')
+    ])
+
+    run_target('coverage-report-text', command: [
+        gcovr,
+        '-f', join_paths(meson.project_source_root(), 'src'),
+        '-f', join_paths(meson.project_source_root(), 'include'),
+        '--exclude-unreachable-branches',
+        '--exclude-throw-branches',
+        '--root=' + join_paths(meson.project_source_root())
+    ])
+endif
+
 # Setup clang-tidy
 run_clang_tidy = find_program('run-clang-tidy', required: false)
 if run_clang_tidy.found()

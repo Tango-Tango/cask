@@ -14,7 +14,9 @@ namespace cask::list {
  * Represents the empty list that holds no values and has no tail.
  */
 template <class T>
-class Nil final : public List<T>, public std::enable_shared_from_this<Nil<T>> {
+class Nil final
+    : public List<T>
+    , public std::enable_shared_from_this<Nil<T>> {
 public:
     static ListRef<T> create();
 

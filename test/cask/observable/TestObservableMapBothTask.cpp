@@ -3,17 +3,17 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
+#include "cask/Observable.hpp"
 #include "gtest/gtest.h"
 #include "gtest/trompeloeil.hpp"
-#include "cask/Observable.hpp"
 #include <exception>
 
 using cask::Ack;
-using cask::Task;
+using cask::None;
 using cask::Observable;
 using cask::Observer;
 using cask::Scheduler;
-using cask::None;
+using cask::Task;
 using cask::observable::MapBothTaskObserver;
 
 class MockMapBothTaskDownstreamObserver : public trompeloeil::mock_interface<Observer<double, int>> {
@@ -25,71 +25,67 @@ public:
 };
 
 TEST(TestObservableMapBothTask, MapsSuccessToSuccess) {
-    auto result = Observable<int,std::string>::pure(123)
-        ->mapBothTask<std::string,std::runtime_error>(
-            [](auto value) {
-                return Task<std::string,std::runtime_error>::pure(std::to_string(value));
-            },
-            [](auto error) {
-                return Task<std::string,std::runtime_error>::raiseError(std::runtime_error(error));
-            }
-        )
-        ->last()
-        .run(Scheduler::global())
-        ->await();
+    auto result = Observable<int, std::string>::pure(123)
+                      ->mapBothTask<std::string, std::runtime_error>(
+                          [](auto value) {
+                              return Task<std::string, std::runtime_error>::pure(std::to_string(value));
+                          },
+                          [](auto error) {
+                              return Task<std::string, std::runtime_error>::raiseError(std::runtime_error(error));
+                          })
+                      ->last()
+                      .run(Scheduler::global())
+                      ->await();
 
     EXPECT_EQ(result, "123");
 }
 
 TEST(TestObservableMapBothTask, MapsErrorToError) {
-    auto result = Observable<int,std::string>::raiseError("broke")
-        ->mapBothTask<std::string,std::runtime_error>(
-            [](auto value) {
-                return Task<std::string,std::runtime_error>::pure(std::to_string(value));
-            },
-            [](auto error) {
-                return Task<std::string,std::runtime_error>::raiseError(std::runtime_error(error));
-            }
-        )
-        ->last()
-        .failed()
-        .run(Scheduler::global())
-        ->await();
+    auto result = Observable<int, std::string>::raiseError("broke")
+                      ->mapBothTask<std::string, std::runtime_error>(
+                          [](auto value) {
+                              return Task<std::string, std::runtime_error>::pure(std::to_string(value));
+                          },
+                          [](auto error) {
+                              return Task<std::string, std::runtime_error>::raiseError(std::runtime_error(error));
+                          })
+                      ->last()
+                      .failed()
+                      .run(Scheduler::global())
+                      ->await();
 
     EXPECT_EQ(result.what(), std::string("broke"));
 }
 
 TEST(TestObservableMapBothTask, MapsSuccessToError) {
-    auto result = Observable<std::string,int>::pure("working")
-        ->mapBothTask<std::string,std::runtime_error>(
-            [](auto value) {
-                return Task<std::string,std::runtime_error>::raiseError(std::runtime_error(value));
-            },
-            [](auto error) {
-                return Task<std::string,std::runtime_error>::pure(std::to_string(error));
-            }
-        )
-        ->last()
-        .failed()
-        .run(Scheduler::global())
-        ->await();
+    auto result = Observable<std::string, int>::pure("working")
+                      ->mapBothTask<std::string, std::runtime_error>(
+                          [](auto value) {
+                              return Task<std::string, std::runtime_error>::raiseError(std::runtime_error(value));
+                          },
+                          [](auto error) {
+                              return Task<std::string, std::runtime_error>::pure(std::to_string(error));
+                          })
+                      ->last()
+                      .failed()
+                      .run(Scheduler::global())
+                      ->await();
 
     EXPECT_EQ(result.what(), std::string("working"));
 }
 
 TEST(TestObservableMapBothTask, MapsErrorToSuccess) {
-    auto result = Observable<std::string,int>::raiseError(123)
-        ->mapBothTask<std::string,std::runtime_error>(
-            [](auto value) {
-                return Task<std::string,std::runtime_error>::raiseError(std::runtime_error(value));
-            },
-            [](auto error) {
-                return Task<std::string,std::runtime_error>::pure(std::to_string(error));
-            }
-        )
-        ->last()
-        .run(Scheduler::global())
-        ->await();
+    auto result = Observable<std::string, int>::raiseError(123)
+                      ->mapBothTask<std::string, std::runtime_error>(
+                          [](auto value) {
+                              return Task<std::string, std::runtime_error>::raiseError(std::runtime_error(value));
+                          },
+                          [](auto error) {
+                              return Task<std::string, std::runtime_error>::pure(std::to_string(error));
+                          })
+                      ->last()
+                      .run(Scheduler::global())
+                      ->await();
 
     EXPECT_EQ(result, "123");
 }
@@ -97,8 +93,7 @@ TEST(TestObservableMapBothTask, MapsErrorToSuccess) {
 TEST(TestObservableMapBothTask, SuccessToSuccessPassesDownstreamContinue) {
     auto mockDownstream = std::make_shared<MockMapBothTaskDownstreamObserver>();
 
-    REQUIRE_CALL(*mockDownstream, onNext(1.23))
-        .RETURN(Task<Ack,None>::pure(cask::Continue));
+    REQUIRE_CALL(*mockDownstream, onNext(1.23)).RETURN(Task<Ack, None>::pure(cask::Continue));
 
     auto observer = std::make_shared<MapBothTaskObserver<int, double, std::string, int>>(
         [](auto) {
@@ -107,8 +102,7 @@ TEST(TestObservableMapBothTask, SuccessToSuccessPassesDownstreamContinue) {
         [](auto) {
             return Task<double, int>::raiseError(456);
         },
-        mockDownstream
-    );
+        mockDownstream);
 
     auto result = observer->onNext(123).run(Scheduler::global())->await();
     EXPECT_EQ(result, cask::Continue);
@@ -117,8 +111,7 @@ TEST(TestObservableMapBothTask, SuccessToSuccessPassesDownstreamContinue) {
 TEST(TestObservableMapBothTask, SuccessToSuccessPassesDownstreamStop) {
     auto mockDownstream = std::make_shared<MockMapBothTaskDownstreamObserver>();
 
-    REQUIRE_CALL(*mockDownstream, onNext(1.23))
-        .RETURN(Task<Ack,None>::pure(cask::Stop));
+    REQUIRE_CALL(*mockDownstream, onNext(1.23)).RETURN(Task<Ack, None>::pure(cask::Stop));
 
     auto observer = std::make_shared<MapBothTaskObserver<int, double, std::string, int>>(
         [](auto) {
@@ -127,8 +120,7 @@ TEST(TestObservableMapBothTask, SuccessToSuccessPassesDownstreamStop) {
         [](auto) {
             return Task<double, int>::raiseError(456);
         },
-        mockDownstream
-    );
+        mockDownstream);
 
     auto result = observer->onNext(123).run(Scheduler::global())->await();
     EXPECT_EQ(result, cask::Stop);
@@ -137,8 +129,7 @@ TEST(TestObservableMapBothTask, SuccessToSuccessPassesDownstreamStop) {
 TEST(TestObservableMapBothTask, SuccessToErrorPassesErrorDownstreamStopsUpstream) {
     auto mockDownstream = std::make_shared<MockMapBothTaskDownstreamObserver>();
 
-    REQUIRE_CALL(*mockDownstream, onError(456))
-        .RETURN(Task<None,None>::none());
+    REQUIRE_CALL(*mockDownstream, onError(456)).RETURN(Task<None, None>::none());
 
     auto observer = std::make_shared<MapBothTaskObserver<int, double, std::string, int>>(
         [](auto) {
@@ -147,8 +138,7 @@ TEST(TestObservableMapBothTask, SuccessToErrorPassesErrorDownstreamStopsUpstream
         [](auto) {
             return Task<double, int>::pure(1.23);
         },
-        mockDownstream
-    );
+        mockDownstream);
 
     auto result = observer->onNext(123).run(Scheduler::global())->await();
     EXPECT_EQ(result, cask::Stop);
@@ -158,9 +148,7 @@ TEST(TestObservableMapBothTask, SuccessToErrorPassesErrorDoesntAcceptSubsequentV
     auto counter = 0;
     auto mockDownstream = std::make_shared<MockMapBothTaskDownstreamObserver>();
 
-    REQUIRE_CALL(*mockDownstream, onError(456))
-        .LR_SIDE_EFFECT(counter++)
-        .RETURN(Task<None,None>::none());
+    REQUIRE_CALL(*mockDownstream, onError(456)).LR_SIDE_EFFECT(counter++).RETURN(Task<None, None>::none());
 
     auto observer = std::make_shared<MapBothTaskObserver<int, double, std::string, int>>(
         [](auto) {
@@ -169,8 +157,7 @@ TEST(TestObservableMapBothTask, SuccessToErrorPassesErrorDoesntAcceptSubsequentV
         [](auto) {
             return Task<double, int>::pure(1.23);
         },
-        mockDownstream
-    );
+        mockDownstream);
 
     EXPECT_EQ(observer->onNext(123).run(Scheduler::global())->await(), cask::Stop);
     EXPECT_EQ(observer->onNext(123).run(Scheduler::global())->await(), cask::Stop);
@@ -180,8 +167,7 @@ TEST(TestObservableMapBothTask, SuccessToErrorPassesErrorDoesntAcceptSubsequentV
 TEST(TestObservableMapBothTask, ErrorToErrorPassesError) {
     auto mockDownstream = std::make_shared<MockMapBothTaskDownstreamObserver>();
 
-    REQUIRE_CALL(*mockDownstream, onError(456))
-        .RETURN(Task<None,None>::none());
+    REQUIRE_CALL(*mockDownstream, onError(456)).RETURN(Task<None, None>::none());
 
     auto observer = std::make_shared<MapBothTaskObserver<int, double, std::string, int>>(
         [](auto) {
@@ -190,8 +176,7 @@ TEST(TestObservableMapBothTask, ErrorToErrorPassesError) {
         [](auto) {
             return Task<double, int>::raiseError(456);
         },
-        mockDownstream
-    );
+        mockDownstream);
 
     observer->onError("broke").run(Scheduler::global())->await();
 }
@@ -199,11 +184,9 @@ TEST(TestObservableMapBothTask, ErrorToErrorPassesError) {
 TEST(TestObservableMapBothTask, ErrorToSuccessCompletesDownstream) {
     auto mockDownstream = std::make_shared<MockMapBothTaskDownstreamObserver>();
 
-    REQUIRE_CALL(*mockDownstream, onNext(1.23))
-        .RETURN(Task<Ack,None>::pure(cask::Continue));
-    
-    REQUIRE_CALL(*mockDownstream, onComplete())
-        .RETURN(Task<None,None>::none());
+    REQUIRE_CALL(*mockDownstream, onNext(1.23)).RETURN(Task<Ack, None>::pure(cask::Continue));
+
+    REQUIRE_CALL(*mockDownstream, onComplete()).RETURN(Task<None, None>::none());
 
     auto observer = std::make_shared<MapBothTaskObserver<int, double, std::string, int>>(
         [](auto) {
@@ -212,8 +195,7 @@ TEST(TestObservableMapBothTask, ErrorToSuccessCompletesDownstream) {
         [](auto) {
             return Task<double, int>::pure(1.23);
         },
-        mockDownstream
-    );
+        mockDownstream);
 
     observer->onError("broke").run(Scheduler::global())->await();
 }
@@ -222,9 +204,7 @@ TEST(TestObservableMapBothTask, ErrorsOnce) {
     int counter = 0;
     auto mockDownstream = std::make_shared<MockMapBothTaskDownstreamObserver>();
 
-    REQUIRE_CALL(*mockDownstream, onError(456))
-        .LR_SIDE_EFFECT(counter++)
-        .RETURN(Task<None,None>::none());
+    REQUIRE_CALL(*mockDownstream, onError(456)).LR_SIDE_EFFECT(counter++).RETURN(Task<None, None>::none());
 
     auto observer = std::make_shared<MapBothTaskObserver<int, double, std::string, int>>(
         [](auto) {
@@ -233,8 +213,7 @@ TEST(TestObservableMapBothTask, ErrorsOnce) {
         [](auto) {
             return Task<double, int>::raiseError(456);
         },
-        mockDownstream
-    );
+        mockDownstream);
 
     observer->onError("broke").run(Scheduler::global())->await();
     observer->onError("broke").run(Scheduler::global())->await();

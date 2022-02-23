@@ -11,12 +11,12 @@
 namespace cask::deferred {
 
 template <class T, class E>
-class PureErrorDeferred final : public Deferred<T,E> {
+class PureErrorDeferred final : public Deferred<T, E> {
 public:
     constexpr explicit PureErrorDeferred(const E& error);
     const E error;
 
-    void onComplete(std::function<void(Either<T,E>)> callback) override;
+    void onComplete(std::function<void(Either<T, E>)> callback) override;
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;
     void onCancel(const std::function<void()>& callback) override;
@@ -26,42 +26,41 @@ public:
 };
 
 template <class T, class E>
-constexpr PureErrorDeferred<T,E>::PureErrorDeferred(const E& error)
-    : error(error)
-{}
+constexpr PureErrorDeferred<T, E>::PureErrorDeferred(const E& error)
+    : error(error) {}
 
 template <class T, class E>
-void PureErrorDeferred<T,E>::onComplete(std::function<void(Either<T,E>)> callback) {
-    return callback(Either<T,E>::right(error));
+void PureErrorDeferred<T, E>::onComplete(std::function<void(Either<T, E>)> callback) {
+    return callback(Either<T, E>::right(error));
 }
 
 template <class T, class E>
-void PureErrorDeferred<T,E>::onSuccess(std::function<void(T)>) {
+void PureErrorDeferred<T, E>::onSuccess(std::function<void(T)>) {
     return;
 }
 
 template <class T, class E>
-void PureErrorDeferred<T,E>::onError(std::function<void(E)> callback) {
+void PureErrorDeferred<T, E>::onError(std::function<void(E)> callback) {
     return callback(error);
 }
 
 template <class T, class E>
-void PureErrorDeferred<T,E>::onCancel(const std::function<void()>&) {
+void PureErrorDeferred<T, E>::onCancel(const std::function<void()>&) {
     return;
 }
 
 template <class T, class E>
-void PureErrorDeferred<T,E>::onShutdown(const std::function<void()>& callback) {
+void PureErrorDeferred<T, E>::onShutdown(const std::function<void()>& callback) {
     return callback();
 }
 
 template <class T, class E>
-void PureErrorDeferred<T,E>::cancel() {
+void PureErrorDeferred<T, E>::cancel() {
     return;
 }
 
 template <class T, class E>
-T PureErrorDeferred<T,E>::await() {
+T PureErrorDeferred<T, E>::await() {
     throw error;
 }
 

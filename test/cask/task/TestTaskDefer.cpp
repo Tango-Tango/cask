@@ -3,14 +3,16 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Task.hpp"
+#include "gtest/gtest.h"
 
-using cask::Task;
 using cask::Scheduler;
+using cask::Task;
 
-TEST(TaskDefer,EvalutesSyncThingSync) {
-    auto deferred = []{ return Task<int>::pure(123); };
+TEST(TaskDefer, EvalutesSyncThingSync) {
+    auto deferred = [] {
+        return Task<int>::pure(123);
+    };
     auto result = Task<int>::defer(deferred).runSync();
 
     ASSERT_TRUE(result.has_value());
@@ -18,43 +20,45 @@ TEST(TaskDefer,EvalutesSyncThingSync) {
     EXPECT_EQ(result->get_left(), 123);
 }
 
-TEST(TaskEval,EvalutesSyncThingAsync) {
-    auto deferred = []{ return Task<int>::pure(123); };
-    auto result = Task<int>::defer(deferred)
-        .run(Scheduler::global())
-        ->await();
-    
+TEST(TaskEval, EvalutesSyncThingAsync) {
+    auto deferred = [] {
+        return Task<int>::pure(123);
+    };
+    auto result = Task<int>::defer(deferred).run(Scheduler::global())->await();
+
     EXPECT_EQ(result, 123);
 }
 
-TEST(TaskDefer,EvalutesErrorSync) {
-    auto deferred = []{ return Task<int,float>::raiseError(1.23); };
-    auto result = Task<int,float>::defer(deferred).runSync();
+TEST(TaskDefer, EvalutesErrorSync) {
+    auto deferred = [] {
+        return Task<int, float>::raiseError(1.23);
+    };
+    auto result = Task<int, float>::defer(deferred).runSync();
 
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->is_right());
     EXPECT_EQ(result->get_right(), 1.23f);
 }
 
-TEST(TaskDefer,EvaluatesErrorAsync) {
-    auto deferred = []{ return Task<int,float>::raiseError(1.23); };
+TEST(TaskDefer, EvaluatesErrorAsync) {
+    auto deferred = [] {
+        return Task<int, float>::raiseError(1.23);
+    };
 
     try {
-        Task<int,float>::defer(deferred)
-            .run(Scheduler::global())
-            ->await();
-        
+        Task<int, float>::defer(deferred).run(Scheduler::global())->await();
+
         FAIL() << "Excepted operation to throw.";
-    } catch(float& error) {
+    } catch (float& error) {
         EXPECT_EQ(error, 1.23f);
     }
 }
 
-TEST(TaskEval,EvalutesAsyncThingAsync) {
-    auto deferred = []{ return Task<int>::pure(123).asyncBoundary(); };
-    auto result = Task<int>::defer(deferred)
-        .run(Scheduler::global())
-        ->await();
-    
+TEST(TaskEval, EvalutesAsyncThingAsync) {
+    auto deferred = [] {
+        return Task<int>::pure(123).asyncBoundary();
+    };
+    auto result = Task<int>::defer(deferred).run(Scheduler::global())->await();
+
     EXPECT_EQ(result, 123);
 }

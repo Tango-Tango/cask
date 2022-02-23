@@ -21,8 +21,7 @@ SingleThreadScheduler::SingleThreadScheduler()
     , timers()
     , runThread()
     , timerThread()
-    , ticks(0)
-{
+    , ticks(0) {
     runThread = std::thread(std::bind(&SingleThreadScheduler::run, this));
     timerThread = std::thread(std::bind(&SingleThreadScheduler::timer, this));
 }
@@ -32,15 +31,18 @@ SingleThreadScheduler::~SingleThreadScheduler() {
 
     try {
         runThread.join();
-    } catch(const std::system_error& error) {}
+    } catch (const std::system_error& error) {
+    }
 
     try {
         timerThread.join();
-    } catch(const std::system_error& error) {}
+    } catch (const std::system_error& error) {
+    }
 }
 
 void SingleThreadScheduler::submit(const std::function<void()>& task) {
-    while(readyQueueLock.test_and_set());
+    while (readyQueueLock.test_and_set())
+        ;
     readyQueue.emplace(task);
     readyQueueSize.fetch_add(1);
     readyQueueLock.clear();
@@ -48,8 +50,9 @@ void SingleThreadScheduler::submit(const std::function<void()>& task) {
 }
 
 void SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
-    while(readyQueueLock.test_and_set());
-    for(auto& task: tasks) {
+    while (readyQueueLock.test_and_set())
+        ;
+    for (auto& task : tasks) {
         readyQueue.emplace(task);
     }
     readyQueueSize.fetch_add(tasks.size());
@@ -64,13 +67,9 @@ CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std
     auto id = next_id++;
     auto tasks = timers.find(executionTick);
     auto entry = std::make_tuple(id, task);
-    auto cancelable = std::make_shared<CancelableTimer>(
-        this->shared_from_this(),
-        executionTick,
-        id
-    );
+    auto cancelable = std::make_shared<CancelableTimer>(this->shared_from_this(), executionTick, id);
 
-    if(tasks == timers.end()) {
+    if (tasks == timers.end()) {
         std::vector<TimerEntry> taskVector = {entry};
         timers[executionTick] = taskVector;
     } else {
@@ -87,32 +86,34 @@ bool SingleThreadScheduler::isIdle() const {
 void SingleThreadScheduler::run() {
     std::function<void()> task;
 
-    while(running) {
-        if(readyQueueSize.load() == 0) {
+    while (running) {
+        if (readyQueueSize.load() == 0) {
             idle = true;
             std::unique_lock<std::mutex> lock(idlingThreadMutex);
-            idlingThread.wait_for(lock, 10ms, [this]{ return readyQueueSize.load() != 0; });
+            idlingThread.wait_for(lock, 10ms, [this] {
+                return readyQueueSize.load() != 0;
+            });
         } else {
             idle = false;
-            while(readyQueueLock.test_and_set());
+            while (readyQueueLock.test_and_set())
+                ;
             task = readyQueue.front();
             readyQueue.pop();
             readyQueueSize.fetch_sub(1);
             readyQueueLock.clear();
             task();
         }
-        
     }
 }
 
 void SingleThreadScheduler::timer() {
     const static std::chrono::milliseconds sleep_time(10);
 
-    while(running) {
+    while (running) {
         auto before = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(sleep_time);
         auto after = std::chrono::steady_clock::now();
-        
+
         auto delta = after - before;
         auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
 
@@ -122,15 +123,15 @@ void SingleThreadScheduler::timer() {
             int64_t previous_ticks = ticks;
             ticks += milliseconds;
 
-            for(int64_t i = previous_ticks; i <= ticks; i++) {
+            for (int64_t i = previous_ticks; i <= ticks; i++) {
                 auto tasks = timers.find(i);
-                if(tasks != timers.end()) {
+                if (tasks != timers.end()) {
                     std::vector<std::function<void()>> submittedTasks;
                     auto entries = tasks->second;
 
                     submittedTasks.reserve(entries.size());
 
-                    for(auto& entry : entries) {
+                    for (auto& entry : entries) {
                         submittedTasks.emplace_back(std::get<1>(entry));
                     }
 
@@ -142,39 +143,37 @@ void SingleThreadScheduler::timer() {
     }
 }
 
-SingleThreadScheduler::CancelableTimer::CancelableTimer(
-    const std::shared_ptr<SingleThreadScheduler>& parent,
-    int64_t time_slot,
-    int64_t id
-)   : parent(parent)
+SingleThreadScheduler::CancelableTimer::CancelableTimer(const std::shared_ptr<SingleThreadScheduler>& parent,
+                                                        int64_t time_slot,
+                                                        int64_t id)
+    : parent(parent)
     , time_slot(time_slot)
     , id(id)
     , callbacks()
     , callback_mutex()
-    , canceled(false)
-{}
+    , canceled(false) {}
 
 void SingleThreadScheduler::CancelableTimer::cancel() {
-    if(canceled) {
+    if (canceled) {
         return;
     } else {
         std::lock_guard<std::mutex> parent_guard(parent->timerMutex);
         std::lock_guard<std::mutex> self_guard(callback_mutex);
         auto tasks = parent->timers.find(time_slot);
-        if(tasks != parent->timers.end()) {
+        if (tasks != parent->timers.end()) {
             std::vector<TimerEntry> filteredEntries;
             auto entries = tasks->second;
 
-            for(auto& entry : entries) {
+            for (auto& entry : entries) {
                 auto entry_id = std::get<0>(entry);
-                if(entry_id != id) {
+                if (entry_id != id) {
                     filteredEntries.emplace_back(entry);
                 } else {
                     canceled = true;
                 }
             }
 
-            if(filteredEntries.size() > 0) {
+            if (filteredEntries.size() > 0) {
                 parent->timers[time_slot] = filteredEntries;
             } else {
                 parent->timers.erase(time_slot);
@@ -182,15 +181,15 @@ void SingleThreadScheduler::CancelableTimer::cancel() {
         }
     }
 
-    if(canceled) {
-        for(auto& cb : callbacks) {
+    if (canceled) {
+        for (auto& cb : callbacks) {
             cb();
         }
     }
 }
 
 void SingleThreadScheduler::CancelableTimer::onCancel(const std::function<void()>& callback) {
-    if(canceled) {
+    if (canceled) {
         callback();
     } else {
         std::lock_guard<std::mutex> guard(callback_mutex);
@@ -206,14 +205,14 @@ void SingleThreadScheduler::CancelableTimer::onShutdown(const std::function<void
         std::lock_guard<std::mutex> self_guard(callback_mutex);
         auto tasks = parent->timers.find(time_slot);
 
-        if(tasks != parent->timers.end()) {
+        if (tasks != parent->timers.end()) {
             std::vector<TimerEntry> newEntries;
             auto entries = tasks->second;
 
-            for(auto& entry : entries) {
+            for (auto& entry : entries) {
                 auto entryId = std::get<0>(entry);
                 auto entryCallback = std::get<1>(entry);
-                if(entryId != id) {
+                if (entryId != id) {
                     newEntries.emplace_back(entry);
                 } else {
                     found = true;
@@ -228,7 +227,7 @@ void SingleThreadScheduler::CancelableTimer::onShutdown(const std::function<void
         }
     }
 
-    if(!found) {
+    if (!found) {
         shutdownCallback();
     }
 }

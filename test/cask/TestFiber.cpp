@@ -3,13 +3,13 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Fiber.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "gtest/gtest.h"
 
 using cask::Deferred;
-using cask::Fiber;
 using cask::Erased;
+using cask::Fiber;
 using cask::None;
 using cask::Promise;
 using cask::fiber::FiberOp;
@@ -18,7 +18,7 @@ using cask::scheduler::BenchScheduler;
 TEST(TestFiber, Constructs) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>::run(op, sched);
+    auto fiber = Fiber<int, std::string>::run(op, sched);
 
     EXPECT_FALSE(fiber->getValue().has_value());
     EXPECT_FALSE(fiber->getError().has_value());
@@ -31,7 +31,7 @@ TEST(TestFiber, DoesntCancelWhenCompletedAndDestructed) {
     {
         auto sched = std::make_shared<BenchScheduler>();
         auto op = FiberOp::value(123);
-        auto fiber = Fiber<int,std::string>::run(op, sched);
+        auto fiber = Fiber<int, std::string>::run(op, sched);
 
         sched->run_ready_tasks();
 
@@ -43,11 +43,10 @@ TEST(TestFiber, DoesntCancelWhenCompletedAndDestructed) {
     EXPECT_TRUE(finished);
 }
 
-
 TEST(TestFiber, EvaluatesPureValue) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>::run(op, sched);
+    auto fiber = Fiber<int, std::string>::run(op, sched);
 
     sched->run_ready_tasks();
 
@@ -58,7 +57,7 @@ TEST(TestFiber, EvaluatesPureValue) {
 
 TEST(TestFiber, EvaluatesPureValueSync) {
     auto op = FiberOp::value(123);
-    auto result = Fiber<int,std::string>::runSync(op);
+    auto result = Fiber<int, std::string>::runSync(op);
 
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->is_left());
@@ -68,7 +67,7 @@ TEST(TestFiber, EvaluatesPureValueSync) {
 TEST(TestFiber, EvaluatesPureError) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::error(std::string("broke"));
-    auto fiber = Fiber<int,std::string>::run(op, sched);
+    auto fiber = Fiber<int, std::string>::run(op, sched);
 
     sched->run_ready_tasks();
 
@@ -79,7 +78,7 @@ TEST(TestFiber, EvaluatesPureError) {
 
 TEST(TestFiber, EvaluatesPureErrorSync) {
     auto op = FiberOp::error(std::string("broke"));
-    auto result = Fiber<int,std::string>::runSync(op);
+    auto result = Fiber<int, std::string>::runSync(op);
 
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->is_right());
@@ -91,7 +90,7 @@ TEST(TestFiber, EvaluatesThunk) {
     auto op = FiberOp::thunk([] {
         return 123;
     });
-    auto fiber = Fiber<int,std::string>::run(op, sched);
+    auto fiber = Fiber<int, std::string>::run(op, sched);
 
     sched->run_ready_tasks();
 
@@ -104,7 +103,7 @@ TEST(TestFiber, EvaluatesThunkSync) {
     auto op = FiberOp::thunk([] {
         return 123;
     });
-    auto result = Fiber<int,std::string>::runSync(op);
+    auto result = Fiber<int, std::string>::runSync(op);
 
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->is_left());
@@ -114,10 +113,10 @@ TEST(TestFiber, EvaluatesThunkSync) {
 TEST(TestFiber, CallsShutdownCallback) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>::run(op, sched);
+    auto fiber = Fiber<int, std::string>::run(op, sched);
     int value = 0;
     int count = 0;
-    
+
     fiber->onFiberShutdown([&value, &count](auto fiber) {
         count++;
         value = *(fiber->getValue());
@@ -132,7 +131,7 @@ TEST(TestFiber, CallsShutdownCallback) {
 TEST(TestFiber, CallsShutdownCallbackImmediately) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>::run(op, sched);
+    auto fiber = Fiber<int, std::string>::run(op, sched);
     int value = 0;
     int count = 0;
 
@@ -149,11 +148,11 @@ TEST(TestFiber, CallsShutdownCallbackImmediately) {
 
 TEST(TestFiber, SuspendsAtAsyncBoundary) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto promise = Promise<Erased,Erased>::create(sched);
+    auto promise = Promise<Erased, Erased>::create(sched);
     auto op = FiberOp::async([promise](auto) {
-        return Deferred<Erased,Erased>::forPromise(promise);
+        return Deferred<Erased, Erased>::forPromise(promise);
     });
-    auto fiber = Fiber<int,std::string>::run(op, sched);
+    auto fiber = Fiber<int, std::string>::run(op, sched);
 
     sched->run_ready_tasks();
 
@@ -164,11 +163,11 @@ TEST(TestFiber, SuspendsAtAsyncBoundary) {
 
 TEST(TestFiber, ResumesAfterAsyncBoundary) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto promise = Promise<Erased,Erased>::create(sched);
+    auto promise = Promise<Erased, Erased>::create(sched);
     auto op = FiberOp::async([promise](auto) {
-        return Deferred<Erased,Erased>::forPromise(promise);
+        return Deferred<Erased, Erased>::forPromise(promise);
     });
-    auto fiber = Fiber<int,std::string>::run(op, sched);
+    auto fiber = Fiber<int, std::string>::run(op, sched);
 
     sched->run_ready_tasks();
     promise->success(123);
@@ -181,11 +180,11 @@ TEST(TestFiber, ResumesAfterAsyncBoundary) {
 
 TEST(TestFiber, AsyncBoundarySync) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto promise = Promise<Erased,Erased>::create(sched);
+    auto promise = Promise<Erased, Erased>::create(sched);
     auto op = FiberOp::async([promise](auto) {
-        return Deferred<Erased,Erased>::forPromise(promise);
+        return Deferred<Erased, Erased>::forPromise(promise);
     });
-    auto result = Fiber<int,std::string>::runSync(op);
+    auto result = Fiber<int, std::string>::runSync(op);
     EXPECT_FALSE(result.has_value());
 }
 
@@ -194,14 +193,14 @@ TEST(TestFiber, DelaysAValue) {
     auto op = FiberOp::delay(10)->flatMap([](auto) {
         return FiberOp::value(123);
     });
-    auto fiber = Fiber<int,std::string>::run(op, sched);
+    auto fiber = Fiber<int, std::string>::run(op, sched);
 
     sched->run_ready_tasks();
     EXPECT_FALSE(fiber->getValue().has_value());
 
     sched->advance_time(10);
     sched->run_ready_tasks();
-    
+
     EXPECT_TRUE(fiber->getValue().has_value());
     EXPECT_EQ(*(fiber->getValue()), 123);
 }
@@ -211,27 +210,27 @@ TEST(TestFiber, DelaysAValueSync) {
     auto op = FiberOp::delay(10)->flatMap([](auto) {
         return FiberOp::value(123);
     });
-    auto result = Fiber<int,std::string>::runSync(op);
+    auto result = Fiber<int, std::string>::runSync(op);
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(TestFiber, RacesSeveralOperationsFirstCompletes) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto promise1 = Promise<Erased,Erased>::create(sched);
-    auto promise2 = Promise<Erased,Erased>::create(sched);
-    auto promise3 = Promise<Erased,Erased>::create(sched);
+    auto promise1 = Promise<Erased, Erased>::create(sched);
+    auto promise2 = Promise<Erased, Erased>::create(sched);
+    auto promise3 = Promise<Erased, Erased>::create(sched);
 
     auto op1 = FiberOp::async([promise1](auto) {
-        return Deferred<Erased,Erased>::forPromise(promise1);
+        return Deferred<Erased, Erased>::forPromise(promise1);
     });
     auto op2 = FiberOp::async([promise2](auto) {
-        return Deferred<Erased,Erased>::forPromise(promise2);
+        return Deferred<Erased, Erased>::forPromise(promise2);
     });
     auto op3 = FiberOp::async([promise3](auto) {
-        return Deferred<Erased,Erased>::forPromise(promise3);
+        return Deferred<Erased, Erased>::forPromise(promise3);
     });
     auto race = FiberOp::race({op1, op2, op3});
-    auto fiber = Fiber<int,std::string>::run(race, sched);
+    auto fiber = Fiber<int, std::string>::run(race, sched);
 
     sched->run_ready_tasks();
 
@@ -255,10 +254,10 @@ TEST(TestFiber, RacesSeveralPureValues) {
     auto op2 = FiberOp::value(456);
     auto op3 = FiberOp::value(789);
     auto race = FiberOp::race({op1, op2, op3});
-    auto fiber = Fiber<int,std::string>::run(race, sched);
+    auto fiber = Fiber<int, std::string>::run(race, sched);
 
     sched->run_ready_tasks();
-    
+
     EXPECT_TRUE(fiber->getValue().has_value());
     EXPECT_FALSE(fiber->getError().has_value());
     EXPECT_EQ(*(fiber->getValue()), 123);
@@ -269,19 +268,21 @@ TEST(TestFiber, RacesSeveralPureValuesSync) {
     auto op2 = FiberOp::value(456);
     auto op3 = FiberOp::value(789);
     auto race = FiberOp::race({op1, op2, op3});
-    auto result = Fiber<int,std::string>::runSync(race);
-    
+    auto result = Fiber<int, std::string>::runSync(race);
+
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(TestFiber, MapBothValue) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
-    auto fiber = Fiber<int,std::string>::run(op, sched)
-        ->template mapBoth<std::string,int>(
-            [](auto) { return "success"; },
-            [](auto) { return 1337; }
-        );
+    auto fiber = Fiber<int, std::string>::run(op, sched)->template mapBoth<std::string, int>(
+        [](auto) {
+            return "success";
+        },
+        [](auto) {
+            return 1337;
+        });
 
     sched->run_ready_tasks();
 
@@ -293,11 +294,13 @@ TEST(TestFiber, MapBothValue) {
 TEST(TestFiber, MapBothError) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::error(std::string("broke"));
-    auto fiber = Fiber<int,std::string>::run(op, sched)
-        ->template mapBoth<std::string,int>(
-            [](auto) { return "success"; },
-            [](auto) { return 1337; }
-        );
+    auto fiber = Fiber<int, std::string>::run(op, sched)->template mapBoth<std::string, int>(
+        [](auto) {
+            return "success";
+        },
+        [](auto) {
+            return 1337;
+        });
 
     sched->run_ready_tasks();
 

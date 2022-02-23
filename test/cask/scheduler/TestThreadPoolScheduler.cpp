@@ -3,9 +3,9 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include <atomic>
-#include "gtest/gtest.h"
 #include "cask/scheduler/ThreadPoolScheduler.hpp"
+#include "gtest/gtest.h"
+#include <atomic>
 
 using cask::scheduler::ThreadPoolScheduler;
 
@@ -13,15 +13,14 @@ const static std::chrono::milliseconds sleep_time(1);
 
 class ThreadPoolSchedulerTest : public ::testing::TestWithParam<int> {
 protected:
-
     void SetUp() override {
         sched = std::make_shared<ThreadPoolScheduler>(GetParam());
     }
 
     void awaitIdle() {
         int num_retries = 1000;
-        while(num_retries > 0) {
-            if(sched->isIdle()) {
+        while (num_retries > 0) {
+            if (sched->isIdle()) {
                 return;
             } else {
                 std::this_thread::sleep_for(sleep_time);
@@ -31,7 +30,7 @@ protected:
 
         FAIL() << "Expected scheduler to return to idle within 1 second.";
     }
-    
+
     std::shared_ptr<ThreadPoolScheduler> sched;
 };
 
@@ -48,7 +47,7 @@ TEST_P(ThreadPoolSchedulerTest, SubmitSingle) {
     });
 
     mutex.lock();
-    
+
     awaitIdle();
 }
 
@@ -60,7 +59,7 @@ TEST_P(ThreadPoolSchedulerTest, SubmitBulk) {
     std::vector<std::function<void()>> tasks;
 
     tasks.reserve(num_tasks);
-    for(int i = 0; i < num_tasks; i++) {
+    for (int i = 0; i < num_tasks; i++) {
         tasks.push_back([&num_executed] {
             num_executed++;
         });
@@ -68,9 +67,8 @@ TEST_P(ThreadPoolSchedulerTest, SubmitBulk) {
 
     sched->submitBulk(tasks);
 
-    
-    while(num_exec_retries > 0) {
-        if(num_executed.load() == num_tasks) {
+    while (num_exec_retries > 0) {
+        if (num_executed.load() == num_tasks) {
             break;
         } else {
             std::this_thread::sleep_for(sleep_time);
@@ -97,7 +95,7 @@ TEST_P(ThreadPoolSchedulerTest, SubmitAfter) {
     auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
 
     EXPECT_GE(milliseconds, 25);
-    
+
     awaitIdle();
 }
 
@@ -106,11 +104,17 @@ TEST_P(ThreadPoolSchedulerTest, SubmitAfterCancel) {
     mutex.lock();
 
     int cancel_counter = 0;
-    auto firstHandle = sched->submitAfter(25, []{});
-    auto secondHandle = sched->submitAfter(25, [&mutex] { mutex.unlock(); });
+    auto firstHandle = sched->submitAfter(25, [] {});
+    auto secondHandle = sched->submitAfter(25, [&mutex] {
+        mutex.unlock();
+    });
 
-    firstHandle->onCancel([&cancel_counter]{ cancel_counter++; });
-    secondHandle->onCancel([&cancel_counter]{ cancel_counter++; });
+    firstHandle->onCancel([&cancel_counter] {
+        cancel_counter++;
+    });
+    secondHandle->onCancel([&cancel_counter] {
+        cancel_counter++;
+    });
 
     firstHandle->cancel();
     firstHandle->cancel();
@@ -127,12 +131,18 @@ TEST_P(ThreadPoolSchedulerTest, RegistersCallbackAfterCancelled) {
     mutex.lock();
 
     int cancel_counter = 0;
-    auto firstHandle = sched->submitAfter(25, []{});
-    auto secondHandle = sched->submitAfter(25, [&mutex] { mutex.unlock(); });
+    auto firstHandle = sched->submitAfter(25, [] {});
+    auto secondHandle = sched->submitAfter(25, [&mutex] {
+        mutex.unlock();
+    });
 
     firstHandle->cancel();
-    firstHandle->onCancel([&cancel_counter]{ cancel_counter++; });
-    secondHandle->onCancel([&cancel_counter]{ cancel_counter++; });
+    firstHandle->onCancel([&cancel_counter] {
+        cancel_counter++;
+    });
+    secondHandle->onCancel([&cancel_counter] {
+        cancel_counter++;
+    });
 
     mutex.lock();
 
@@ -167,7 +177,7 @@ TEST_P(ThreadPoolSchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
 
     EXPECT_GE(milliseconds, 25);
     EXPECT_TRUE(shutdown);
-    
+
     awaitIdle();
 }
 
@@ -195,9 +205,8 @@ TEST_P(ThreadPoolSchedulerTest, RunsShutdownImmediatelyCallbackIfTimerAlreadyFir
     });
 
     EXPECT_TRUE(shutdown);
-    
+
     awaitIdle();
 }
-
 
 INSTANTIATE_TEST_SUITE_P(Scheduler, ThreadPoolSchedulerTest, ::testing::Values(1, 2, 4, 16));

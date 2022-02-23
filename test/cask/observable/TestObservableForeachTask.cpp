@@ -3,9 +3,9 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "gtest/gtest.h"
 
 using cask::None;
 using cask::Observable;
@@ -17,10 +17,10 @@ using cask::scheduler::BenchScheduler;
 TEST(ObservableForeachTask, Empty) {
     int counter = 0;
 
-    Observable<int,std::string>::empty()
+    Observable<int, std::string>::empty()
         ->foreachTask([&counter](auto) {
             counter++;
-            return Task<None,std::string>::none();
+            return Task<None, std::string>::none();
         })
         .run(Scheduler::global())
         ->await();
@@ -31,10 +31,10 @@ TEST(ObservableForeachTask, Empty) {
 TEST(ObservableForeachTask, SingleValue) {
     int counter = 0;
 
-    Observable<int,std::string>::pure(567)
+    Observable<int, std::string>::pure(567)
         ->foreachTask([&counter](auto) {
             counter++;
-            return Task<None,std::string>::none();
+            return Task<None, std::string>::none();
         })
         .run(Scheduler::global())
         ->await();
@@ -45,10 +45,10 @@ TEST(ObservableForeachTask, SingleValue) {
 TEST(ObservableForeachTask, MultipleValues) {
     int counter = 0;
 
-    Observable<int,std::string>::fromVector({5, 6, 7 ,3, 1, 4})
+    Observable<int, std::string>::fromVector({5, 6, 7, 3, 1, 4})
         ->foreachTask([&counter](auto) {
             counter++;
-            return Task<None,std::string>::none();
+            return Task<None, std::string>::none();
         })
         .run(Scheduler::global())
         ->await();
@@ -59,14 +59,14 @@ TEST(ObservableForeachTask, MultipleValues) {
 TEST(ObservableForeachTask, RaiseError) {
     int counter = 0;
 
-    auto result = Observable<int,std::string>::fromVector({5, 6, 7 ,3, 1, 4})
-        ->foreachTask([&counter](auto) {
-            counter++;
-            return Task<None,std::string>::raiseError("broke");
-        })
-        .failed()
-        .run(Scheduler::global())
-        ->await();
+    auto result = Observable<int, std::string>::fromVector({5, 6, 7, 3, 1, 4})
+                      ->foreachTask([&counter](auto) {
+                          counter++;
+                          return Task<None, std::string>::raiseError("broke");
+                      })
+                      .failed()
+                      .run(Scheduler::global())
+                      ->await();
 
     EXPECT_EQ(counter, 1);
     EXPECT_EQ(result, "broke");
@@ -75,14 +75,14 @@ TEST(ObservableForeachTask, RaiseError) {
 TEST(ObservableForeachTask, UpstreamError) {
     int counter = 0;
 
-    auto result = Observable<int,std::string>::raiseError("already broke")
-        ->foreachTask([&counter](auto) {
-            counter++;
-            return Task<None,std::string>::raiseError("broke");
-        })
-        .failed()
-        .run(Scheduler::global())
-        ->await();
+    auto result = Observable<int, std::string>::raiseError("already broke")
+                      ->foreachTask([&counter](auto) {
+                          counter++;
+                          return Task<None, std::string>::raiseError("broke");
+                      })
+                      .failed()
+                      .run(Scheduler::global())
+                      ->await();
 
     EXPECT_EQ(counter, 0);
     EXPECT_EQ(result, "already broke");
@@ -91,21 +91,21 @@ TEST(ObservableForeachTask, UpstreamError) {
 TEST(ObservableForeachTask, Canceled) {
     int counter = 0;
 
-    auto deferred = Observable<int,std::string>::deferTask([] {
-            return Task<int, std::string>::never();
-        })
-        ->foreachTask([&counter](auto) {
-            counter++;
-            return Task<None,std::string>::none();
-        })
-        .run(Scheduler::global());
+    auto deferred = Observable<int, std::string>::deferTask([] {
+                        return Task<int, std::string>::never();
+                    })
+                        ->foreachTask([&counter](auto) {
+                            counter++;
+                            return Task<None, std::string>::none();
+                        })
+                        .run(Scheduler::global());
 
     deferred->cancel();
 
     try {
         deferred->await();
         FAIL() << "Expected method to throw";
-    } catch(std::runtime_error&) {
+    } catch (std::runtime_error&) {
         EXPECT_EQ(counter, 0);
     }
 }
@@ -113,17 +113,15 @@ TEST(ObservableForeachTask, Canceled) {
 TEST(ObservableForeachTask, CompletesGuaranteedEffects) {
     int counter = 0;
     bool completed = false;
-    std::vector<int> values = {1,2,3,4,5};
-    Observable<int,std::string>::fromVector(values)
-        ->guarantee(
-            Task<None,None>::eval([&completed] {
-                completed = true;
-                return None();
-            }).delay(100)
-        )
+    std::vector<int> values = {1, 2, 3, 4, 5};
+    Observable<int, std::string>::fromVector(values)
+        ->guarantee(Task<None, None>::eval([&completed] {
+                        completed = true;
+                        return None();
+                    }).delay(100))
         ->foreachTask([&counter](auto) {
             counter++;
-            return Task<None,std::string>::none();
+            return Task<None, std::string>::none();
         })
         .run(Scheduler::global())
         ->await();
@@ -136,29 +134,29 @@ TEST(ObservableForeachTask, RunsCancelCallbacks) {
     auto sched = std::make_shared<BenchScheduler>();
     int counter = 0;
     int run_count = 0;
-    auto task = Task<None,None>::eval([&run_count]() {
+    auto task = Task<None, None>::eval([&run_count]() {
         run_count++;
         return None();
     });
 
-    auto fiber = Observable<int,std::string>::deferTask([]{
-            return Task<int,std::string>::never();
-        })
-        ->guarantee(task)
-        ->foreachTask([&counter](auto) {
-            counter++;
-            return Task<None,std::string>::none();
-        })
-        .run(sched);
+    auto fiber = Observable<int, std::string>::deferTask([] {
+                     return Task<int, std::string>::never();
+                 })
+                     ->guarantee(task)
+                     ->foreachTask([&counter](auto) {
+                         counter++;
+                         return Task<None, std::string>::none();
+                     })
+                     .run(sched);
 
     sched->run_ready_tasks();
     fiber->cancel();
     sched->run_ready_tasks();
-    
+
     try {
         fiber->await();
         FAIL() << "Expected method to throw";
-    } catch(std::runtime_error&) {
+    } catch (std::runtime_error&) {
         EXPECT_EQ(run_count, 1);
     }
 }

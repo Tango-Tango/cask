@@ -3,19 +3,19 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Task.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "gtest/gtest.h"
 
 using cask::Task;
 using cask::scheduler::BenchScheduler;
 
 TEST(TaskFlatMapError, PureValue) {
-    auto result_opt = Task<int,std::string>::pure(123)
-        .template flatMapError<std::string>([](auto) {
-            return Task<int,std::string>::raiseError("broke");
-        })
-        .runSync();
+    auto result_opt = Task<int, std::string>::pure(123)
+                          .template flatMapError<std::string>([](auto) {
+                              return Task<int, std::string>::raiseError("broke");
+                          })
+                          .runSync();
 
     ASSERT_TRUE(result_opt.has_value());
     ASSERT_TRUE(result_opt->is_left());
@@ -23,11 +23,11 @@ TEST(TaskFlatMapError, PureValue) {
 }
 
 TEST(TaskFlatMapError, ErrorToValue) {
-    auto result_opt = Task<int,std::string>::raiseError("broke")
-        .template flatMapError<std::string>([](auto) {
-            return Task<int,std::string>::pure(123);
-        })
-        .runSync();
+    auto result_opt = Task<int, std::string>::raiseError("broke")
+                          .template flatMapError<std::string>([](auto) {
+                              return Task<int, std::string>::pure(123);
+                          })
+                          .runSync();
 
     ASSERT_TRUE(result_opt.has_value());
     ASSERT_TRUE(result_opt->is_left());
@@ -35,11 +35,11 @@ TEST(TaskFlatMapError, ErrorToValue) {
 }
 
 TEST(TaskFlatMapError, ErrorToError) {
-    auto result_opt = Task<int,std::string>::raiseError("broke")
-        .template flatMapError<std::string>([](auto error) {
-            return Task<int,std::string>::raiseError(error + " worse");
-        })
-        .runSync();
+    auto result_opt = Task<int, std::string>::raiseError("broke")
+                          .template flatMapError<std::string>([](auto error) {
+                              return Task<int, std::string>::raiseError(error + " worse");
+                          })
+                          .runSync();
 
     ASSERT_TRUE(result_opt.has_value());
     ASSERT_TRUE(result_opt->is_right());
@@ -48,11 +48,11 @@ TEST(TaskFlatMapError, ErrorToError) {
 
 TEST(TaskFlatMapError, CancelsOuter) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto fiber = Task<int,std::string>::never()
-        .template flatMapError<std::string>([](auto error) {
-            return Task<int,std::string>::raiseError(error + " worse");
-        })
-        .run(sched);
+    auto fiber = Task<int, std::string>::never()
+                     .template flatMapError<std::string>([](auto error) {
+                         return Task<int, std::string>::raiseError(error + " worse");
+                     })
+                     .run(sched);
 
     sched->run_ready_tasks();
     fiber->cancel();
@@ -63,11 +63,11 @@ TEST(TaskFlatMapError, CancelsOuter) {
 
 TEST(TaskFlatMapError, CancelsInner) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto fiber = Task<int,std::string>::raiseError("broke")
-        .template flatMapError<std::string>([](auto) {
-            return Task<int,std::string>::never();
-        })
-        .run(sched);
+    auto fiber = Task<int, std::string>::raiseError("broke")
+                     .template flatMapError<std::string>([](auto) {
+                         return Task<int, std::string>::never();
+                     })
+                     .run(sched);
 
     sched->run_ready_tasks();
     fiber->cancel();

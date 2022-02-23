@@ -3,9 +3,9 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Task.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "gtest/gtest.h"
 
 using cask::Task;
 using cask::scheduler::BenchScheduler;
@@ -13,10 +13,9 @@ using cask::scheduler::BenchScheduler;
 TEST(TaskDeferFiber, PureValue) {
     auto sched = std::make_shared<BenchScheduler>();
 
-    auto fiber = Task<int,std::string>::deferFiber([](auto sched) {
-            return Task<int,std::string>::pure(123).run(sched);
-        })
-        .run(sched);
+    auto fiber = Task<int, std::string>::deferFiber([](auto sched) {
+                     return Task<int, std::string>::pure(123).run(sched);
+                 }).run(sched);
 
     sched->run_ready_tasks();
 
@@ -27,10 +26,9 @@ TEST(TaskDeferFiber, PureValue) {
 TEST(TaskDeferFiber, Error) {
     auto sched = std::make_shared<BenchScheduler>();
 
-    auto fiber = Task<int,std::string>::deferFiber([](auto sched) {
-            return Task<int,std::string>::raiseError("broke").run(sched);
-        })
-        .run(sched);
+    auto fiber = Task<int, std::string>::deferFiber([](auto sched) {
+                     return Task<int, std::string>::raiseError("broke").run(sched);
+                 }).run(sched);
 
     sched->run_ready_tasks();
 
@@ -41,10 +39,9 @@ TEST(TaskDeferFiber, Error) {
 TEST(TaskDeferFiber, Cancels) {
     auto sched = std::make_shared<BenchScheduler>();
 
-    auto fiber = Task<int,std::string>::deferFiber([](auto sched) {
-            return Task<int,std::string>::never().run(sched);
-        })
-        .run(sched);
+    auto fiber = Task<int, std::string>::deferFiber([](auto sched) {
+                     return Task<int, std::string>::never().run(sched);
+                 }).run(sched);
 
     sched->run_ready_tasks();
     fiber->cancel();
@@ -52,4 +49,3 @@ TEST(TaskDeferFiber, Cancels) {
 
     ASSERT_TRUE(fiber->isCanceled());
 }
-

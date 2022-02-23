@@ -10,14 +10,14 @@
 #include <condition_variable>
 #include <map>
 #include <mutex>
-#include <thread>
 #include <queue>
+#include <thread>
 #include <vector>
 
 #include "../Scheduler.hpp"
 
 namespace cask::scheduler {
-    
+
 /**
  * The single thread scheduler only utilizes a single thread for processing submitted
  * work. It uses simpler lock-free protections where possible to protect its internal
@@ -27,7 +27,9 @@ namespace cask::scheduler {
  * in faster handling of asynchrounous boundaries. This comes at the expensive of some amount
  * of fairness (because of spinlocks) and the inability to spread load across multiple cores.
  */
-class SingleThreadScheduler final : public Scheduler, public std::enable_shared_from_this<SingleThreadScheduler> {
+class SingleThreadScheduler final
+    : public Scheduler
+    , public std::enable_shared_from_this<SingleThreadScheduler> {
 public:
     /**
      * Construct a single threaded scheduler.
@@ -44,6 +46,7 @@ public:
     void submitBulk(const std::vector<std::function<void()>>& tasks) override;
     CancelableRef submitAfter(int64_t milliseconds, const std::function<void()>& task) override;
     bool isIdle() const override;
+
 private:
     using TimerEntry = std::tuple<int64_t, std::function<void()>>;
 
@@ -58,7 +61,7 @@ private:
     mutable std::atomic_flag readyQueueLock;
     std::queue<std::function<void()>> readyQueue;
     std::mutex timerMutex;
-    std::map<int64_t,std::vector<TimerEntry>> timers;
+    std::map<int64_t, std::vector<TimerEntry>> timers;
     std::thread runThread;
     std::thread timerThread;
     int64_t ticks;
@@ -69,15 +72,12 @@ private:
 
     class CancelableTimer final : public Cancelable {
     public:
-        CancelableTimer(
-            const std::shared_ptr<SingleThreadScheduler>& parent,
-            int64_t time_slot,
-            int64_t id
-        );
+        CancelableTimer(const std::shared_ptr<SingleThreadScheduler>& parent, int64_t time_slot, int64_t id);
 
         void cancel() override;
         void onCancel(const std::function<void()>& callback) override;
         void onShutdown(const std::function<void()>&) override;
+
     private:
         std::shared_ptr<SingleThreadScheduler> parent;
         int64_t time_slot;
@@ -86,7 +86,6 @@ private:
         std::mutex callback_mutex;
         bool canceled;
     };
-
 };
 
 } // namespace cask::scheduler
