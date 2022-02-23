@@ -6,26 +6,24 @@
 #ifndef _CASK_FIBER_OP_H_
 #define _CASK_FIBER_OP_H_
 
+#include "../Either.hpp"
+#include "../Erased.hpp"
+#include "../None.hpp"
+#include "../Scheduler.hpp"
+#include "FiberValue.hpp"
 #include <functional>
 #include <memory>
 #include <optional>
-#include <type_traits>
 #include <tuple>
-#include "FiberValue.hpp"
-#include "../None.hpp"
-#include "../Either.hpp"
-#include "../Erased.hpp"
-#include "../Scheduler.hpp"
+#include <type_traits>
 
 namespace cask {
 
-template <class T, class E>
-class Deferred;
+template <class T, class E> class Deferred;
 
-template <class T, class E>
-using DeferredRef = std::shared_ptr<Deferred<T,E>>;
+template <class T, class E> using DeferredRef = std::shared_ptr<Deferred<T, E>>;
 
-}
+} // namespace cask
 
 namespace cask::fiber {
 
@@ -36,10 +34,10 @@ enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE, CANCEL };
  * that can be executed via a `Fiber`. The operations are not
  * meant to be used directly but rather as an intermediate description of
  * execution for higher-order monads (such as `Task`).
- * 
+ *
  * This engine supports only a few operations - from which a large number
  * of composite operations can be described:
- * 
+ *
  *   1. `Value` represents a pure value which does not need to be computed.
  *   2. `Error` represents an errors which should halt execution.
  *   3. `Thunk` represents a lazily-evaluated method which returns a `Value`.
@@ -56,12 +54,12 @@ enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE, CANCEL };
  */
 class FiberOp final : public std::enable_shared_from_this<FiberOp> {
 public:
-    using ConstantData = Either<Erased,Erased>;
-    using AsyncData = std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>;
+    using ConstantData = Either<Erased, Erased>;
+    using AsyncData = std::function<DeferredRef<Erased, Erased>(const std::shared_ptr<Scheduler>&)>;
     using ThunkData = std::function<Erased()>;
     using FlatMapInput = std::shared_ptr<const FiberOp>;
     using FlatMapPredicate = std::function<std::shared_ptr<const FiberOp>(const FiberValue&)>;
-    using FlatMapData = std::pair<FlatMapInput,FlatMapPredicate>;
+    using FlatMapData = std::pair<FlatMapInput, FlatMapPredicate>;
     using DelayData = int64_t;
     using RaceData = std::vector<std::shared_ptr<const FiberOp>>;
 
@@ -74,7 +72,8 @@ public:
     static std::shared_ptr<const FiberOp> value(const Erased& v) noexcept;
     static std::shared_ptr<const FiberOp> value(Erased&& v) noexcept;
     static std::shared_ptr<const FiberOp> error(const Erased& e) noexcept;
-    static std::shared_ptr<const FiberOp> async(const std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept;
+    static std::shared_ptr<const FiberOp>
+    async(const std::function<DeferredRef<Erased, Erased>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept;
     static std::shared_ptr<const FiberOp> thunk(const std::function<Erased()>& thunk) noexcept;
     static std::shared_ptr<const FiberOp> delay(int64_t delay_ms) noexcept;
     static std::shared_ptr<const FiberOp> race(const std::vector<std::shared_ptr<const FiberOp>>& race) noexcept;
@@ -85,7 +84,7 @@ public:
      * Create a new operation which represents the flat map of this operation
      * via the given predicate. This is a convenience method which hides some
      * of the type erasure and other internal bits from users.
-     * 
+     *
      * @param predicate The method which maps the input value to a new operation.
      * @return A new operation which transforms the intput to the given output operation.
      */

@@ -3,19 +3,19 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Task.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "gtest/gtest.h"
 
 using cask::Task;
 using cask::scheduler::BenchScheduler;
 
 TEST(TaskRecover, PureValue) {
-    auto result_opt = Task<int,std::string>::pure(123)
-        .recover([](auto) {
-            return 456;
-        })
-        .runSync();
+    auto result_opt = Task<int, std::string>::pure(123)
+                          .recover([](auto) {
+                              return 456;
+                          })
+                          .runSync();
 
     ASSERT_TRUE(result_opt.has_value());
     ASSERT_TRUE(result_opt->is_left());
@@ -23,11 +23,11 @@ TEST(TaskRecover, PureValue) {
 }
 
 TEST(TaskRecover, Error) {
-    auto result_opt = Task<int,std::string>::raiseError("broke")
-        .recover([](auto) {
-            return 456;
-        })
-        .runSync();
+    auto result_opt = Task<int, std::string>::raiseError("broke")
+                          .recover([](auto) {
+                              return 456;
+                          })
+                          .runSync();
 
     ASSERT_TRUE(result_opt.has_value());
     ASSERT_TRUE(result_opt->is_left());
@@ -37,11 +37,11 @@ TEST(TaskRecover, Error) {
 TEST(TaskRecover, Canceled) {
     auto sched = std::make_shared<BenchScheduler>();
 
-    auto fiber = Task<int,std::string>::never()
-        .recover([](auto) {
-            return 456;
-        })
-        .run(sched);
+    auto fiber = Task<int, std::string>::never()
+                     .recover([](auto) {
+                         return 456;
+                     })
+                     .run(sched);
 
     sched->run_ready_tasks();
     fiber->cancel();
@@ -50,7 +50,7 @@ TEST(TaskRecover, Canceled) {
     try {
         fiber->await();
         FAIL() << "Expected call to throw.";
-    } catch(std::runtime_error&) {
+    } catch (std::runtime_error&) {
         SUCCEED();
     }
 }

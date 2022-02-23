@@ -17,29 +17,28 @@ namespace cask::observable {
  * observable is cancelled and a new subscription is started. Normally obtained by calling
  * `Observable<T>::switchMap`.
  */
-template <class TI, class TO, class E>
-class SwitchMapObservable final : public Observable<TO,E> {
+template <class TI, class TO, class E> class SwitchMapObservable final : public Observable<TO, E> {
 public:
-    SwitchMapObservable(const std::shared_ptr<const Observable<TI,E>>& upstream, const std::function<ObservableRef<TO,E>(const TI&)>& predicate);
-    FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const override;
+    SwitchMapObservable(const std::shared_ptr<const Observable<TI, E>>& upstream,
+                        const std::function<ObservableRef<TO, E>(const TI&)>& predicate);
+    FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,
+                                   const std::shared_ptr<Observer<TO, E>>& observer) const override;
+
 private:
-    std::shared_ptr<const Observable<TI,E>> upstream;
-    std::function<ObservableRef<TO,E>(const TI&)> predicate;
+    std::shared_ptr<const Observable<TI, E>> upstream;
+    std::function<ObservableRef<TO, E>(const TI&)> predicate;
 };
 
-
 template <class TI, class TO, class E>
-SwitchMapObservable<TI,TO,E>::SwitchMapObservable(
-    const std::shared_ptr<const Observable<TI,E>>& upstream,
-    const std::function<ObservableRef<TO,E>(const TI&)>& predicate
-)
+SwitchMapObservable<TI, TO, E>::SwitchMapObservable(const std::shared_ptr<const Observable<TI, E>>& upstream,
+                                                    const std::function<ObservableRef<TO, E>(const TI&)>& predicate)
     : upstream(upstream)
-    , predicate(predicate)
-{}
+    , predicate(predicate) {}
 
 template <class TI, class TO, class E>
-FiberRef<None,None> SwitchMapObservable<TI,TO,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const {
-    auto switchMapObserver = std::make_shared<SwitchMapObserver<TI,TO,E>>(predicate, observer, sched);
+FiberRef<None, None> SwitchMapObservable<TI, TO, E>::subscribe(const std::shared_ptr<Scheduler>& sched,
+                                                               const std::shared_ptr<Observer<TO, E>>& observer) const {
+    auto switchMapObserver = std::make_shared<SwitchMapObserver<TI, TO, E>>(predicate, observer, sched);
     return upstream->subscribe(sched, switchMapObserver);
 }
 

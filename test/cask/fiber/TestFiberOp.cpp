@@ -3,9 +3,9 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Deferred.hpp"
 #include "cask/fiber/FiberOp.hpp"
+#include "gtest/gtest.h"
 
 using cask::Deferred;
 using cask::Erased;
@@ -40,8 +40,8 @@ TEST(FiberOp, Error) {
 
 TEST(FiberOp, Async) {
     auto op = FiberOp::async([](auto sched) {
-        auto promise = Promise<Erased,Erased>::create(sched);
-        return Deferred<Erased,Erased>::forPromise(promise);
+        auto promise = Promise<Erased, Erased>::create(sched);
+        return Deferred<Erased, Erased>::forPromise(promise);
     });
 
     ASSERT_EQ(op->opType, cask::fiber::ASYNC);
@@ -81,10 +81,7 @@ TEST(FiberOp, RaceCopy) {
 }
 
 TEST(FiberOp, RaceMove) {
-    auto op = FiberOp::race({
-        FiberOp::value(123),
-        FiberOp::value(456)
-    });
+    auto op = FiberOp::race({FiberOp::value(123), FiberOp::value(456)});
 
     ASSERT_EQ(op->opType, cask::fiber::RACE);
 

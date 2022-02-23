@@ -3,25 +3,25 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Task.hpp"
+#include "gtest/gtest.h"
 
-using cask::Task;
 using cask::Scheduler;
+using cask::Task;
 
-TEST(TaskNever,EvalutesSync) {
-    auto result = Task<int,float>::never().runSync();
+TEST(TaskNever, EvalutesSync) {
+    auto result = Task<int, float>::never().runSync();
     ASSERT_FALSE(result.has_value());
 }
 
-TEST(TaskNever,EvalutesAsync) {
-    auto deferred = Task<int,float>::never().run(Scheduler::global());
+TEST(TaskNever, EvalutesAsync) {
+    auto deferred = Task<int, float>::never().run(Scheduler::global());
 
     deferred->cancel();
 
     try {
         deferred->await();
         FAIL() << "Excepted operation to throw.";
-    } catch(std::runtime_error& error) {}
+    } catch (std::runtime_error& error) {
+    }
 }
-

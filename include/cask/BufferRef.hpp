@@ -6,8 +6,7 @@
 
 namespace cask {
 
-template <class T>
-using BufferRef = std::shared_ptr<std::vector<T>>;
+template <class T> using BufferRef = std::shared_ptr<std::vector<T>>;
 
 } // namespace cask
 

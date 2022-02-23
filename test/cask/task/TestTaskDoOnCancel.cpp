@@ -3,9 +3,9 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Task.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "gtest/gtest.h"
 
 using cask::None;
 using cask::Task;
@@ -15,12 +15,12 @@ TEST(TaskDoOnCancel, IgnoredForCompletedValue) {
     int cancel_counter = 0;
     auto sched = std::make_shared<BenchScheduler>();
 
-    auto fiber = Task<int,std::string>::pure(123)
-        .doOnCancel(Task<None,None>::eval([&cancel_counter] {
-            cancel_counter++;
-            return None();
-        }))
-        .run(sched);
+    auto fiber = Task<int, std::string>::pure(123)
+                     .doOnCancel(Task<None, None>::eval([&cancel_counter] {
+                         cancel_counter++;
+                         return None();
+                     }))
+                     .run(sched);
 
     sched->run_ready_tasks();
     fiber->cancel();
@@ -35,12 +35,12 @@ TEST(TaskDoOnCancel, IgnoredForCompletedError) {
     int cancel_counter = 0;
     auto sched = std::make_shared<BenchScheduler>();
 
-    auto fiber = Task<int,std::string>::raiseError("broke")
-        .doOnCancel(Task<None,None>::eval([&cancel_counter] {
-            cancel_counter++;
-            return None();
-        }))
-        .run(sched);
+    auto fiber = Task<int, std::string>::raiseError("broke")
+                     .doOnCancel(Task<None, None>::eval([&cancel_counter] {
+                         cancel_counter++;
+                         return None();
+                     }))
+                     .run(sched);
 
     sched->run_ready_tasks();
     fiber->cancel();
@@ -55,12 +55,12 @@ TEST(TaskDoOnCancel, IgnoredForEarlyCancelFire) {
     int cancel_counter = 0;
     auto sched = std::make_shared<BenchScheduler>();
 
-    auto fiber = Task<int,std::string>::pure(123)
-        .doOnCancel(Task<None,None>::eval([&cancel_counter] {
-            cancel_counter++;
-            return None();
-        }))
-        .run(sched);
+    auto fiber = Task<int, std::string>::pure(123)
+                     .doOnCancel(Task<None, None>::eval([&cancel_counter] {
+                         cancel_counter++;
+                         return None();
+                     }))
+                     .run(sched);
 
     fiber->cancel();
     sched->run_ready_tasks();
@@ -69,17 +69,16 @@ TEST(TaskDoOnCancel, IgnoredForEarlyCancelFire) {
     EXPECT_EQ(cancel_counter, 0);
 }
 
-
 TEST(TaskDoOnCancel, RunsForCanceledTask) {
     int cancel_counter = 0;
     auto sched = std::make_shared<BenchScheduler>();
 
-    auto fiber = Task<int,std::string>::never()
-        .doOnCancel(Task<None,None>::eval([&cancel_counter] {
-            cancel_counter++;
-            return None();
-        }))
-        .run(sched);
+    auto fiber = Task<int, std::string>::never()
+                     .doOnCancel(Task<None, None>::eval([&cancel_counter] {
+                         cancel_counter++;
+                         return None();
+                     }))
+                     .run(sched);
 
     sched->run_ready_tasks();
     fiber->cancel();
@@ -88,4 +87,3 @@ TEST(TaskDoOnCancel, RunsForCanceledTask) {
     ASSERT_TRUE(fiber->isCanceled());
     EXPECT_EQ(cancel_counter, 1);
 }
-

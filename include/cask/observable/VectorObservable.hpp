@@ -11,60 +11,56 @@
 
 namespace cask::observable {
 
-template <class T, class E>
-class VectorObservable final : public Observable<T,E> {
+template <class T, class E> class VectorObservable final : public Observable<T, E> {
 public:
     explicit VectorObservable(const std::vector<T>& source);
-    FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
+    FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,
+                                   const std::shared_ptr<Observer<T, E>>& observer) const override;
+
 private:
     std::vector<T> source;
 
-    static Task<Ack,None> pushEvent(
-        unsigned int i,
-        const std::vector<T>& source,
-        const std::shared_ptr<Scheduler>& sched,
-        const std::shared_ptr<Observer<T,E>>& observer,
-        Ack lastAck
-    );
+    static Task<Ack, None> pushEvent(unsigned int i,
+                                     const std::vector<T>& source,
+                                     const std::shared_ptr<Scheduler>& sched,
+                                     const std::shared_ptr<Observer<T, E>>& observer,
+                                     Ack lastAck);
 };
 
 template <class T, class E>
-VectorObservable<T,E>::VectorObservable(const std::vector<T>& source)
-    : source(source)
-{}
+VectorObservable<T, E>::VectorObservable(const std::vector<T>& source)
+    : source(source) {}
 
 template <class T, class E>
-FiberRef<None,None> VectorObservable<T,E>::subscribe(
-    const std::shared_ptr<Scheduler>& sched,
-    const std::shared_ptr<Observer<T,E>>& observer) const
-{
+FiberRef<None, None> VectorObservable<T, E>::subscribe(const std::shared_ptr<Scheduler>& sched,
+                                                       const std::shared_ptr<Observer<T, E>>& observer) const {
     return pushEvent(0, source, sched, observer, Continue)
-        .doOnCancel(Task<None,None>::defer([observer] { return observer->onCancel(); }))
-        .template map<None>([](auto) { return None(); })
+        .doOnCancel(Task<None, None>::defer([observer] {
+            return observer->onCancel();
+        }))
+        .template map<None>([](auto) {
+            return None();
+        })
         .run(sched);
 }
 
 template <class T, class E>
-Task<Ack,None> VectorObservable<T,E>::pushEvent(
-    unsigned int i,
-    const std::vector<T>& source,
-    const std::shared_ptr<Scheduler>& sched,
-    const std::shared_ptr<Observer<T,E>>& observer,
-    Ack lastAck
-) {
+Task<Ack, None> VectorObservable<T, E>::pushEvent(unsigned int i,
+                                                  const std::vector<T>& source,
+                                                  const std::shared_ptr<Scheduler>& sched,
+                                                  const std::shared_ptr<Observer<T, E>>& observer,
+                                                  Ack lastAck) {
     return Task<Ack, None>::defer([i, source, sched, observer, lastAck] {
-        if(i >= source.size()) {
-            return observer->onComplete()
-                .template map<Ack>([](auto) {
-                    return Stop;
-                });
-        } else if(lastAck == Continue) {
-            return observer->onNext(source[i])
-                .template flatMap<Ack>([i, source, sched, observer](auto ack) {
-                    return pushEvent(i + 1, source, sched, observer, ack);
-                });
+        if (i >= source.size()) {
+            return observer->onComplete().template map<Ack>([](auto) {
+                return Stop;
+            });
+        } else if (lastAck == Continue) {
+            return observer->onNext(source[i]).template flatMap<Ack>([i, source, sched, observer](auto ack) {
+                return pushEvent(i + 1, source, sched, observer, ack);
+            });
         } else {
-            return Task<Ack,None>::pure(Stop);
+            return Task<Ack, None>::pure(Stop);
         }
     });
 }

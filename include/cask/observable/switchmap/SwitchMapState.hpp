@@ -12,7 +12,7 @@
 namespace cask::observable::switchmap {
 
 struct SwitchMapState {
-    FiberRef<None,None> subscription;
+    FiberRef<None, None> subscription;
     Ack downstream_ack;
     bool upstream_completed;
     bool subscription_completed;
@@ -21,8 +21,7 @@ struct SwitchMapState {
         : subscription(nullptr)
         , downstream_ack(Continue)
         , upstream_completed(false)
-        , subscription_completed(true)
-    {}
+        , subscription_completed(true) {}
 };
 
 } // namespace cask::observable::switchmap

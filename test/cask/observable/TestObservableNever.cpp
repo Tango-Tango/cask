@@ -3,17 +3,16 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-
-#include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "gtest/gtest.h"
 
 using cask::Observable;
 using cask::scheduler::BenchScheduler;
 
-TEST(ObservableNever,NeverCompletes) {
+TEST(ObservableNever, NeverCompletes) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto fiber = Observable<int,std::string>::never()->last().run(sched);
+    auto fiber = Observable<int, std::string>::never()->last().run(sched);
 
     sched->run_ready_tasks();
 
@@ -25,10 +24,9 @@ TEST(ObservableNever,NeverCompletes) {
     EXPECT_EQ(sched->num_timers(), 0);
 }
 
-
-TEST(ObservableNever,Cancels) {
+TEST(ObservableNever, Cancels) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto fiber = Observable<int,std::string>::never()->last().run(sched);
+    auto fiber = Observable<int, std::string>::never()->last().run(sched);
 
     sched->run_ready_tasks();
     fiber->cancel();
@@ -41,4 +39,3 @@ TEST(ObservableNever,Cancels) {
     EXPECT_TRUE(sched->isIdle());
     EXPECT_EQ(sched->num_timers(), 0);
 }
-

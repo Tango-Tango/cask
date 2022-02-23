@@ -11,45 +11,41 @@
 
 namespace cask::observable {
 
-template <class T, class E>
-class DeferTaskObservable final : public Observable<T,E> {
+template <class T, class E> class DeferTaskObservable final : public Observable<T, E> {
 public:
-    explicit DeferTaskObservable(const std::function<Task<T,E>()>& predicate);
-    FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
+    explicit DeferTaskObservable(const std::function<Task<T, E>()>& predicate);
+    FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,
+                                   const std::shared_ptr<Observer<T, E>>& observer) const override;
+
 private:
-    std::function<Task<T,E>()> predicate;
+    std::function<Task<T, E>()> predicate;
 };
 
 template <class T, class E>
-DeferTaskObservable<T,E>::DeferTaskObservable(const std::function<Task<T,E>()>& predicate)
-    : predicate(predicate)
-{}
+DeferTaskObservable<T, E>::DeferTaskObservable(const std::function<Task<T, E>()>& predicate)
+    : predicate(predicate) {}
 
 template <class T, class E>
-FiberRef<None,None> DeferTaskObservable<T,E>::subscribe(
-    const std::shared_ptr<Scheduler>& sched,
-    const std::shared_ptr<Observer<T,E>>& observer) const
-{
-    auto downstreamTask = Task<None,None>::defer([predicate = predicate, observer] {
+FiberRef<None, None> DeferTaskObservable<T, E>::subscribe(const std::shared_ptr<Scheduler>& sched,
+                                                          const std::shared_ptr<Observer<T, E>>& observer) const {
+    auto downstreamTask = Task<None, None>::defer([predicate = predicate, observer] {
         try {
-            return predicate().template flatMapBoth<None,None>(
+            return predicate().template flatMapBoth<None, None>(
                 [observer](auto result) {
-                    return observer->onNext(result)
-                    .template flatMap<None>([observer](auto) {
+                    return observer->onNext(result).template flatMap<None>([observer](auto) {
                         return observer->onComplete();
                     });
                 },
                 [observer](auto error) {
                     return observer->onError(error);
-                }
-            );
-        } catch(E& error) {
+                });
+        } catch (E& error) {
             return observer->onError(error);
         }
     });
 
     return downstreamTask
-        .doOnCancel(Task<None,None>::defer([observer] {
+        .doOnCancel(Task<None, None>::defer([observer] {
             return observer->onCancel();
         }))
         .run(sched);

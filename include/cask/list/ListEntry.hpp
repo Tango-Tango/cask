@@ -14,7 +14,9 @@ namespace cask::list {
  * Represents a list that has a value and a tail (which may be empty).
  */
 template <class T>
-class ListEntry final : public List<T>, public std::enable_shared_from_this<ListEntry<T>> {
+class ListEntry final
+    : public List<T>
+    , public std::enable_shared_from_this<ListEntry<T>> {
 public:
     ListEntry(const T& head, ListRef<T> tail);
     static ListRef<T> create(const T& head, ListRef<T> tail);
@@ -33,8 +35,7 @@ private:
     std::size_t memoizedSize;
 };
 
-template <class T>
-ListRef<T> ListEntry<T>::create(const T& head, ListRef<T> tail) {
+template <class T> ListRef<T> ListEntry<T>::create(const T& head, ListRef<T> tail) {
     return std::make_shared<ListEntry<T>>(head, tail);
 }
 
@@ -42,22 +43,19 @@ template <class T>
 ListEntry<T>::ListEntry(const T& head, ListRef<T> tail)
     : headValue(head)
     , tailRef(tail)
-    , memoizedSize(tail == nullptr ? 0 : tail->size() + 1)
-{}
+    , memoizedSize(tail == nullptr ? 0 : tail->size() + 1) {}
 
-template <class T>
-ListRef<T> ListEntry<T>::prepend(const T& elem) const {
+template <class T> ListRef<T> ListEntry<T>::prepend(const T& elem) const {
     return ListEntry<T>::create(elem, this->shared_from_this());
 }
 
-template <class T>
-ListRef<T> ListEntry<T>::append(const T& elem) const {
+template <class T> ListRef<T> ListEntry<T>::append(const T& elem) const {
     std::shared_ptr<ListEntry<T>> headEntry = std::make_shared<ListEntry<T>>(headValue, nullptr);
     std::shared_ptr<ListEntry<T>> entry = headEntry;
     ListRef<T> original = this->shared_from_this();
 
-    while(true) {
-        if(auto next = std::dynamic_pointer_cast<const ListEntry<T>>(original->tail())) {
+    while (true) {
+        if (auto next = std::dynamic_pointer_cast<const ListEntry<T>>(original->tail())) {
             auto newNext = std::make_shared<ListEntry<T>>(next->headValue, nullptr);
             entry->tailRef = newNext;
             entry->memoizedSize = original->size() + 1;
@@ -73,34 +71,29 @@ ListRef<T> ListEntry<T>::append(const T& elem) const {
     return headEntry;
 }
 
-template <class T>
-bool ListEntry<T>::is_empty() const {
+template <class T> bool ListEntry<T>::is_empty() const {
     return false;
 }
 
-template <class T>
-std::size_t ListEntry<T>::size() const {
+template <class T> std::size_t ListEntry<T>::size() const {
     return memoizedSize;
 }
 
-template <class T>
-std::optional<T> ListEntry<T>::head() const {
+template <class T> std::optional<T> ListEntry<T>::head() const {
     return headValue;
 }
 
-template <class T>
-ListRef<T> ListEntry<T>::tail() const {
+template <class T> ListRef<T> ListEntry<T>::tail() const {
     return tailRef;
 }
 
-template <class T>
-ListRef<T> ListEntry<T>::dropWhile(const std::function<bool(const T&)>& predicate) const {
+template <class T> ListRef<T> ListEntry<T>::dropWhile(const std::function<bool(const T&)>& predicate) const {
     ListRef<T> entry = this->shared_from_this();
 
-    while(true) {
+    while (true) {
         auto valueOpt = entry->head();
-        if(valueOpt.has_value()) {
-            if(predicate(*valueOpt)) {
+        if (valueOpt.has_value()) {
+            if (predicate(*valueOpt)) {
                 entry = entry->tail();
             } else {
                 break;

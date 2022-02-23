@@ -6,26 +6,23 @@
 #ifndef _CASK_PROMISE_DEFERRED_H_
 #define _CASK_PROMISE_DEFERRED_H_
 
+#include "../Scheduler.hpp"
 #include <any>
 #include <functional>
-#include <optional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <variant>
 #include <vector>
-#include "../Scheduler.hpp"
 
 namespace cask::deferred {
 
-template <class T, class E>
-class PromiseDeferred;
+template <class T, class E> class PromiseDeferred;
 
-
-template <class T, class E = std::any>
-class PromiseDeferred final : public Deferred<T,E> {
+template <class T, class E = std::any> class PromiseDeferred final : public Deferred<T, E> {
 public:
-    explicit PromiseDeferred(std::shared_ptr<Promise<T,E>> promise);
-    void onComplete(std::function<void(Either<T,E>)> callback) override;
+    explicit PromiseDeferred(std::shared_ptr<Promise<T, E>> promise);
+    void onComplete(std::function<void(Either<T, E>)> callback) override;
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;
     void onCancel(const std::function<void()>& callback) override;
@@ -33,70 +30,63 @@ public:
     void cancel() override;
     T await() override;
 
-    std::shared_ptr<Promise<T,E>> promise;
+    std::shared_ptr<Promise<T, E>> promise;
+
 private:
     std::shared_ptr<Scheduler> sched;
 };
 
 template <class T, class E>
-PromiseDeferred<T,E>::PromiseDeferred(std::shared_ptr<Promise<T,E>> promise)
+PromiseDeferred<T, E>::PromiseDeferred(std::shared_ptr<Promise<T, E>> promise)
     : promise(promise)
-    , sched(promise->sched)
-{}
+    , sched(promise->sched) {}
 
-template <class T, class E>
-void PromiseDeferred<T,E>::onComplete(std::function<void(Either<T,E>)> callback) {
+template <class T, class E> void PromiseDeferred<T, E>::onComplete(std::function<void(Either<T, E>)> callback) {
     promise->onComplete(callback);
 }
 
-template <class T, class E>
-void PromiseDeferred<T,E>::onSuccess(std::function<void(T)> callback) {
-    promise->onComplete([callback](Either<T,E> value) {
-        if(value.is_left()) {
+template <class T, class E> void PromiseDeferred<T, E>::onSuccess(std::function<void(T)> callback) {
+    promise->onComplete([callback](Either<T, E> value) {
+        if (value.is_left()) {
             callback(value.get_left());
         }
     });
 }
 
-template <class T, class E>
-void PromiseDeferred<T,E>::onError(std::function<void(E)> callback) {
-    promise->onComplete([callback](Either<T,E> value) {
-        if(value.is_right()) {
+template <class T, class E> void PromiseDeferred<T, E>::onError(std::function<void(E)> callback) {
+    promise->onComplete([callback](Either<T, E> value) {
+        if (value.is_right()) {
             callback(value.get_right());
         }
     });
 }
 
-template <class T, class E>
-void PromiseDeferred<T,E>::onCancel(const std::function<void()>& callback) {
+template <class T, class E> void PromiseDeferred<T, E>::onCancel(const std::function<void()>& callback) {
     promise->onCancel(callback);
 }
 
-template <class T, class E>
-void PromiseDeferred<T,E>::onShutdown(const std::function<void()>& callback) {
+template <class T, class E> void PromiseDeferred<T, E>::onShutdown(const std::function<void()>& callback) {
     promise->onShutdown(callback);
 }
 
-template <class T, class E>
-void PromiseDeferred<T,E>::cancel() {
+template <class T, class E> void PromiseDeferred<T, E>::cancel() {
     promise->cancel();
 }
 
-template <class T, class E>
-T PromiseDeferred<T,E>::await() {
+template <class T, class E> T PromiseDeferred<T, E>::await() {
     bool canceled = false;
-    std::optional<Either<T,E>> result = promise->get();
+    std::optional<Either<T, E>> result = promise->get();
 
-    if(!result.has_value()) {
+    if (!result.has_value()) {
         std::mutex mutex;
         mutex.lock();
 
-        promise->onComplete([&mutex, &result](Either<T,E> newResult){
+        promise->onComplete([&mutex, &result](Either<T, E> newResult) {
             result = newResult;
             mutex.unlock();
         });
 
-        promise->onCancel([&mutex, &canceled](){
+        promise->onCancel([&mutex, &canceled]() {
             canceled = true;
             mutex.unlock();
         });
@@ -104,9 +94,9 @@ T PromiseDeferred<T,E>::await() {
         mutex.lock();
     }
 
-    if(canceled) {
+    if (canceled) {
         throw std::runtime_error("Awaiting a promise which was canceled");
-    } else if(result->is_left()) {
+    } else if (result->is_left()) {
         return result->get_left();
     } else {
         throw result->get_right();

@@ -12,28 +12,27 @@
 
 namespace cask::observable {
 
-template <class T, class E>
-class BufferObservable final : public Observable<BufferRef<T>,E> {
+template <class T, class E> class BufferObservable final : public Observable<BufferRef<T>, E> {
 public:
-    explicit BufferObservable(const std::shared_ptr<const Observable<T,E>>& upstream, uint32_t buffer_size);
-    FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<BufferRef<T>,E>>& observer) const override;
+    explicit BufferObservable(const std::shared_ptr<const Observable<T, E>>& upstream, uint32_t buffer_size);
+    FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,
+                                   const std::shared_ptr<Observer<BufferRef<T>, E>>& observer) const override;
+
 private:
-    std::shared_ptr<const Observable<T,E>> upstream;
+    std::shared_ptr<const Observable<T, E>> upstream;
     uint32_t buffer_size;
 };
 
 template <class T, class E>
-BufferObservable<T,E>::BufferObservable(const std::shared_ptr<const Observable<T,E>>& upstream, uint32_t buffer_size)
+BufferObservable<T, E>::BufferObservable(const std::shared_ptr<const Observable<T, E>>& upstream, uint32_t buffer_size)
     : upstream(upstream)
-    , buffer_size(buffer_size)
-{}
+    , buffer_size(buffer_size) {}
 
 template <class T, class E>
-FiberRef<None,None> BufferObservable<T,E>::subscribe(
-    const std::shared_ptr<Scheduler>& sched,
-    const std::shared_ptr<Observer<BufferRef<T>,E>>& observer) const
-{
-    auto bufferObserver = std::make_shared<BufferObserver<T,E>>(observer, buffer_size);
+FiberRef<None, None>
+BufferObservable<T, E>::subscribe(const std::shared_ptr<Scheduler>& sched,
+                                  const std::shared_ptr<Observer<BufferRef<T>, E>>& observer) const {
+    auto bufferObserver = std::make_shared<BufferObserver<T, E>>(observer, buffer_size);
     return upstream->subscribe(sched, bufferObserver);
 }
 

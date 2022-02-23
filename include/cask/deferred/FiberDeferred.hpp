@@ -11,11 +11,10 @@
 
 namespace cask::deferred {
 
-template <class T, class E>
-class FiberDeferred final : public Deferred<T,E> {
+template <class T, class E> class FiberDeferred final : public Deferred<T, E> {
 public:
-    explicit FiberDeferred(std::shared_ptr<Fiber<T,E>> fiber);
-    void onComplete(std::function<void(Either<T,E>)> callback) override;
+    explicit FiberDeferred(std::shared_ptr<Fiber<T, E>> fiber);
+    void onComplete(std::function<void(Either<T, E>)> callback) override;
     void onSuccess(std::function<void(T)> callback) override;
     void onError(std::function<void(E)> callback) override;
     void onCancel(const std::function<void()>& callback) override;
@@ -24,60 +23,52 @@ public:
     T await() override;
 
 private:
-    std::shared_ptr<Fiber<T,E>> fiber;
+    std::shared_ptr<Fiber<T, E>> fiber;
 };
 
 template <class T, class E>
-FiberDeferred<T,E>::FiberDeferred(std::shared_ptr<Fiber<T,E>> fiber)
-    : fiber(fiber)
-{}
+FiberDeferred<T, E>::FiberDeferred(std::shared_ptr<Fiber<T, E>> fiber)
+    : fiber(fiber) {}
 
-template <class T, class E>
-void FiberDeferred<T,E>::onComplete(std::function<void(Either<T,E>)> callback) {
+template <class T, class E> void FiberDeferred<T, E>::onComplete(std::function<void(Either<T, E>)> callback) {
     fiber->onFiberShutdown([callback](auto fiber) {
-        if(auto value_opt = fiber->getValue()) {
-            callback(Either<T,E>::left(*value_opt));
-        } else if(auto error_opt = fiber->getError()) {
-            callback(Either<T,E>::right(*error_opt));
+        if (auto value_opt = fiber->getValue()) {
+            callback(Either<T, E>::left(*value_opt));
+        } else if (auto error_opt = fiber->getError()) {
+            callback(Either<T, E>::right(*error_opt));
         }
     });
 }
 
-template <class T, class E>
-void FiberDeferred<T,E>::onSuccess(std::function<void(T)> callback) {
+template <class T, class E> void FiberDeferred<T, E>::onSuccess(std::function<void(T)> callback) {
     fiber->onFiberShutdown([callback](auto fiber) {
-        if(auto value_opt = fiber->getValue()) {
+        if (auto value_opt = fiber->getValue()) {
             callback(*value_opt);
         }
     });
 }
 
-template <class T, class E>
-void FiberDeferred<T,E>::onError(std::function<void(E)> callback) {
+template <class T, class E> void FiberDeferred<T, E>::onError(std::function<void(E)> callback) {
     fiber->onFiberShutdown([callback](auto fiber) {
-        if(auto error_opt = fiber->getError()) {
+        if (auto error_opt = fiber->getError()) {
             callback(*error_opt);
         }
     });
 }
 
-template <class T, class E>
-void FiberDeferred<T,E>::onCancel(const std::function<void()>& callback) {
+template <class T, class E> void FiberDeferred<T, E>::onCancel(const std::function<void()>& callback) {
     fiber->onCancel(callback);
 }
 
-template <class T, class E>
-void FiberDeferred<T,E>::onShutdown(const std::function<void()>& callback) {
+template <class T, class E> void FiberDeferred<T, E>::onShutdown(const std::function<void()>& callback) {
     fiber->onShutdown(callback);
 }
 
-template <class T, class E>
-void FiberDeferred<T,E>::cancel() {
+template <class T, class E> void FiberDeferred<T, E>::cancel() {
     fiber->cancel();
 }
 
-template <class T, class E>
-T FiberDeferred<T,E>::await() {
+template <class T, class E> T FiberDeferred<T, E>::await() {
     return fiber->await();
 }
 

@@ -3,68 +3,65 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Ref.hpp"
+#include "gtest/gtest.h"
 
 using cask::FiberRef;
-using cask::Task;
+using cask::None;
 using cask::Ref;
 using cask::Scheduler;
-using cask::None;
+using cask::Task;
 
-TEST(Ref,Creates) {
+TEST(Ref, Creates) {
     auto ref = Ref<int>::create(0);
     auto result = ref->get().run(Scheduler::global());
     auto value = result->await();
     EXPECT_EQ(value, 0);
 }
 
-TEST(Ref,Updates) {
+TEST(Ref, Updates) {
     auto ref = Ref<int>::create(0);
     auto result = ref->update([](auto value) {
-        return value + 1;
-    })
-    .template flatMap<int>([ref](auto) {
-        return ref->get();
-    })
-    .run(Scheduler::global());
+                         return value + 1;
+                     })
+                      .template flatMap<int>([ref](auto) {
+                          return ref->get();
+                      })
+                      .run(Scheduler::global());
 
     auto value = result->await();
     EXPECT_EQ(value, 1);
 }
 
-TEST(Ref,ContendedUpdates) {
-    auto ref = Ref<std::tuple<int,int>>::create(std::make_tuple(0,0));
+TEST(Ref, ContendedUpdates) {
+    auto ref = Ref<std::tuple<int, int>>::create(std::make_tuple(0, 0));
 
-    std::vector<FiberRef<None,std::any>> fibers;
+    std::vector<FiberRef<None, std::any>> fibers;
 
-    for(int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 1000; i++) {
         auto first = ref->update([](auto value) {
-            auto [left, right] = value;
-            return std::make_tuple(left + 1, right);
-        })
-        .asyncBoundary()
-        .run(Scheduler::global());
+                            auto [left, right] = value;
+                            return std::make_tuple(left + 1, right);
+                        })
+                         .asyncBoundary()
+                         .run(Scheduler::global());
 
         auto second = ref->update([](auto value) {
-            auto [left, right] = value;
-            return std::make_tuple(left, right + 1);
-        })
-        .asyncBoundary()
-        .run(Scheduler::global());
+                             auto [left, right] = value;
+                             return std::make_tuple(left, right + 1);
+                         })
+                          .asyncBoundary()
+                          .run(Scheduler::global());
 
         fibers.push_back(first);
         fibers.push_back(second);
     }
 
-    for(auto& fiber : fibers) {
+    for (auto& fiber : fibers) {
         fiber->await();
     }
 
-    auto [left, right] = ref->get()
-        .asyncBoundary()
-        .run(Scheduler::global())
-        ->await();
+    auto [left, right] = ref->get().asyncBoundary().run(Scheduler::global())->await();
 
     EXPECT_EQ(left, 1000);
     EXPECT_EQ(right, 1000);

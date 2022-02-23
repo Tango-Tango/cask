@@ -18,32 +18,30 @@ namespace cask {
  */
 enum Ack { Continue, Stop };
 
-template <class T, class E>
-class Observer;
+template <class T, class E> class Observer;
 
-template <class T, class E = std::any>
-using ObserverRef = std::shared_ptr<Observer<T,E>>;
+template <class T, class E = std::any> using ObserverRef = std::shared_ptr<Observer<T, E>>;
 
 /**
  * An observer represents the consumer of an event stream.
- * 
+ *
  * Events are given to the consumer by calling `onNext`. The
  * processing of an event may proceed synchronously or asynchronously
  * as dictacted by the returned task. When processing of an event
  * is complete, observers signal back upstream to either `Continue`
  * sending the next event or `Stop` sending events altogether.
- * 
+ *
  * When the event stream completes, the observer will be notified
  * via a call to `onComplete`. This may not happen though - streams
  * can be cancelled without completing gracefully - and so observers
  * should be prepared to be destructed without a call to onComplete.
- * 
+ *
  * Observers _may_ be stateful - meaning each call to `onNext` manipulates
  * some state in such a way that the next event will be processed differently.
- * 
+ *
  * Observables must implement the following rules when calling methods
  * on this interface:
- * 
+ *
  *   1. `onNext` may be called 0 or more times but never concurrently.
  *   2. Callers must wait for the processing of an event to complete as
  *      signaled by the task returned by calls to `onNext`.
@@ -60,37 +58,36 @@ using ObserverRef = std::shared_ptr<Observer<T,E>>;
  *   7. If an observer reports an error upstream via its task result, the
  *      upstream task must not call `onError` on the observer which reported
  *      that error.
- * 
+ *
  * These rules, when taken together, allow observers to both backpressure
  * their upstream sources and also allow observers to implement their `onNext`
  * methods without using expensive locks or other synchronization mechanisms.
  */
-template <class T, class E>
-class Observer : public std::enable_shared_from_this<Observer<T,E>> {
+template <class T, class E> class Observer : public std::enable_shared_from_this<Observer<T, E>> {
 public:
     /**
      * Handle the next event in the event stream.
-     * 
+     *
      * @param value The next value to process.
      * @return A signal to the upstream observable that processing
      *         can continue or needs to stop.
      */
-    virtual Task<Ack,None> onNext(const T& value) = 0;
+    virtual Task<Ack, None> onNext(const T& value) = 0;
 
     /**
      * Provide an error which should terminate processing.
      */
-    virtual Task<None,None> onError(const E& error) = 0;
+    virtual Task<None, None> onError(const E& error) = 0;
 
     /**
      * Handle stream close because all events have been processed.
      */
-    virtual Task<None,None> onComplete() = 0;
+    virtual Task<None, None> onComplete() = 0;
 
     /**
      * Handle mid-stream cancelation of the running fiber.
      */
-    virtual Task<None,None> onCancel() = 0;
+    virtual Task<None, None> onCancel() = 0;
 
     virtual ~Observer() = default;
 };

@@ -21,12 +21,14 @@ TEST(BenchScheduler, SubmitAndRunOne) {
     auto sched = std::make_shared<BenchScheduler>();
 
     int counter = 0;
-    sched->submit([&counter] { counter++; });
+    sched->submit([&counter] {
+        counter++;
+    });
 
     EXPECT_EQ(sched->num_task_ready(), 1);
     EXPECT_FALSE(sched->isIdle());
     EXPECT_EQ(counter, 0);
-    
+
     EXPECT_TRUE(sched->run_one_task());
     EXPECT_FALSE(sched->run_one_task());
 
@@ -39,7 +41,9 @@ TEST(BenchScheduler, SubmitAndRunReady) {
     auto sched = std::make_shared<BenchScheduler>();
 
     int counter = 0;
-    sched->submit([&counter] { counter++; });
+    sched->submit([&counter] {
+        counter++;
+    });
 
     EXPECT_EQ(sched->num_task_ready(), 1);
     EXPECT_FALSE(sched->isIdle());
@@ -57,9 +61,15 @@ TEST(BenchScheduler, SubmitAndRunMultipleReady) {
     auto sched = std::make_shared<BenchScheduler>();
 
     int counter = 0;
-    sched->submit([&counter] { counter++; });
-    sched->submit([&counter] { counter++; });
-    sched->submit([&counter] { counter++; });
+    sched->submit([&counter] {
+        counter++;
+    });
+    sched->submit([&counter] {
+        counter++;
+    });
+    sched->submit([&counter] {
+        counter++;
+    });
 
     EXPECT_FALSE(sched->isIdle());
     EXPECT_EQ(sched->num_task_ready(), 3);
@@ -77,11 +87,15 @@ TEST(BenchScheduler, SubmitBulk) {
     auto sched = std::make_shared<BenchScheduler>();
 
     int counter = 0;
-    std::vector<std::function<void()>> tasks = {
-        [&counter] { counter++; },
-        [&counter] { counter++; },
-        [&counter] { counter++; }
-    };
+    std::vector<std::function<void()>> tasks = {[&counter] {
+                                                    counter++;
+                                                },
+                                                [&counter] {
+                                                    counter++;
+                                                },
+                                                [&counter] {
+                                                    counter++;
+                                                }};
 
     sched->submitBulk(tasks);
 
@@ -101,7 +115,9 @@ TEST(BenchScheduler, SubmitAfterAndAdvanceTime) {
     auto sched = std::make_shared<BenchScheduler>();
 
     int counter = 0;
-    sched->submitAfter(10, [&counter] { counter++; });
+    sched->submitAfter(10, [&counter] {
+        counter++;
+    });
 
     EXPECT_FALSE(sched->isIdle());
     EXPECT_EQ(sched->num_task_ready(), 0);
@@ -133,8 +149,12 @@ TEST(BenchScheduler, SubmitAfterAndCancel) {
     int timer_counter = 0;
     int cancel_counter = 0;
 
-    auto handle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
-    handle->onCancel([&cancel_counter] { cancel_counter++; });
+    auto handle = sched->submitAfter(10, [&timer_counter] {
+        timer_counter++;
+    });
+    handle->onCancel([&cancel_counter] {
+        cancel_counter++;
+    });
 
     EXPECT_FALSE(sched->isIdle());
     EXPECT_EQ(sched->num_task_ready(), 0);
@@ -155,11 +175,19 @@ TEST(BenchScheduler, SubmitAfterMultipleTimersCancelOne) {
     int timer_counter = 0;
     int cancel_counter = 0;
 
-    auto firstHandle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
-    firstHandle->onCancel([&cancel_counter] { cancel_counter++; });
+    auto firstHandle = sched->submitAfter(10, [&timer_counter] {
+        timer_counter++;
+    });
+    firstHandle->onCancel([&cancel_counter] {
+        cancel_counter++;
+    });
 
-    auto secondHandle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
-    secondHandle->onCancel([&cancel_counter] { cancel_counter++; });
+    auto secondHandle = sched->submitAfter(10, [&timer_counter] {
+        timer_counter++;
+    });
+    secondHandle->onCancel([&cancel_counter] {
+        cancel_counter++;
+    });
 
     firstHandle->cancel();
     EXPECT_EQ(timer_counter, 0);
@@ -177,8 +205,12 @@ TEST(BenchScheduler, SubmitAfterMultipleCancels) {
     int timer_counter = 0;
     int cancel_counter = 0;
 
-    auto handle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
-    handle->onCancel([&cancel_counter] { cancel_counter++; });
+    auto handle = sched->submitAfter(10, [&timer_counter] {
+        timer_counter++;
+    });
+    handle->onCancel([&cancel_counter] {
+        cancel_counter++;
+    });
     handle->cancel();
     handle->cancel();
     handle->cancel();
@@ -196,8 +228,12 @@ TEST(BenchScheduler, CancelsAfterTimerFires) {
     int timer_counter = 0;
     int cancel_counter = 0;
 
-    auto handle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
-    handle->onCancel([&cancel_counter] { cancel_counter++; });
+    auto handle = sched->submitAfter(10, [&timer_counter] {
+        timer_counter++;
+    });
+    handle->onCancel([&cancel_counter] {
+        cancel_counter++;
+    });
 
     sched->advance_time(10);
     handle->cancel();
@@ -220,9 +256,13 @@ TEST(BenchScheduler, RegistersCallbackAfterCanceled) {
     int timer_counter = 0;
     int cancel_counter = 0;
 
-    auto handle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
+    auto handle = sched->submitAfter(10, [&timer_counter] {
+        timer_counter++;
+    });
     handle->cancel();
-    handle->onCancel([&cancel_counter] { cancel_counter++; });
+    handle->onCancel([&cancel_counter] {
+        cancel_counter++;
+    });
 
     EXPECT_TRUE(sched->isIdle());
     EXPECT_EQ(sched->num_task_ready(), 0);
@@ -237,8 +277,12 @@ TEST(BenchScheduler, RunsShutdownCallbackAfterTimerTaskCompletion) {
     int timer_counter = 0;
     int shutdown_counter = 0;
 
-    auto handle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
-    handle->onShutdown([&shutdown_counter] { shutdown_counter++; });
+    auto handle = sched->submitAfter(10, [&timer_counter] {
+        timer_counter++;
+    });
+    handle->onShutdown([&shutdown_counter] {
+        shutdown_counter++;
+    });
 
     sched->advance_time(10);
 
@@ -260,7 +304,9 @@ TEST(BenchScheduler, RunsShutdownImmediatelyCallbackIfTimerAlreadyFired) {
     int timer_counter = 0;
     int shutdown_counter = 0;
 
-    auto handle = sched->submitAfter(10, [&timer_counter] { timer_counter++; });
+    auto handle = sched->submitAfter(10, [&timer_counter] {
+        timer_counter++;
+    });
 
     sched->advance_time(10);
     sched->run_ready_tasks();
@@ -268,7 +314,8 @@ TEST(BenchScheduler, RunsShutdownImmediatelyCallbackIfTimerAlreadyFired) {
     EXPECT_EQ(shutdown_counter, 0);
     EXPECT_EQ(timer_counter, 1);
 
-    handle->onShutdown([&shutdown_counter] { shutdown_counter++; });
+    handle->onShutdown([&shutdown_counter] {
+        shutdown_counter++;
+    });
     EXPECT_EQ(shutdown_counter, 1);
 }
-

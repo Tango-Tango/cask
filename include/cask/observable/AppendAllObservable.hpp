@@ -12,28 +12,28 @@
 
 namespace cask::observable {
 
-template <class T, class E>
-class AppendAllObservable final : public Observable<T,E> {
+template <class T, class E> class AppendAllObservable final : public Observable<T, E> {
 public:
-    explicit AppendAllObservable(const std::shared_ptr<const Observable<T,E>>& first, const std::shared_ptr<const Observable<T,E>>& second);
-    FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
+    explicit AppendAllObservable(const std::shared_ptr<const Observable<T, E>>& first,
+                                 const std::shared_ptr<const Observable<T, E>>& second);
+    FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,
+                                   const std::shared_ptr<Observer<T, E>>& observer) const override;
+
 private:
-    std::shared_ptr<const Observable<T,E>> first;
-    std::shared_ptr<const Observable<T,E>> second;
+    std::shared_ptr<const Observable<T, E>> first;
+    std::shared_ptr<const Observable<T, E>> second;
 };
 
 template <class T, class E>
-AppendAllObservable<T,E>::AppendAllObservable(const std::shared_ptr<const Observable<T,E>>& first, const std::shared_ptr<const Observable<T,E>>& second)
+AppendAllObservable<T, E>::AppendAllObservable(const std::shared_ptr<const Observable<T, E>>& first,
+                                               const std::shared_ptr<const Observable<T, E>>& second)
     : first(first)
-    , second(second)
-{}
+    , second(second) {}
 
 template <class T, class E>
-FiberRef<None,None> AppendAllObservable<T,E>::subscribe(
-    const std::shared_ptr<Scheduler>& sched,
-    const std::shared_ptr<Observer<T,E>>& observer) const
-{
-    auto appendObserver = std::make_shared<AppendAllObserver<T,E>>(sched, observer, second);
+FiberRef<None, None> AppendAllObservable<T, E>::subscribe(const std::shared_ptr<Scheduler>& sched,
+                                                          const std::shared_ptr<Observer<T, E>>& observer) const {
+    auto appendObserver = std::make_shared<AppendAllObserver<T, E>>(sched, observer, second);
     return first->subscribe(sched, appendObserver);
 }
 

@@ -14,7 +14,9 @@ namespace cask::list {
  * Represents the empty list that holds no values and has no tail.
  */
 template <class T>
-class Nil final : public List<T>, public std::enable_shared_from_this<Nil<T>> {
+class Nil final
+    : public List<T>
+    , public std::enable_shared_from_this<Nil<T>> {
 public:
     static ListRef<T> create();
 
@@ -33,43 +35,35 @@ public:
 
 namespace cask::list {
 
-template <class T>
-ListRef<T> Nil<T>::create() {
+template <class T> ListRef<T> Nil<T>::create() {
     return std::make_shared<Nil<T>>();
 }
 
-template <class T>
-ListRef<T> Nil<T>::prepend(const T& elem) const {
+template <class T> ListRef<T> Nil<T>::prepend(const T& elem) const {
     return ListEntry<T>::create(elem, this->shared_from_this());
 }
 
-template <class T>
-ListRef<T> Nil<T>::append(const T& elem) const {
+template <class T> ListRef<T> Nil<T>::append(const T& elem) const {
     return ListEntry<T>::create(elem, this->shared_from_this());
 }
 
-template <class T>
-bool Nil<T>::is_empty() const {
+template <class T> bool Nil<T>::is_empty() const {
     return true;
 }
 
-template <class T>
-std::size_t Nil<T>::size() const {
+template <class T> std::size_t Nil<T>::size() const {
     return 0;
 }
 
-template <class T>
-std::optional<T> Nil<T>::head() const {
+template <class T> std::optional<T> Nil<T>::head() const {
     return {};
 }
 
-template <class T>
-ListRef<T> Nil<T>::tail() const {
+template <class T> ListRef<T> Nil<T>::tail() const {
     return std::make_shared<Nil<T>>();
 }
 
-template <class T>
-ListRef<T> Nil<T>::dropWhile(const std::function<bool(const T&)>&) const {
+template <class T> ListRef<T> Nil<T>::dropWhile(const std::function<bool(const T&)>&) const {
     return this->shared_from_this();
 }
 

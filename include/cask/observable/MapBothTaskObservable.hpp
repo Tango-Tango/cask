@@ -15,35 +15,35 @@ namespace cask::observable {
  * Represents an observable that transforms each element from an upstream observable
  * using the given predicate function. Normally obtained by calling `Observable<T>::map`.
  */
-template <class TI, class TO, class EI, class EO>
-class MapBothTaskObservable final : public Observable<TO,EO> {
+template <class TI, class TO, class EI, class EO> class MapBothTaskObservable final : public Observable<TO, EO> {
 public:
-    MapBothTaskObservable(
-        const std::shared_ptr<const Observable<TI,EI>>& upstream,
-        const std::function<Task<TO,EO>(const TI&)>& successPredicate,
-        const std::function<Task<TO,EO>(const EI&)>& errorPredicate
-    );
-    FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,EO>>& observer) const override;
+    MapBothTaskObservable(const std::shared_ptr<const Observable<TI, EI>>& upstream,
+                          const std::function<Task<TO, EO>(const TI&)>& successPredicate,
+                          const std::function<Task<TO, EO>(const EI&)>& errorPredicate);
+    FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,
+                                   const std::shared_ptr<Observer<TO, EO>>& observer) const override;
+
 private:
-    std::shared_ptr<const Observable<TI,EI>> upstream;
-    std::function<Task<TO,EO>(const TI&)> successPredicate;
-    std::function<Task<TO,EO>(const EI&)> errorPredicate;
+    std::shared_ptr<const Observable<TI, EI>> upstream;
+    std::function<Task<TO, EO>(const TI&)> successPredicate;
+    std::function<Task<TO, EO>(const EI&)> errorPredicate;
 };
 
 template <class TI, class TO, class EI, class EO>
-MapBothTaskObservable<TI,TO,EI,EO>::MapBothTaskObservable(
-    const std::shared_ptr<const Observable<TI,EI>>& upstream,
-    const std::function<Task<TO,EO>(const TI&)>& successPredicate,
-    const std::function<Task<TO,EO>(const EI&)>& errorPredicate
-)
+MapBothTaskObservable<TI, TO, EI, EO>::MapBothTaskObservable(
+    const std::shared_ptr<const Observable<TI, EI>>& upstream,
+    const std::function<Task<TO, EO>(const TI&)>& successPredicate,
+    const std::function<Task<TO, EO>(const EI&)>& errorPredicate)
     : upstream(upstream)
     , successPredicate(successPredicate)
-    , errorPredicate(errorPredicate)
-{}
+    , errorPredicate(errorPredicate) {}
 
 template <class TI, class TO, class EI, class EO>
-FiberRef<None,None> MapBothTaskObservable<TI,TO,EI,EO>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,EO>>& observer) const {
-    auto mapObserver = std::make_shared<MapBothTaskObserver<TI,TO,EI,EO>>(successPredicate, errorPredicate, observer);
+FiberRef<None, None>
+MapBothTaskObservable<TI, TO, EI, EO>::subscribe(const std::shared_ptr<Scheduler>& sched,
+                                                 const std::shared_ptr<Observer<TO, EO>>& observer) const {
+    auto mapObserver =
+        std::make_shared<MapBothTaskObserver<TI, TO, EI, EO>>(successPredicate, errorPredicate, observer);
     return upstream->subscribe(sched, mapObserver);
 }
 

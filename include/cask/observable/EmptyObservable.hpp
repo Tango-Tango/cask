@@ -11,19 +11,18 @@
 
 namespace cask::observable {
 
-template <class T, class E>
-class EmptyObservable final : public Observable<T,E> {
+template <class T, class E> class EmptyObservable final : public Observable<T, E> {
 public:
-    FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
+    FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,
+                                   const std::shared_ptr<Observer<T, E>>& observer) const override;
+
 private:
-    friend class Observable<T,E>;
+    friend class Observable<T, E>;
 };
 
 template <class T, class E>
-FiberRef<None,None> EmptyObservable<T,E>::subscribe(
-    const std::shared_ptr<Scheduler>& sched,
-    const std::shared_ptr<Observer<T,E>>& observer) const
-{
+FiberRef<None, None> EmptyObservable<T, E>::subscribe(const std::shared_ptr<Scheduler>& sched,
+                                                      const std::shared_ptr<Observer<T, E>>& observer) const {
     return observer->onComplete().run(sched);
 }
 

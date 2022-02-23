@@ -7,8 +7,8 @@
 #define _CASK_CANCELABLE_H_
 
 #include <any>
-#include <memory>
 #include <functional>
+#include <memory>
 
 namespace cask {
 
@@ -47,7 +47,7 @@ public:
      */
     virtual void onShutdown(const std::function<void()>&) = 0;
 
-    virtual ~Cancelable() {};
+    virtual ~Cancelable(){};
 };
 
 class IgnoreCancelation final : public Cancelable {

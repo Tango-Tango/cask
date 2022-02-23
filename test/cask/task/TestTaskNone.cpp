@@ -3,14 +3,14 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Task.hpp"
+#include "gtest/gtest.h"
 
-using cask::Task;
-using cask::Scheduler;
 using cask::None;
+using cask::Scheduler;
+using cask::Task;
 
-TEST(TaskNone,EvalutesSync) {
+TEST(TaskNone, EvalutesSync) {
     auto result = Task<>::none().runSync();
 
     ASSERT_TRUE(result.has_value());
@@ -18,10 +18,8 @@ TEST(TaskNone,EvalutesSync) {
     EXPECT_EQ(result->get_left(), None());
 }
 
-TEST(TaskNone,EvaluatesAsync) {
-    auto result = Task<>::none()
-        .run(Scheduler::global())
-        ->await();
-    
+TEST(TaskNone, EvaluatesAsync) {
+    auto result = Task<>::none().run(Scheduler::global())->await();
+
     EXPECT_EQ(result, None());
 }

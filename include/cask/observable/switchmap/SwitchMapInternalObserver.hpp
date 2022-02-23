@@ -16,31 +16,29 @@ namespace cask::observable::switchmap {
  * is cancelled and a new subscription is started.  Normally obtained by calling `Observable<T>::switchMap`
  * and then subscribring to the resulting observable.
  */
-template <class T, class E>
-class SwitchMapInternalObserver final : public Observer<T,E> {
+template <class T, class E> class SwitchMapInternalObserver final : public Observer<T, E> {
 public:
-    SwitchMapInternalObserver(const std::shared_ptr<Observer<T,E>>& downstream,
-                              const std::shared_ptr<MVar<switchmap::SwitchMapState,None>>& stateVar);
+    SwitchMapInternalObserver(const std::shared_ptr<Observer<T, E>>& downstream,
+                              const std::shared_ptr<MVar<switchmap::SwitchMapState, None>>& stateVar);
 
-    Task<Ack,None> onNext(const T& value) override;
-    Task<None,None> onError(const E& value) override;
-    Task<None,None> onComplete() override;
-    Task<None,None> onCancel() override;
+    Task<Ack, None> onNext(const T& value) override;
+    Task<None, None> onError(const E& value) override;
+    Task<None, None> onComplete() override;
+    Task<None, None> onCancel() override;
+
 private:
-    std::shared_ptr<Observer<T,E>> downstream;
-    std::shared_ptr<MVar<switchmap::SwitchMapState,None>> stateVar;
+    std::shared_ptr<Observer<T, E>> downstream;
+    std::shared_ptr<MVar<switchmap::SwitchMapState, None>> stateVar;
 };
 
 template <class T, class E>
-SwitchMapInternalObserver<T,E>::SwitchMapInternalObserver(
-    const std::shared_ptr<Observer<T,E>>& downstream,
-    const std::shared_ptr<MVar<switchmap::SwitchMapState,None>>& stateVar)
+SwitchMapInternalObserver<T, E>::SwitchMapInternalObserver(
+    const std::shared_ptr<Observer<T, E>>& downstream,
+    const std::shared_ptr<MVar<switchmap::SwitchMapState, None>>& stateVar)
     : downstream(downstream)
-    , stateVar(stateVar)
-{}
+    , stateVar(stateVar) {}
 
-template <class T, class E>
-Task<Ack,None> SwitchMapInternalObserver<T,E>::onNext(const T& value) {
+template <class T, class E> Task<Ack, None> SwitchMapInternalObserver<T, E>::onNext(const T& value) {
     return stateVar->template modify<Ack>([downstream = downstream, value](auto state) {
         return downstream->onNext(value).template map<StatefulResult<Ack>>([state](auto ack) {
             switchmap::SwitchMapState updated_state = state;
@@ -50,8 +48,7 @@ Task<Ack,None> SwitchMapInternalObserver<T,E>::onNext(const T& value) {
     });
 }
 
-template <class T, class E>
-Task<None,None> SwitchMapInternalObserver<T,E>::onError(const E& error) {
+template <class T, class E> Task<None, None> SwitchMapInternalObserver<T, E>::onError(const E& error) {
     return stateVar->template modify<None>([downstream = downstream, error](auto state) {
         switchmap::SwitchMapState updated_state = state;
         updated_state.downstream_ack = Stop;
@@ -61,25 +58,23 @@ Task<None,None> SwitchMapInternalObserver<T,E>::onError(const E& error) {
     });
 }
 
-template <class T, class E>
-Task<None,None> SwitchMapInternalObserver<T,E>::onComplete() {
+template <class T, class E> Task<None, None> SwitchMapInternalObserver<T, E>::onComplete() {
     return stateVar->template modify<None>([downstream = downstream](auto state) {
         switchmap::SwitchMapState updated_state = state;
         updated_state.subscription_completed = true;
 
-        if(state.upstream_completed) {
+        if (state.upstream_completed) {
             return downstream->onComplete().template map<StatefulResult<None>>([updated_state](auto) {
                 return StatefulResult<None>({updated_state, None()});
             });
         } else {
-            return Task<StatefulResult<None>,None>::pure({updated_state, None()});
+            return Task<StatefulResult<None>, None>::pure({updated_state, None()});
         }
     });
 }
 
-template <class T, class E>
-Task<None,None> SwitchMapInternalObserver<T,E>::onCancel() {
-    return Task<None,None>::none();
+template <class T, class E> Task<None, None> SwitchMapInternalObserver<T, E>::onCancel() {
+    return Task<None, None>::none();
 }
 
 } // namespace cask::observable::switchmap

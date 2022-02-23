@@ -15,25 +15,28 @@ namespace cask::observable {
  * Represents an observable that transforms each element from an upstream observable
  * using the given predicate function. Normally obtained by calling `Observable<T>::map`.
  */
-template <class TI, class TO, class E>
-class MapTaskObservable final : public Observable<TO,E> {
+template <class TI, class TO, class E> class MapTaskObservable final : public Observable<TO, E> {
 public:
-    MapTaskObservable(const std::shared_ptr<const Observable<TI,E>>& upstream, const std::function<Task<TO,E>(const TI&)>& predicate);
-    FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const override;
+    MapTaskObservable(const std::shared_ptr<const Observable<TI, E>>& upstream,
+                      const std::function<Task<TO, E>(const TI&)>& predicate);
+    FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,
+                                   const std::shared_ptr<Observer<TO, E>>& observer) const override;
+
 private:
-    std::shared_ptr<const Observable<TI,E>> upstream;
-    std::function<Task<TO,E>(const TI&)> predicate;
+    std::shared_ptr<const Observable<TI, E>> upstream;
+    std::function<Task<TO, E>(const TI&)> predicate;
 };
 
 template <class TI, class TO, class E>
-MapTaskObservable<TI,TO,E>::MapTaskObservable(const std::shared_ptr<const Observable<TI,E>>& upstream, const std::function<Task<TO,E>(const TI&)>& predicate)
+MapTaskObservable<TI, TO, E>::MapTaskObservable(const std::shared_ptr<const Observable<TI, E>>& upstream,
+                                                const std::function<Task<TO, E>(const TI&)>& predicate)
     : upstream(upstream)
-    , predicate(predicate)
-{}
+    , predicate(predicate) {}
 
 template <class TI, class TO, class E>
-FiberRef<None,None> MapTaskObservable<TI,TO,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const {
-    auto mapObserver = std::make_shared<MapTaskObserver<TI,TO,E>>(predicate, observer);
+FiberRef<None, None> MapTaskObservable<TI, TO, E>::subscribe(const std::shared_ptr<Scheduler>& sched,
+                                                             const std::shared_ptr<Observer<TO, E>>& observer) const {
+    auto mapObserver = std::make_shared<MapTaskObserver<TI, TO, E>>(predicate, observer);
     return upstream->subscribe(sched, mapObserver);
 }
 

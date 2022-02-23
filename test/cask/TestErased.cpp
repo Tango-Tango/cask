@@ -3,8 +3,8 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#include "gtest/gtest.h"
 #include "cask/Erased.hpp"
+#include "gtest/gtest.h"
 
 using cask::Erased;
 
@@ -97,5 +97,6 @@ TEST(Erased, ThrowsEmptyGet) {
         Erased foo;
         foo.get<int>();
         FAIL() << "expected method to throw";
-    } catch(std::runtime_error&) {}
+    } catch (std::runtime_error&) {
+    }
 }

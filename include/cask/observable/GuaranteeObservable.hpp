@@ -15,25 +15,27 @@ namespace cask::observable {
  * Represents an observable that transforms each element from an upstream observable
  * using the given predicate function. Normally obtained by calling `Observable<T>::map`.
  */
-template <class T, class E>
-class GuaranteeObservable final : public Observable<T,E> {
+template <class T, class E> class GuaranteeObservable final : public Observable<T, E> {
 public:
-    GuaranteeObservable(const std::shared_ptr<const Observable<T,E>>& upstream, const Task<None,None>& task);
-    FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
+    GuaranteeObservable(const std::shared_ptr<const Observable<T, E>>& upstream, const Task<None, None>& task);
+    FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,
+                                   const std::shared_ptr<Observer<T, E>>& observer) const override;
+
 private:
-    std::shared_ptr<const Observable<T,E>> upstream;
-    Task<None,None> task;
+    std::shared_ptr<const Observable<T, E>> upstream;
+    Task<None, None> task;
 };
 
 template <class T, class E>
-GuaranteeObservable<T,E>::GuaranteeObservable(const std::shared_ptr<const Observable<T,E>>& upstream, const Task<None,None>& task)
+GuaranteeObservable<T, E>::GuaranteeObservable(const std::shared_ptr<const Observable<T, E>>& upstream,
+                                               const Task<None, None>& task)
     : upstream(upstream)
-    , task(task)
-{}
+    , task(task) {}
 
 template <class T, class E>
-FiberRef<None,None> GuaranteeObservable<T,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const {
-    auto guaranteeObserver = std::make_shared<GuaranteeObserver<T,E>>(observer, task);
+FiberRef<None, None> GuaranteeObservable<T, E>::subscribe(const std::shared_ptr<Scheduler>& sched,
+                                                          const std::shared_ptr<Observer<T, E>>& observer) const {
+    auto guaranteeObserver = std::make_shared<GuaranteeObserver<T, E>>(observer, task);
     return upstream->subscribe(sched, guaranteeObserver);
 }
 

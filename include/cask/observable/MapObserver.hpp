@@ -15,43 +15,38 @@ namespace cask::observable {
  * transformed event to a downstream observer. Normally obtained by calling `Observable<T>::map` and
  * then subscribring to the resulting observable.
  */
-template <class TI, class TO, class E>
-class MapObserver final : public Observer<TI,E> {
+template <class TI, class TO, class E> class MapObserver final : public Observer<TI, E> {
 public:
-    MapObserver(const std::function<TO(const TI&)>& predicate, const std::shared_ptr<Observer<TO,E>>& downstream);
-    Task<Ack,None> onNext(const TI& value) override;
-    Task<None,None> onError(const E& error) override;
-    Task<None,None> onComplete() override;
-    Task<None,None> onCancel() override;
+    MapObserver(const std::function<TO(const TI&)>& predicate, const std::shared_ptr<Observer<TO, E>>& downstream);
+    Task<Ack, None> onNext(const TI& value) override;
+    Task<None, None> onError(const E& error) override;
+    Task<None, None> onComplete() override;
+    Task<None, None> onCancel() override;
+
 private:
     std::function<TO(const TI&)> predicate;
-    std::shared_ptr<Observer<TO,E>> downstream;
+    std::shared_ptr<Observer<TO, E>> downstream;
 };
 
-
 template <class TI, class TO, class E>
-MapObserver<TI,TO,E>::MapObserver(const std::function<TO(const TI&)>& predicate, const std::shared_ptr<Observer<TO,E>>& downstream)
+MapObserver<TI, TO, E>::MapObserver(const std::function<TO(const TI&)>& predicate,
+                                    const std::shared_ptr<Observer<TO, E>>& downstream)
     : predicate(predicate)
-    , downstream(downstream)
-{}
+    , downstream(downstream) {}
 
-template <class TI, class TO, class E>
-Task<Ack,None> MapObserver<TI,TO,E>::onNext(const TI& value) {
+template <class TI, class TO, class E> Task<Ack, None> MapObserver<TI, TO, E>::onNext(const TI& value) {
     return downstream->onNext(predicate(value));
 }
 
-template <class TI, class TO, class E>
-Task<None,None> MapObserver<TI,TO,E>::onError(const E& error) {
+template <class TI, class TO, class E> Task<None, None> MapObserver<TI, TO, E>::onError(const E& error) {
     return downstream->onError(error);
 }
 
-template <class TI, class TO, class E>
-Task<None,None> MapObserver<TI,TO,E>::onComplete() {
+template <class TI, class TO, class E> Task<None, None> MapObserver<TI, TO, E>::onComplete() {
     return downstream->onComplete();
 }
 
-template <class TI, class TO, class E>
-Task<None,None> MapObserver<TI,TO,E>::onCancel() {
+template <class TI, class TO, class E> Task<None, None> MapObserver<TI, TO, E>::onCancel() {
     return downstream->onCancel();
 }
 
