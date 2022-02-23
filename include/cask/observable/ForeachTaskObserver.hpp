@@ -16,7 +16,8 @@ namespace cask::observable {
  * completion, completes a promise with the last event seen (or nothing, if the stream
  * was empty). Normally obtained by using `Observer<T>::last()`.
  */
-template <class T, class E> class ForeachTaskObserver final : public Observer<T, E> {
+template <class T, class E>
+class ForeachTaskObserver final : public Observer<T, E> {
 public:
     explicit ForeachTaskObserver(const std::weak_ptr<Promise<None, E>>& promise,
                                  const std::function<Task<None, E>(const T& value)>& predicate);
@@ -37,7 +38,8 @@ ForeachTaskObserver<T, E>::ForeachTaskObserver(const std::weak_ptr<Promise<None,
     : promise(promise)
     , predicate(predicate) {}
 
-template <class T, class E> Task<Ack, None> ForeachTaskObserver<T, E>::onNext(const T& value) {
+template <class T, class E>
+Task<Ack, None> ForeachTaskObserver<T, E>::onNext(const T& value) {
     return predicate(value).template flatMapBoth<Ack, None>(
         [](auto) {
             return Task<Ack, None>::pure(cask::Continue);
@@ -53,7 +55,8 @@ template <class T, class E> Task<Ack, None> ForeachTaskObserver<T, E>::onNext(co
         });
 }
 
-template <class T, class E> Task<None, None> ForeachTaskObserver<T, E>::onError(const E& error) {
+template <class T, class E>
+Task<None, None> ForeachTaskObserver<T, E>::onError(const E& error) {
     if (auto promiseLock = promise.lock()) {
         promiseLock->error(error);
     }
@@ -61,7 +64,8 @@ template <class T, class E> Task<None, None> ForeachTaskObserver<T, E>::onError(
     return Task<None, None>::none();
 }
 
-template <class T, class E> Task<None, None> ForeachTaskObserver<T, E>::onComplete() {
+template <class T, class E>
+Task<None, None> ForeachTaskObserver<T, E>::onComplete() {
     if (auto promiseLock = promise.lock()) {
         promiseLock->success(None());
     }
@@ -69,7 +73,8 @@ template <class T, class E> Task<None, None> ForeachTaskObserver<T, E>::onComple
     return Task<None, None>::none();
 }
 
-template <class T, class E> Task<None, None> ForeachTaskObserver<T, E>::onCancel() {
+template <class T, class E>
+Task<None, None> ForeachTaskObserver<T, E>::onCancel() {
     if (auto promiseLock = promise.lock()) {
         promiseLock->cancel();
     }

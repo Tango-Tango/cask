@@ -16,7 +16,8 @@ namespace cask::observable::switchmap {
  * is cancelled and a new subscription is started.  Normally obtained by calling `Observable<T>::switchMap`
  * and then subscribring to the resulting observable.
  */
-template <class T, class E> class SwitchMapInternalObserver final : public Observer<T, E> {
+template <class T, class E>
+class SwitchMapInternalObserver final : public Observer<T, E> {
 public:
     SwitchMapInternalObserver(const std::shared_ptr<Observer<T, E>>& downstream,
                               const std::shared_ptr<MVar<switchmap::SwitchMapState, None>>& stateVar);
@@ -38,7 +39,8 @@ SwitchMapInternalObserver<T, E>::SwitchMapInternalObserver(
     : downstream(downstream)
     , stateVar(stateVar) {}
 
-template <class T, class E> Task<Ack, None> SwitchMapInternalObserver<T, E>::onNext(const T& value) {
+template <class T, class E>
+Task<Ack, None> SwitchMapInternalObserver<T, E>::onNext(const T& value) {
     return stateVar->template modify<Ack>([downstream = downstream, value](auto state) {
         return downstream->onNext(value).template map<StatefulResult<Ack>>([state](auto ack) {
             switchmap::SwitchMapState updated_state = state;
@@ -48,7 +50,8 @@ template <class T, class E> Task<Ack, None> SwitchMapInternalObserver<T, E>::onN
     });
 }
 
-template <class T, class E> Task<None, None> SwitchMapInternalObserver<T, E>::onError(const E& error) {
+template <class T, class E>
+Task<None, None> SwitchMapInternalObserver<T, E>::onError(const E& error) {
     return stateVar->template modify<None>([downstream = downstream, error](auto state) {
         switchmap::SwitchMapState updated_state = state;
         updated_state.downstream_ack = Stop;
@@ -58,7 +61,8 @@ template <class T, class E> Task<None, None> SwitchMapInternalObserver<T, E>::on
     });
 }
 
-template <class T, class E> Task<None, None> SwitchMapInternalObserver<T, E>::onComplete() {
+template <class T, class E>
+Task<None, None> SwitchMapInternalObserver<T, E>::onComplete() {
     return stateVar->template modify<None>([downstream = downstream](auto state) {
         switchmap::SwitchMapState updated_state = state;
         updated_state.subscription_completed = true;
@@ -73,7 +77,8 @@ template <class T, class E> Task<None, None> SwitchMapInternalObserver<T, E>::on
     });
 }
 
-template <class T, class E> Task<None, None> SwitchMapInternalObserver<T, E>::onCancel() {
+template <class T, class E>
+Task<None, None> SwitchMapInternalObserver<T, E>::onCancel() {
     return Task<None, None>::none();
 }
 

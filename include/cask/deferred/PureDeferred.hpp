@@ -10,7 +10,8 @@
 
 namespace cask::deferred {
 
-template <class T, class E> class PureDeferred final : public Deferred<T, E> {
+template <class T, class E>
+class PureDeferred final : public Deferred<T, E> {
 public:
     constexpr explicit PureDeferred(const T& value);
     constexpr explicit PureDeferred(T&& value);
@@ -36,31 +37,38 @@ template <class T, class E>
 constexpr PureDeferred<T, E>::PureDeferred(T&& value)
     : value(std::move(value)) {}
 
-template <class T, class E> void PureDeferred<T, E>::onComplete(std::function<void(Either<T, E>)> callback) {
+template <class T, class E>
+void PureDeferred<T, E>::onComplete(std::function<void(Either<T, E>)> callback) {
     return callback(Either<T, E>::left(value));
 }
 
-template <class T, class E> void PureDeferred<T, E>::onSuccess(std::function<void(T)> callback) {
+template <class T, class E>
+void PureDeferred<T, E>::onSuccess(std::function<void(T)> callback) {
     return callback(value);
 }
 
-template <class T, class E> void PureDeferred<T, E>::onError(std::function<void(E)>) {
+template <class T, class E>
+void PureDeferred<T, E>::onError(std::function<void(E)>) {
     return;
 }
 
-template <class T, class E> void PureDeferred<T, E>::onCancel(const std::function<void()>&) {
+template <class T, class E>
+void PureDeferred<T, E>::onCancel(const std::function<void()>&) {
     return;
 }
 
-template <class T, class E> void PureDeferred<T, E>::onShutdown(const std::function<void()>& callback) {
+template <class T, class E>
+void PureDeferred<T, E>::onShutdown(const std::function<void()>& callback) {
     return callback();
 }
 
-template <class T, class E> void PureDeferred<T, E>::cancel() {
+template <class T, class E>
+void PureDeferred<T, E>::cancel() {
     return;
 }
 
-template <class T, class E> T PureDeferred<T, E>::await() {
+template <class T, class E>
+T PureDeferred<T, E>::await() {
     return value;
 }
 

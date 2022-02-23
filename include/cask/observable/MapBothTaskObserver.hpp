@@ -15,7 +15,8 @@ namespace cask::observable {
  * transformed event to a downstream observer. Normally obtained by calling `Observable<T>::map` and
  * then subscribring to the resulting observable.
  */
-template <class TI, class TO, class EI, class EO> class MapBothTaskObserver final : public Observer<TI, EI> {
+template <class TI, class TO, class EI, class EO>
+class MapBothTaskObserver final : public Observer<TI, EI> {
 public:
     MapBothTaskObserver(const std::function<Task<TO, EO>(const TI&)>& successPredicate,
                         const std::function<Task<TO, EO>(const EI&)>& errorPredicate,
@@ -76,7 +77,8 @@ Task<None, None> MapBothTaskObserver<TI, TO, EI, EO>::onError(const EI& error) {
     }
 }
 
-template <class TI, class TO, class EI, class EO> Task<None, None> MapBothTaskObserver<TI, TO, EI, EO>::onComplete() {
+template <class TI, class TO, class EI, class EO>
+Task<None, None> MapBothTaskObserver<TI, TO, EI, EO>::onComplete() {
     if (!completed->test_and_set()) {
         return downstream->onComplete();
     } else {
@@ -84,7 +86,8 @@ template <class TI, class TO, class EI, class EO> Task<None, None> MapBothTaskOb
     }
 }
 
-template <class TI, class TO, class EI, class EO> Task<None, None> MapBothTaskObserver<TI, TO, EI, EO>::onCancel() {
+template <class TI, class TO, class EI, class EO>
+Task<None, None> MapBothTaskObserver<TI, TO, EI, EO>::onCancel() {
     if (!completed->test_and_set()) {
         return downstream->onCancel();
     } else {

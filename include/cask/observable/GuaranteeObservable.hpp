@@ -15,7 +15,8 @@ namespace cask::observable {
  * Represents an observable that transforms each element from an upstream observable
  * using the given predicate function. Normally obtained by calling `Observable<T>::map`.
  */
-template <class T, class E> class GuaranteeObservable final : public Observable<T, E> {
+template <class T, class E>
+class GuaranteeObservable final : public Observable<T, E> {
 public:
     GuaranteeObservable(const std::shared_ptr<const Observable<T, E>>& upstream, const Task<None, None>& task);
     FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,

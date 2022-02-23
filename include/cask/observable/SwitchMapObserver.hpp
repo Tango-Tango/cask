@@ -12,7 +12,8 @@
 
 namespace cask::observable {
 
-template <class U> using StatefulResult = std::tuple<switchmap::SwitchMapState, U>;
+template <class U>
+using StatefulResult = std::tuple<switchmap::SwitchMapState, U>;
 
 /**
  * Represents an observer that transforms each event received on a stream to a new value and emits the
@@ -20,7 +21,8 @@ template <class U> using StatefulResult = std::tuple<switchmap::SwitchMapState, 
  * is cancelled and a new subscription is started.  Normally obtained by calling `Observable<T>::switchMap`
  * and then subscribring to the resulting observable.
  */
-template <class TI, class TO, class E> class SwitchMapObserver final : public Observer<TI, E> {
+template <class TI, class TO, class E>
+class SwitchMapObserver final : public Observer<TI, E> {
 public:
     SwitchMapObserver(const std::function<ObservableRef<TO, E>(const TI&)>& predicate,
                       const std::shared_ptr<Observer<TO, E>>& downstream,
@@ -58,21 +60,24 @@ SwitchMapObserver<TI, TO, E>::SwitchMapObserver(const std::function<ObservableRe
     , sched(sched)
     , stateVar(MVar<switchmap::SwitchMapState, None>::create(sched, {})) {}
 
-template <class TI, class TO, class E> Task<Ack, None> SwitchMapObserver<TI, TO, E>::onNext(const TI& value) {
+template <class TI, class TO, class E>
+Task<Ack, None> SwitchMapObserver<TI, TO, E>::onNext(const TI& value) {
     return stateVar->template modify<Ack>([self = this->shared_from_this(), value](auto state) {
         auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI, TO, E>>(self);
         return casted_self->onNextUnsafe(value, state);
     });
 }
 
-template <class TI, class TO, class E> Task<None, None> SwitchMapObserver<TI, TO, E>::onError(const E& error) {
+template <class TI, class TO, class E>
+Task<None, None> SwitchMapObserver<TI, TO, E>::onError(const E& error) {
     return stateVar->template modify<None>([self = this->shared_from_this(), error](auto state) {
         auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI, TO, E>>(self);
         return casted_self->onErrorUnsafe(error, state);
     });
 }
 
-template <class TI, class TO, class E> Task<None, None> SwitchMapObserver<TI, TO, E>::onComplete() {
+template <class TI, class TO, class E>
+Task<None, None> SwitchMapObserver<TI, TO, E>::onComplete() {
     return stateVar
         ->template modify<FiberRef<None, None>>([self = this->shared_from_this()](auto state) {
             auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI, TO, E>>(self);
@@ -91,7 +96,8 @@ template <class TI, class TO, class E> Task<None, None> SwitchMapObserver<TI, TO
         });
 }
 
-template <class TI, class TO, class E> Task<None, None> SwitchMapObserver<TI, TO, E>::onCancel() {
+template <class TI, class TO, class E>
+Task<None, None> SwitchMapObserver<TI, TO, E>::onCancel() {
     return stateVar->template modify<None>([self = this->shared_from_this()](auto state) {
         auto casted_self = std::static_pointer_cast<SwitchMapObserver<TI, TO, E>>(self);
         return casted_self->onCancelUnsafe(state);

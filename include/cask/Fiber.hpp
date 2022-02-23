@@ -13,9 +13,11 @@
 
 namespace cask {
 
-template <class T, class E> class Fiber;
+template <class T, class E>
+class Fiber;
 
-template <class T, class E> using FiberRef = std::shared_ptr<Fiber<T, E>>;
+template <class T, class E>
+using FiberRef = std::shared_ptr<Fiber<T, E>>;
 
 /**
  * A Fiber is a user-space cooperatively scheduled operation that has been started

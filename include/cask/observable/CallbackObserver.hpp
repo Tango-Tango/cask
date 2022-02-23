@@ -10,7 +10,8 @@
 
 namespace cask::observable {
 
-template <class T, class E> class CallbackObserver final : public Observer<T, E> {
+template <class T, class E>
+class CallbackObserver final : public Observer<T, E> {
 public:
     CallbackObserver(const std::function<Task<Ack, None>(const T&)>& onNextHdl,
                      const std::function<Task<None, None>(const E&)>& onErrorHdl,
@@ -39,19 +40,23 @@ CallbackObserver<T, E>::CallbackObserver(const std::function<Task<Ack, None>(con
     , onCompleteHdl(onCompleteHdl)
     , onCancelHdl(onCancelHdl) {}
 
-template <class T, class E> Task<Ack, None> CallbackObserver<T, E>::onNext(const T& value) {
+template <class T, class E>
+Task<Ack, None> CallbackObserver<T, E>::onNext(const T& value) {
     return onNextHdl(value);
 }
 
-template <class T, class E> Task<None, None> CallbackObserver<T, E>::onError(const E& value) {
+template <class T, class E>
+Task<None, None> CallbackObserver<T, E>::onError(const E& value) {
     return onErrorHdl(value);
 }
 
-template <class T, class E> Task<None, None> CallbackObserver<T, E>::onComplete() {
+template <class T, class E>
+Task<None, None> CallbackObserver<T, E>::onComplete() {
     return onCompleteHdl();
 }
 
-template <class T, class E> Task<None, None> CallbackObserver<T, E>::onCancel() {
+template <class T, class E>
+Task<None, None> CallbackObserver<T, E>::onCancel() {
     return onCancelHdl();
 }
 

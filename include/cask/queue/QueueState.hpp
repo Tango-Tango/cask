@@ -17,7 +17,8 @@ namespace cask::queue {
  * Represents the internal state of an MVar. It should not be used directly by consumers. It does
  * not provide any concurrency protection on its own and is expected to be protected by a `Ref`.
  */
-template <class T, class E> class QueueState {
+template <class T, class E>
+class QueueState {
 public:
     using PendingPut = std::tuple<PromiseRef<None, E>, T>;
 
@@ -97,7 +98,8 @@ std::tuple<QueueState<T, E>, bool, std::function<void()>> QueueState<T, E>::tryP
     }
 }
 
-template <class T, class E> std::tuple<QueueState<T, E>, Task<None, E>> QueueState<T, E>::put(const T& value) const {
+template <class T, class E>
+std::tuple<QueueState<T, E>, Task<None, E>> QueueState<T, E>::put(const T& value) const {
     auto result = tryPut(value);
     auto nextState = std::get<0>(result);
     auto completed = std::get<1>(result);
@@ -146,7 +148,8 @@ std::tuple<QueueState<T, E>, std::optional<T>, std::function<void()>> QueueState
     }
 }
 
-template <class T, class E> std::tuple<QueueState<T, E>, Task<T, E>> QueueState<T, E>::take() const {
+template <class T, class E>
+std::tuple<QueueState<T, E>, Task<T, E>> QueueState<T, E>::take() const {
     auto result = tryTake();
     auto nextState = std::get<0>(result);
     auto valueOpt = std::get<1>(result);

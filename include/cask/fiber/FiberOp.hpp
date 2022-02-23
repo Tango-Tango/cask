@@ -19,9 +19,11 @@
 
 namespace cask {
 
-template <class T, class E> class Deferred;
+template <class T, class E>
+class Deferred;
 
-template <class T, class E> using DeferredRef = std::shared_ptr<Deferred<T, E>>;
+template <class T, class E>
+using DeferredRef = std::shared_ptr<Deferred<T, E>>;
 
 } // namespace cask
 

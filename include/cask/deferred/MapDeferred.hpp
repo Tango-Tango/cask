@@ -10,7 +10,8 @@
 
 namespace cask::deferred {
 
-template <class T1, class T2, class E1, class E2> class MapDeferred final : public Deferred<T2, E2> {
+template <class T1, class T2, class E1, class E2>
+class MapDeferred final : public Deferred<T2, E2> {
 public:
     MapDeferred(DeferredRef<T1, E1> deferred,
                 std::function<T2(T1)> value_transform,
@@ -73,11 +74,13 @@ void MapDeferred<T1, T2, E1, E2>::onShutdown(const std::function<void()>& callba
     deferred->onShutdown(callback);
 }
 
-template <class T1, class T2, class E1, class E2> void MapDeferred<T1, T2, E1, E2>::cancel() {
+template <class T1, class T2, class E1, class E2>
+void MapDeferred<T1, T2, E1, E2>::cancel() {
     deferred->cancel();
 }
 
-template <class T1, class T2, class E1, class E2> T2 MapDeferred<T1, T2, E1, E2>::await() {
+template <class T1, class T2, class E1, class E2>
+T2 MapDeferred<T1, T2, E1, E2>::await() {
     try {
         return value_transform(deferred->await());
     } catch (const E1& error) {

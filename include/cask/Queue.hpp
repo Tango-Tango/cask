@@ -12,16 +12,19 @@
 
 namespace cask {
 
-template <class T, class E> class Queue;
+template <class T, class E>
+class Queue;
 
-template <class T, class E = std::any> using QueueRef = std::shared_ptr<Queue<T, E>>;
+template <class T, class E = std::any>
+using QueueRef = std::shared_ptr<Queue<T, E>>;
 
 /**
  * A Queue is a concurrent queue which implements asynchronous semantic blocking for puts and takes. It
  * can be used to coordinate between two proceses, with backpressure, where one producer process inserts
  * items with `put` and a consume process takes items with `take`.
  */
-template <class T, class E = std::any> class Queue {
+template <class T, class E = std::any>
+class Queue {
 public:
     /**
      * Create an empty queue.
@@ -89,7 +92,8 @@ template <class T, class E>
 Queue<T, E>::Queue(const std::shared_ptr<Scheduler>& sched, const T& value)
     : stateRef(Ref<queue::QueueState<T, E>, E>::create(queue::QueueState<T, E>(sched, value))) {}
 
-template <class T, class E> Task<None, E> Queue<T, E>::put(const T& value) {
+template <class T, class E>
+Task<None, E> Queue<T, E>::put(const T& value) {
     return stateRef
         ->template modify<Task<None, E>>([value](auto state) {
             return state.put(value);
@@ -99,7 +103,8 @@ template <class T, class E> Task<None, E> Queue<T, E>::put(const T& value) {
         });
 }
 
-template <class T, class E> bool Queue<T, E>::tryPut(const T& value) {
+template <class T, class E>
+bool Queue<T, E>::tryPut(const T& value) {
     using IntermediateResult = std::tuple<bool, std::function<void()>>;
 
     auto result_opt = stateRef
@@ -125,7 +130,8 @@ template <class T, class E> bool Queue<T, E>::tryPut(const T& value) {
     }
 }
 
-template <class T, class E> Task<T, E> Queue<T, E>::take() {
+template <class T, class E>
+Task<T, E> Queue<T, E>::take() {
     return stateRef
         ->template modify<Task<T, E>>([](auto state) {
             return state.take();
@@ -135,7 +141,8 @@ template <class T, class E> Task<T, E> Queue<T, E>::take() {
         });
 }
 
-template <class T, class E> std::optional<T> Queue<T, E>::tryTake() {
+template <class T, class E>
+std::optional<T> Queue<T, E>::tryTake() {
     using IntermediateResult = std::tuple<std::optional<T>, std::function<void()>>;
 
     auto result_opt = stateRef

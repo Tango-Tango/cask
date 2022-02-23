@@ -16,7 +16,8 @@ namespace cask::observable {
  * once set number of events is accumulated completes a promise and stops the stream. This
  * is normally used via the `Observable<T>::take` method.
  */
-template <class T, class E> class TakeWhileObserver final : public Observer<T, E> {
+template <class T, class E>
+class TakeWhileObserver final : public Observer<T, E> {
 public:
     TakeWhileObserver(const ObserverRef<T, E>& downstream,
                       const std::function<bool(const T&)>& predicate,
@@ -42,7 +43,8 @@ TakeWhileObserver<T, E>::TakeWhileObserver(const ObserverRef<T, E>& downstream,
     , inclusive(inclusive)
     , completed(false) {}
 
-template <class T, class E> Task<Ack, None> TakeWhileObserver<T, E>::onNext(const T& value) {
+template <class T, class E>
+Task<Ack, None> TakeWhileObserver<T, E>::onNext(const T& value) {
     if (predicate(value)) {
         return downstream->onNext(value);
     } else {
@@ -66,7 +68,8 @@ template <class T, class E> Task<Ack, None> TakeWhileObserver<T, E>::onNext(cons
     }
 }
 
-template <class T, class E> Task<None, None> TakeWhileObserver<T, E>::onError(const E& error) {
+template <class T, class E>
+Task<None, None> TakeWhileObserver<T, E>::onError(const E& error) {
     if (!completed.test_and_set()) {
         return downstream->onError(error);
     } else {
@@ -74,7 +77,8 @@ template <class T, class E> Task<None, None> TakeWhileObserver<T, E>::onError(co
     }
 }
 
-template <class T, class E> Task<None, None> TakeWhileObserver<T, E>::onComplete() {
+template <class T, class E>
+Task<None, None> TakeWhileObserver<T, E>::onComplete() {
     if (!completed.test_and_set()) {
         return downstream->onComplete();
     } else {
@@ -82,7 +86,8 @@ template <class T, class E> Task<None, None> TakeWhileObserver<T, E>::onComplete
     }
 }
 
-template <class T, class E> Task<None, None> TakeWhileObserver<T, E>::onCancel() {
+template <class T, class E>
+Task<None, None> TakeWhileObserver<T, E>::onCancel() {
     if (!completed.test_and_set()) {
         return downstream->onCancel();
     } else {

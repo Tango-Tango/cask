@@ -35,7 +35,8 @@ private:
     std::size_t memoizedSize;
 };
 
-template <class T> ListRef<T> ListEntry<T>::create(const T& head, ListRef<T> tail) {
+template <class T>
+ListRef<T> ListEntry<T>::create(const T& head, ListRef<T> tail) {
     return std::make_shared<ListEntry<T>>(head, tail);
 }
 
@@ -45,11 +46,13 @@ ListEntry<T>::ListEntry(const T& head, ListRef<T> tail)
     , tailRef(tail)
     , memoizedSize(tail == nullptr ? 0 : tail->size() + 1) {}
 
-template <class T> ListRef<T> ListEntry<T>::prepend(const T& elem) const {
+template <class T>
+ListRef<T> ListEntry<T>::prepend(const T& elem) const {
     return ListEntry<T>::create(elem, this->shared_from_this());
 }
 
-template <class T> ListRef<T> ListEntry<T>::append(const T& elem) const {
+template <class T>
+ListRef<T> ListEntry<T>::append(const T& elem) const {
     std::shared_ptr<ListEntry<T>> headEntry = std::make_shared<ListEntry<T>>(headValue, nullptr);
     std::shared_ptr<ListEntry<T>> entry = headEntry;
     ListRef<T> original = this->shared_from_this();
@@ -71,23 +74,28 @@ template <class T> ListRef<T> ListEntry<T>::append(const T& elem) const {
     return headEntry;
 }
 
-template <class T> bool ListEntry<T>::is_empty() const {
+template <class T>
+bool ListEntry<T>::is_empty() const {
     return false;
 }
 
-template <class T> std::size_t ListEntry<T>::size() const {
+template <class T>
+std::size_t ListEntry<T>::size() const {
     return memoizedSize;
 }
 
-template <class T> std::optional<T> ListEntry<T>::head() const {
+template <class T>
+std::optional<T> ListEntry<T>::head() const {
     return headValue;
 }
 
-template <class T> ListRef<T> ListEntry<T>::tail() const {
+template <class T>
+ListRef<T> ListEntry<T>::tail() const {
     return tailRef;
 }
 
-template <class T> ListRef<T> ListEntry<T>::dropWhile(const std::function<bool(const T&)>& predicate) const {
+template <class T>
+ListRef<T> ListEntry<T>::dropWhile(const std::function<bool(const T&)>& predicate) const {
     ListRef<T> entry = this->shared_from_this();
 
     while (true) {

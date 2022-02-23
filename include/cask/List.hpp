@@ -6,20 +6,24 @@
 #ifndef _CASK_LIST_H_
 #define _CASK_LIST_H_
 
+#include <functional>
 #include <memory>
 #include <optional>
 
 namespace cask {
 
-template <class T> class List;
+template <class T>
+class List;
 
-template <class T> using ListRef = std::shared_ptr<const List<T>>;
+template <class T>
+using ListRef = std::shared_ptr<const List<T>>;
 
 /**
  * A simple immutable and persistent list supporting constant time prepend and
  * head access operations - along with linear time append operations.
  */
-template <class T> class List {
+template <class T>
+class List {
 public:
     /**
      * Create an empty list.
@@ -101,7 +105,8 @@ public:
 
 namespace cask {
 
-template <class T> ListRef<T> List<T>::empty() {
+template <class T>
+ListRef<T> List<T>::empty() {
     return list::Nil<T>::create();
 }
 

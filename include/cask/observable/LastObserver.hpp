@@ -16,7 +16,8 @@ namespace cask::observable {
  * completion, completes a promise with the last event seen (or nothing, if the stream
  * was empty). Normally obtained by using `Observer<T>::last()`.
  */
-template <class T, class E> class LastObserver final : public Observer<T, E> {
+template <class T, class E>
+class LastObserver final : public Observer<T, E> {
 public:
     explicit LastObserver(const std::weak_ptr<Promise<std::optional<T>, E>>& promise);
 
@@ -37,12 +38,14 @@ LastObserver<T, E>::LastObserver(const std::weak_ptr<Promise<std::optional<T>, E
     , promise(promise)
     , completed(false) {}
 
-template <class T, class E> Task<Ack, None> LastObserver<T, E>::onNext(const T& value) {
+template <class T, class E>
+Task<Ack, None> LastObserver<T, E>::onNext(const T& value) {
     lastValue = value;
     return Task<Ack, None>::pure(Continue);
 }
 
-template <class T, class E> Task<None, None> LastObserver<T, E>::onError(const E& error) {
+template <class T, class E>
+Task<None, None> LastObserver<T, E>::onError(const E& error) {
     if (!completed.test_and_set()) {
         if (auto promiseLock = promise.lock()) {
             promiseLock->error(error);
@@ -52,7 +55,8 @@ template <class T, class E> Task<None, None> LastObserver<T, E>::onError(const E
     return Task<None, None>::none();
 }
 
-template <class T, class E> Task<None, None> LastObserver<T, E>::onComplete() {
+template <class T, class E>
+Task<None, None> LastObserver<T, E>::onComplete() {
     if (!completed.test_and_set()) {
         if (auto promiseLock = promise.lock()) {
             promiseLock->success(lastValue);
@@ -62,7 +66,8 @@ template <class T, class E> Task<None, None> LastObserver<T, E>::onComplete() {
     return Task<None, None>::none();
 }
 
-template <class T, class E> Task<None, None> LastObserver<T, E>::onCancel() {
+template <class T, class E>
+Task<None, None> LastObserver<T, E>::onCancel() {
     if (!completed.test_and_set()) {
         if (auto promiseLock = promise.lock()) {
             promiseLock->cancel();

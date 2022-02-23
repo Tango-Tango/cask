@@ -38,7 +38,8 @@ namespace cask {
  * A Task can be evaluated as many times as you want. Each evaluation will execute
  * independently and will re-compute the entire composition of tasks.
  */
-template <class T = None, class E = std::any> class Task {
+template <class T = None, class E = std::any>
+class Task {
 public:
     /**
      * Create a task that wraps a simple pure value. Whenever
@@ -157,7 +158,8 @@ public:
      * @param predicate The function to use for transforming the result.
      * @return A new `Task` representing the new output value.
      */
-    template <class T2> constexpr Task<T2, E> map(const std::function<T2(const T&)>& predicate) const noexcept;
+    template <class T2>
+    constexpr Task<T2, E> map(const std::function<T2(const T&)>& predicate) const noexcept;
 
     /**
      * Transform the failed result of this task to a new error type.
@@ -165,7 +167,8 @@ public:
      * @param predicate The function to use for transforming the error.
      * @return A new `Task` representing the new transformed error value.
      */
-    template <class E2> constexpr Task<T, E2> mapError(const std::function<E2(const E&)>& predicate) const noexcept;
+    template <class E2>
+    constexpr Task<T, E2> mapError(const std::function<E2(const E&)>& predicate) const noexcept;
 
     /**
      * Transform the result of this task by appying the given function
@@ -300,7 +303,8 @@ public:
      * @result A task which mirrors the results of the original task
      *         but with the added evaluation of the given side effect.
      */
-    template <class T2> constexpr Task<T, E> sideEffect(const Task<T2, E>& task) const noexcept;
+    template <class T2>
+    constexpr Task<T, E> sideEffect(const Task<T2, E>& task) const noexcept;
 
     /**
      * Guarantee that the given task will be run when this task completes
@@ -310,7 +314,8 @@ public:
      * @result A task which mirrors the results of the original task
      *         but with the added guaranteed evalution of the given task.
      */
-    template <class T2> constexpr Task<T, E> guarantee(const Task<T2, E>& task) const noexcept;
+    template <class T2>
+    constexpr Task<T, E> guarantee(const Task<T2, E>& task) const noexcept;
 
     /**
      * Timeout this task after the given interval if it does not complete
@@ -356,31 +361,37 @@ template <class T, class E>
 constexpr Task<T, E>::Task(Task<T, E>&& other) noexcept
     : op(std::move(other.op)) {}
 
-template <class T, class E> constexpr Task<T, E>& Task<T, E>::operator=(const Task<T, E>& other) noexcept {
+template <class T, class E>
+constexpr Task<T, E>& Task<T, E>::operator=(const Task<T, E>& other) noexcept {
     if (this != &other) {
         this->op = other.op;
     }
     return *this;
 }
 
-template <class T, class E> constexpr Task<T, E>& Task<T, E>::operator=(Task<T, E>&& other) noexcept {
+template <class T, class E>
+constexpr Task<T, E>& Task<T, E>::operator=(Task<T, E>&& other) noexcept {
     this->op = std::move(other.op);
     return *this;
 }
 
-template <class T, class E> constexpr Task<T, E> Task<T, E>::pure(const T& value) noexcept {
+template <class T, class E>
+constexpr Task<T, E> Task<T, E>::pure(const T& value) noexcept {
     return Task<T, E>(fiber::FiberOp::value(Erased(value)));
 }
 
-template <class T, class E> constexpr Task<T, E> Task<T, E>::raiseError(const E& error) noexcept {
+template <class T, class E>
+constexpr Task<T, E> Task<T, E>::raiseError(const E& error) noexcept {
     return Task<T, E>(fiber::FiberOp::error(Erased(error)));
 }
 
-template <class T, class E> constexpr Task<None, E> Task<T, E>::none() noexcept {
+template <class T, class E>
+constexpr Task<None, E> Task<T, E>::none() noexcept {
     return Task<None, E>::pure(None());
 }
 
-template <class T, class E> constexpr Task<T, E> Task<T, E>::eval(const std::function<T()>& predicate) noexcept {
+template <class T, class E>
+constexpr Task<T, E> Task<T, E>::eval(const std::function<T()>& predicate) noexcept {
     return Task<T, E>(fiber::FiberOp::thunk(predicate));
 }
 
@@ -428,7 +439,8 @@ Task<T, E>::deferFiber(const std::function<FiberRef<T, E>(const std::shared_ptr<
     }));
 }
 
-template <class T, class E> constexpr Task<T, E> Task<T, E>::forPromise(const PromiseRef<T, E>& promise) noexcept {
+template <class T, class E>
+constexpr Task<T, E> Task<T, E>::forPromise(const PromiseRef<T, E>& promise) noexcept {
     return Task<T, E>(fiber::FiberOp::async([promise](auto) {
         return Deferred<T, E>::forPromise(promise)->template mapBoth<Erased, Erased>(
             [](auto value) {
@@ -440,22 +452,26 @@ template <class T, class E> constexpr Task<T, E> Task<T, E>::forPromise(const Pr
     }));
 }
 
-template <class T, class E> constexpr Task<T, E> Task<T, E>::never() noexcept {
+template <class T, class E>
+constexpr Task<T, E> Task<T, E>::never() noexcept {
     return Task<T, E>(fiber::FiberOp::async([](auto sched) constexpr {
         auto promise = Promise<Erased, Erased>::create(sched);
         return Deferred<Erased, Erased>::forPromise(promise);
     }));
 }
 
-template <class T, class E> FiberRef<T, E> Task<T, E>::run(const std::shared_ptr<Scheduler>& sched) const {
+template <class T, class E>
+FiberRef<T, E> Task<T, E>::run(const std::shared_ptr<Scheduler>& sched) const {
     return Fiber<T, E>::run(op, sched);
 }
 
-template <class T, class E> std::optional<Either<T, E>> Task<T, E>::runSync() const {
+template <class T, class E>
+std::optional<Either<T, E>> Task<T, E>::runSync() const {
     return Fiber<T, E>::runSync(op);
 }
 
-template <class T, class E> constexpr Task<T, E> Task<T, E>::asyncBoundary() const noexcept {
+template <class T, class E>
+constexpr Task<T, E> Task<T, E>::asyncBoundary() const noexcept {
     return Task<T, E>(fiber::FiberOp::async([op = op](auto sched) {
                           auto promise = Promise<Erased, Erased>::create(sched);
                           promise->success(Erased());
@@ -591,7 +607,8 @@ Task<T, E>::flatMapBoth(const std::function<Task<T2, E2>(const T&)>& successPred
     }
 }
 
-template <class T, class E> constexpr Task<E, T> Task<T, E>::failed() const noexcept {
+template <class T, class E>
+constexpr Task<E, T> Task<T, E>::failed() const noexcept {
     return Task<E, T>(op->flatMap([](auto input) constexpr {
         if (input.isError()) {
             return fiber::FiberOp::value(input.underlying());
@@ -637,7 +654,8 @@ constexpr Task<T, E> Task<T, E>::doOnCancel(const Task<None, None>& handler) con
     }));
 }
 
-template <class T, class E> constexpr Task<Either<T, E>, E> Task<T, E>::materialize() const noexcept {
+template <class T, class E>
+constexpr Task<Either<T, E>, E> Task<T, E>::materialize() const noexcept {
     return Task<Either<T, E>, E>(op->flatMap([](auto fiber_value) constexpr {
         if (fiber_value.isValue()) {
             auto value = fiber_value.underlying().template get<T>();
@@ -670,7 +688,8 @@ constexpr Task<T2, E> Task<T, E>::dematerialize() const noexcept {
     }));
 }
 
-template <class T, class E> constexpr Task<T, E> Task<T, E>::delay(uint32_t milliseconds) const noexcept {
+template <class T, class E>
+constexpr Task<T, E> Task<T, E>::delay(uint32_t milliseconds) const noexcept {
     return Task<T, E>(fiber::FiberOp::delay(milliseconds)->flatMap([op = this->op](auto result) {
         if (result.isCanceled()) {
             return fiber::FiberOp::cancel();
@@ -705,7 +724,8 @@ constexpr Task<T, E> Task<T, E>::restartUntil(const std::function<bool(const T&)
     });
 }
 
-template <class T, class E> constexpr Task<T, E> Task<T, E>::raceWith(const Task<T, E>& other) const noexcept {
+template <class T, class E>
+constexpr Task<T, E> Task<T, E>::raceWith(const Task<T, E>& other) const noexcept {
     return Task<T, E>(fiber::FiberOp::race({op, other.op}));
 }
 

@@ -17,9 +17,11 @@
 
 namespace cask::deferred {
 
-template <class T, class E> class PromiseDeferred;
+template <class T, class E>
+class PromiseDeferred;
 
-template <class T, class E = std::any> class PromiseDeferred final : public Deferred<T, E> {
+template <class T, class E = std::any>
+class PromiseDeferred final : public Deferred<T, E> {
 public:
     explicit PromiseDeferred(std::shared_ptr<Promise<T, E>> promise);
     void onComplete(std::function<void(Either<T, E>)> callback) override;
@@ -41,11 +43,13 @@ PromiseDeferred<T, E>::PromiseDeferred(std::shared_ptr<Promise<T, E>> promise)
     : promise(promise)
     , sched(promise->sched) {}
 
-template <class T, class E> void PromiseDeferred<T, E>::onComplete(std::function<void(Either<T, E>)> callback) {
+template <class T, class E>
+void PromiseDeferred<T, E>::onComplete(std::function<void(Either<T, E>)> callback) {
     promise->onComplete(callback);
 }
 
-template <class T, class E> void PromiseDeferred<T, E>::onSuccess(std::function<void(T)> callback) {
+template <class T, class E>
+void PromiseDeferred<T, E>::onSuccess(std::function<void(T)> callback) {
     promise->onComplete([callback](Either<T, E> value) {
         if (value.is_left()) {
             callback(value.get_left());
@@ -53,7 +57,8 @@ template <class T, class E> void PromiseDeferred<T, E>::onSuccess(std::function<
     });
 }
 
-template <class T, class E> void PromiseDeferred<T, E>::onError(std::function<void(E)> callback) {
+template <class T, class E>
+void PromiseDeferred<T, E>::onError(std::function<void(E)> callback) {
     promise->onComplete([callback](Either<T, E> value) {
         if (value.is_right()) {
             callback(value.get_right());
@@ -61,19 +66,23 @@ template <class T, class E> void PromiseDeferred<T, E>::onError(std::function<vo
     });
 }
 
-template <class T, class E> void PromiseDeferred<T, E>::onCancel(const std::function<void()>& callback) {
+template <class T, class E>
+void PromiseDeferred<T, E>::onCancel(const std::function<void()>& callback) {
     promise->onCancel(callback);
 }
 
-template <class T, class E> void PromiseDeferred<T, E>::onShutdown(const std::function<void()>& callback) {
+template <class T, class E>
+void PromiseDeferred<T, E>::onShutdown(const std::function<void()>& callback) {
     promise->onShutdown(callback);
 }
 
-template <class T, class E> void PromiseDeferred<T, E>::cancel() {
+template <class T, class E>
+void PromiseDeferred<T, E>::cancel() {
     promise->cancel();
 }
 
-template <class T, class E> T PromiseDeferred<T, E>::await() {
+template <class T, class E>
+T PromiseDeferred<T, E>::await() {
     bool canceled = false;
     std::optional<Either<T, E>> result = promise->get();
 

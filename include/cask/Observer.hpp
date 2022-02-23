@@ -18,9 +18,11 @@ namespace cask {
  */
 enum Ack { Continue, Stop };
 
-template <class T, class E> class Observer;
+template <class T, class E>
+class Observer;
 
-template <class T, class E = std::any> using ObserverRef = std::shared_ptr<Observer<T, E>>;
+template <class T, class E = std::any>
+using ObserverRef = std::shared_ptr<Observer<T, E>>;
 
 /**
  * An observer represents the consumer of an event stream.
@@ -63,7 +65,8 @@ template <class T, class E = std::any> using ObserverRef = std::shared_ptr<Obser
  * their upstream sources and also allow observers to implement their `onNext`
  * methods without using expensive locks or other synchronization mechanisms.
  */
-template <class T, class E> class Observer : public std::enable_shared_from_this<Observer<T, E>> {
+template <class T, class E>
+class Observer : public std::enable_shared_from_this<Observer<T, E>> {
 public:
     /**
      * Handle the next event in the event stream.

@@ -12,7 +12,8 @@
 
 namespace cask::observable {
 
-template <class T, class E> class AppendAllObservable final : public Observable<T, E> {
+template <class T, class E>
+class AppendAllObservable final : public Observable<T, E> {
 public:
     explicit AppendAllObservable(const std::shared_ptr<const Observable<T, E>>& first,
                                  const std::shared_ptr<const Observable<T, E>>& second);

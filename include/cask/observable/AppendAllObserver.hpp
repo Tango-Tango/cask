@@ -10,7 +10,8 @@
 
 namespace cask::observable {
 
-template <class T, class E> class AppendAllObserver final : public Observer<T, E> {
+template <class T, class E>
+class AppendAllObserver final : public Observer<T, E> {
 public:
     AppendAllObserver(const std::shared_ptr<Scheduler>& sched,
                       const std::shared_ptr<Observer<T, E>>& downstream,
@@ -35,15 +36,18 @@ AppendAllObserver<T, E>::AppendAllObserver(const std::shared_ptr<Scheduler>& sch
     , downstream(downstream)
     , next(next) {}
 
-template <class T, class E> Task<Ack, None> AppendAllObserver<T, E>::onNext(const T& value) {
+template <class T, class E>
+Task<Ack, None> AppendAllObserver<T, E>::onNext(const T& value) {
     return downstream->onNext(value);
 }
 
-template <class T, class E> Task<None, None> AppendAllObserver<T, E>::onError(const E& error) {
+template <class T, class E>
+Task<None, None> AppendAllObserver<T, E>::onError(const E& error) {
     return downstream->onError(error);
 }
 
-template <class T, class E> Task<None, None> AppendAllObserver<T, E>::onComplete() {
+template <class T, class E>
+Task<None, None> AppendAllObserver<T, E>::onComplete() {
     return next
         ->template mapBothTask<Ack, None>(
             [downstream = downstream](const T& value) {
@@ -68,7 +72,8 @@ template <class T, class E> Task<None, None> AppendAllObserver<T, E>::onComplete
         });
 }
 
-template <class T, class E> Task<None, None> AppendAllObserver<T, E>::onCancel() {
+template <class T, class E>
+Task<None, None> AppendAllObserver<T, E>::onCancel() {
     return downstream->onCancel();
 }
 

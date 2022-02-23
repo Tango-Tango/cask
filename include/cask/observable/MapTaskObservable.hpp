@@ -15,7 +15,8 @@ namespace cask::observable {
  * Represents an observable that transforms each element from an upstream observable
  * using the given predicate function. Normally obtained by calling `Observable<T>::map`.
  */
-template <class TI, class TO, class E> class MapTaskObservable final : public Observable<TO, E> {
+template <class TI, class TO, class E>
+class MapTaskObservable final : public Observable<TO, E> {
 public:
     MapTaskObservable(const std::shared_ptr<const Observable<TI, E>>& upstream,
                       const std::function<Task<TO, E>(const TI&)>& predicate);

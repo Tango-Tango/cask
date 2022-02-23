@@ -15,7 +15,8 @@ namespace cask::observable {
  * transformed event to a downstream observer. Normally obtained by calling `Observable<T>::map` and
  * then subscribring to the resulting observable.
  */
-template <class TI, class TO, class E> class FlatMapObserver final : public Observer<TI, E> {
+template <class TI, class TO, class E>
+class FlatMapObserver final : public Observer<TI, E> {
 public:
     FlatMapObserver(const std::function<ObservableRef<TO, E>(const TI&)>& predicate,
                     const std::shared_ptr<Observer<TO, E>>& downstream);
@@ -38,7 +39,8 @@ FlatMapObserver<TI, TO, E>::FlatMapObserver(const std::function<ObservableRef<TO
     , downstream(downstream)
     , completed(false) {}
 
-template <class TI, class TO, class E> Task<Ack, None> FlatMapObserver<TI, TO, E>::onNext(const TI& value) {
+template <class TI, class TO, class E>
+Task<Ack, None> FlatMapObserver<TI, TO, E>::onNext(const TI& value) {
     return predicate(value)
         ->template mapBothTask<Ack, None>(
             [downstream = downstream](auto result) {
@@ -66,7 +68,8 @@ template <class TI, class TO, class E> Task<Ack, None> FlatMapObserver<TI, TO, E
         });
 }
 
-template <class TI, class TO, class E> Task<None, None> FlatMapObserver<TI, TO, E>::onError(const E& error) {
+template <class TI, class TO, class E>
+Task<None, None> FlatMapObserver<TI, TO, E>::onError(const E& error) {
     if (!completed.test_and_set()) {
         return downstream->onError(error);
     } else {
@@ -74,7 +77,8 @@ template <class TI, class TO, class E> Task<None, None> FlatMapObserver<TI, TO, 
     }
 }
 
-template <class TI, class TO, class E> Task<None, None> FlatMapObserver<TI, TO, E>::onComplete() {
+template <class TI, class TO, class E>
+Task<None, None> FlatMapObserver<TI, TO, E>::onComplete() {
     if (!completed.test_and_set()) {
         return downstream->onComplete();
     } else {
@@ -82,7 +86,8 @@ template <class TI, class TO, class E> Task<None, None> FlatMapObserver<TI, TO, 
     }
 }
 
-template <class TI, class TO, class E> Task<None, None> FlatMapObserver<TI, TO, E>::onCancel() {
+template <class TI, class TO, class E>
+Task<None, None> FlatMapObserver<TI, TO, E>::onCancel() {
     if (!completed.test_and_set()) {
         return downstream->onCancel();
     } else {

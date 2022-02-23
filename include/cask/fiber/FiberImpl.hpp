@@ -16,7 +16,8 @@ namespace cask::fiber {
 
 enum FiberState { READY, RUNNING, WAITING, DELAYED, RACING, COMPLETED, CANCELED };
 
-template <class T, class E> class FiberImpl final : public Fiber<T, E> {
+template <class T, class E>
+class FiberImpl final : public Fiber<T, E> {
 public:
     explicit FiberImpl(const std::shared_ptr<const FiberOp>& op);
     ~FiberImpl();
@@ -36,7 +37,8 @@ public:
 private:
     friend class Fiber<T, E>;
 
-    template <class TT, class EE> friend class FiberImpl;
+    template <class TT, class EE>
+    friend class FiberImpl;
 
     bool resumeSync();
     bool resume(const std::shared_ptr<Scheduler>& sched);
@@ -49,11 +51,13 @@ private:
 
     void reschedule(const std::shared_ptr<Scheduler>& sched);
 
-    template <bool Async> bool evaluateOp(const std::shared_ptr<Scheduler>& sched);
+    template <bool Async>
+    bool evaluateOp(const std::shared_ptr<Scheduler>& sched);
 
     bool finishIteration();
 
-    template <bool Async> bool resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned int batch_size);
+    template <bool Async>
+    bool resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned int batch_size);
 
     int id;
     std::shared_ptr<const FiberOp> op;
@@ -86,13 +90,16 @@ FiberImpl<T, E>::FiberImpl(const std::shared_ptr<const FiberOp>& op)
     , attempting_cancel(false)
     , racing_fibers() {}
 
-template <class T, class E> FiberImpl<T, E>::~FiberImpl() {}
+template <class T, class E>
+FiberImpl<T, E>::~FiberImpl() {}
 
-template <class T, class E> bool FiberImpl<T, E>::resumeSync() {
+template <class T, class E>
+bool FiberImpl<T, E>::resumeSync() {
     return resumeUnsafe<false>(nullptr, 1024);
 }
 
-template <class T, class E> bool FiberImpl<T, E>::resume(const std::shared_ptr<Scheduler>& sched) {
+template <class T, class E>
+bool FiberImpl<T, E>::resume(const std::shared_ptr<Scheduler>& sched) {
     return resumeUnsafe<true>(sched, 1024);
 }
 
@@ -126,19 +133,23 @@ bool FiberImpl<T, E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsi
     return true;
 }
 
-template <class T, class E> FiberState FiberImpl<T, E>::getState() {
+template <class T, class E>
+FiberState FiberImpl<T, E>::getState() {
     return state;
 }
 
-template <class T, class E> int FiberImpl<T, E>::getId() {
+template <class T, class E>
+int FiberImpl<T, E>::getId() {
     return id;
 }
 
-template <class T, class E> const FiberValue& FiberImpl<T, E>::getRawValue() {
+template <class T, class E>
+const FiberValue& FiberImpl<T, E>::getRawValue() {
     return value;
 }
 
-template <class T, class E> std::optional<T> FiberImpl<T, E>::getValue() {
+template <class T, class E>
+std::optional<T> FiberImpl<T, E>::getValue() {
     std::optional<T> result;
 
     if (state.load() == COMPLETED && value.isValue()) {
@@ -148,7 +159,8 @@ template <class T, class E> std::optional<T> FiberImpl<T, E>::getValue() {
     return result;
 }
 
-template <class T, class E> std::optional<E> FiberImpl<T, E>::getError() {
+template <class T, class E>
+std::optional<E> FiberImpl<T, E>::getError() {
     std::optional<E> result;
 
     if (state.load() == COMPLETED && value.isError()) {
@@ -158,11 +170,13 @@ template <class T, class E> std::optional<E> FiberImpl<T, E>::getError() {
     return result;
 }
 
-template <class T, class E> bool FiberImpl<T, E>::isCanceled() {
+template <class T, class E>
+bool FiberImpl<T, E>::isCanceled() {
     return state.load() == CANCELED;
 }
 
-template <class T, class E> void FiberImpl<T, E>::asyncError(const Erased& error) {
+template <class T, class E>
+void FiberImpl<T, E>::asyncError(const Erased& error) {
     FiberState expected = WAITING;
     if (state.compare_exchange_strong(expected, RUNNING)) {
         value.setError(error);
@@ -174,7 +188,8 @@ template <class T, class E> void FiberImpl<T, E>::asyncError(const Erased& error
     }
 }
 
-template <class T, class E> void FiberImpl<T, E>::asyncSuccess(const Erased& new_value) {
+template <class T, class E>
+void FiberImpl<T, E>::asyncSuccess(const Erased& new_value) {
     FiberState expected = WAITING;
     if (state.compare_exchange_strong(expected, RUNNING)) {
         value.setValue(new_value);
@@ -186,7 +201,8 @@ template <class T, class E> void FiberImpl<T, E>::asyncSuccess(const Erased& new
     }
 }
 
-template <class T, class E> void FiberImpl<T, E>::asyncCancel() {
+template <class T, class E>
+void FiberImpl<T, E>::asyncCancel() {
     FiberState expected = WAITING;
     if (state.compare_exchange_strong(expected, RUNNING)) {
         value.setCanceled();
@@ -198,7 +214,8 @@ template <class T, class E> void FiberImpl<T, E>::asyncCancel() {
     }
 }
 
-template <class T, class E> void FiberImpl<T, E>::delayFinished() {
+template <class T, class E>
+void FiberImpl<T, E>::delayFinished() {
     FiberState expected = DELAYED;
     if (state.compare_exchange_strong(expected, RUNNING)) {
         delayedBy = nullptr;
@@ -208,7 +225,8 @@ template <class T, class E> void FiberImpl<T, E>::delayFinished() {
     }
 }
 
-template <class T, class E> bool FiberImpl<T, E>::racerFinished(const std::shared_ptr<Fiber<Erased, Erased>>& racer) {
+template <class T, class E>
+bool FiberImpl<T, E>::racerFinished(const std::shared_ptr<Fiber<Erased, Erased>>& racer) {
     bool no_more_fibers = false;
 
     {
@@ -246,7 +264,8 @@ template <class T, class E> bool FiberImpl<T, E>::racerFinished(const std::share
     }
 }
 
-template <class T, class E> void FiberImpl<T, E>::reschedule(const std::shared_ptr<Scheduler>& sched) {
+template <class T, class E>
+void FiberImpl<T, E>::reschedule(const std::shared_ptr<Scheduler>& sched) {
     last_used_scheduler = sched;
     sched->submit([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)] {
         if (auto self = self_weak.lock()) {
@@ -392,7 +411,8 @@ bool FiberImpl<T, E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
     return suspended;
 }
 
-template <class T, class E> bool FiberImpl<T, E>::finishIteration() {
+template <class T, class E>
+bool FiberImpl<T, E>::finishIteration() {
     if (nextOp) {
         op = nextOp(value);
         nextOp = nullptr;
@@ -421,7 +441,8 @@ template <class T, class E> bool FiberImpl<T, E>::finishIteration() {
     }
 }
 
-template <class T, class E> void FiberImpl<T, E>::cancel() {
+template <class T, class E>
+void FiberImpl<T, E>::cancel() {
     FiberState current_state;
 
     while (true) {
@@ -475,7 +496,8 @@ template <class T, class E> void FiberImpl<T, E>::cancel() {
     }
 }
 
-template <class T, class E> void FiberImpl<T, E>::onCancel(const std::function<void()>& callback) {
+template <class T, class E>
+void FiberImpl<T, E>::onCancel(const std::function<void()>& callback) {
     onFiberShutdown([callback](auto fiber) {
         if (fiber->isCanceled()) {
             callback();
@@ -483,7 +505,8 @@ template <class T, class E> void FiberImpl<T, E>::onCancel(const std::function<v
     });
 }
 
-template <class T, class E> void FiberImpl<T, E>::onShutdown(const std::function<void()>& callback) {
+template <class T, class E>
+void FiberImpl<T, E>::onShutdown(const std::function<void()>& callback) {
     onFiberShutdown([callback](auto fiber) {
         if (!fiber->isCanceled()) {
             callback();
@@ -491,7 +514,8 @@ template <class T, class E> void FiberImpl<T, E>::onShutdown(const std::function
     });
 }
 
-template <class T, class E> void FiberImpl<T, E>::onFiberShutdown(const std::function<void(Fiber<T, E>*)>& callback) {
+template <class T, class E>
+void FiberImpl<T, E>::onFiberShutdown(const std::function<void(Fiber<T, E>*)>& callback) {
     bool run_callback_now = false;
 
     {
@@ -509,7 +533,8 @@ template <class T, class E> void FiberImpl<T, E>::onFiberShutdown(const std::fun
     }
 }
 
-template <class T, class E> T FiberImpl<T, E>::await() {
+template <class T, class E>
+T FiberImpl<T, E>::await() {
     auto current_state = state.load();
 
     if (current_state != COMPLETED && current_state != CANCELED) {

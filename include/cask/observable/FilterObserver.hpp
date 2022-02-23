@@ -15,7 +15,8 @@ namespace cask::observable {
  * transformed event to a downstream observer. Normally obtained by calling `Observable<T>::map` and
  * then subscribring to the resulting observable.
  */
-template <class T, class E> class FilterObserver final : public Observer<T, E> {
+template <class T, class E>
+class FilterObserver final : public Observer<T, E> {
 public:
     FilterObserver(const std::function<bool(const T&)>& predicate, const std::shared_ptr<Observer<T, E>>& downstream);
     Task<Ack, None> onNext(const T& value) override;
@@ -34,7 +35,8 @@ FilterObserver<T, E>::FilterObserver(const std::function<bool(const T&)>& predic
     : predicate(predicate)
     , downstream(downstream) {}
 
-template <class T, class E> Task<Ack, None> FilterObserver<T, E>::onNext(const T& value) {
+template <class T, class E>
+Task<Ack, None> FilterObserver<T, E>::onNext(const T& value) {
     if (predicate(value)) {
         return downstream->onNext(value);
     } else {
@@ -42,15 +44,18 @@ template <class T, class E> Task<Ack, None> FilterObserver<T, E>::onNext(const T
     }
 }
 
-template <class T, class E> Task<None, None> FilterObserver<T, E>::onError(const E& error) {
+template <class T, class E>
+Task<None, None> FilterObserver<T, E>::onError(const E& error) {
     return downstream->onError(error);
 }
 
-template <class T, class E> Task<None, None> FilterObserver<T, E>::onComplete() {
+template <class T, class E>
+Task<None, None> FilterObserver<T, E>::onComplete() {
     return downstream->onComplete();
 }
 
-template <class T, class E> Task<None, None> FilterObserver<T, E>::onCancel() {
+template <class T, class E>
+Task<None, None> FilterObserver<T, E>::onCancel() {
     return downstream->onCancel();
 }
 

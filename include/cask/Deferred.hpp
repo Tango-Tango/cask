@@ -14,13 +14,17 @@
 
 namespace cask {
 
-template <class T, class E> class Fiber;
+template <class T, class E>
+class Fiber;
 
-template <class T, class E> using FiberRef = std::shared_ptr<Fiber<T, E>>;
+template <class T, class E>
+using FiberRef = std::shared_ptr<Fiber<T, E>>;
 
-template <class T, class E> class Deferred;
+template <class T, class E>
+class Deferred;
 
-template <class T = None, class E = std::any> using DeferredRef = std::shared_ptr<Deferred<T, E>>;
+template <class T = None, class E = std::any>
+using DeferredRef = std::shared_ptr<Deferred<T, E>>;
 
 /**
  * A `Deferred` represents the "consumer" side of a running asynchronous operation. Consumers
@@ -138,23 +142,28 @@ public:
 
 namespace cask {
 
-template <class T, class E> constexpr DeferredRef<T, E> Deferred<T, E>::pure(const T& value) noexcept {
+template <class T, class E>
+constexpr DeferredRef<T, E> Deferred<T, E>::pure(const T& value) noexcept {
     return std::make_shared<deferred::PureDeferred<T, E>>(value);
 }
 
-template <class T, class E> constexpr DeferredRef<T, E> Deferred<T, E>::pure(T&& value) noexcept {
+template <class T, class E>
+constexpr DeferredRef<T, E> Deferred<T, E>::pure(T&& value) noexcept {
     return std::make_shared<deferred::PureDeferred<T, E>>(std::move(value));
 }
 
-template <class T, class E> constexpr DeferredRef<T, E> Deferred<T, E>::raiseError(const E& error) noexcept {
+template <class T, class E>
+constexpr DeferredRef<T, E> Deferred<T, E>::raiseError(const E& error) noexcept {
     return std::make_shared<deferred::PureErrorDeferred<T, E>>(error);
 }
 
-template <class T, class E> DeferredRef<T, E> Deferred<T, E>::forPromise(PromiseRef<T, E> promise) {
+template <class T, class E>
+DeferredRef<T, E> Deferred<T, E>::forPromise(PromiseRef<T, E> promise) {
     return std::make_shared<deferred::PromiseDeferred<T, E>>(promise);
 }
 
-template <class T, class E> DeferredRef<T, E> Deferred<T, E>::forFiber(FiberRef<T, E> fiber) {
+template <class T, class E>
+DeferredRef<T, E> Deferred<T, E>::forFiber(FiberRef<T, E> fiber) {
     return std::make_shared<deferred::FiberDeferred<T, E>>(fiber);
 }
 

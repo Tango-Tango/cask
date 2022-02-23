@@ -12,9 +12,11 @@
 
 namespace cask {
 
-template <class T, class E> class MVar;
+template <class T, class E>
+class MVar;
 
-template <class T, class E = std::any> using MVarRef = std::shared_ptr<MVar<T, E>>;
+template <class T, class E = std::any>
+using MVarRef = std::shared_ptr<MVar<T, E>>;
 
 /**
  * An MVar is a simple mailbox that can be used to:
@@ -27,7 +29,8 @@ template <class T, class E = std::any> using MVarRef = std::shared_ptr<MVar<T, E
  * mutable structures (e.g. from the STL) take care not to allow a reference to the
  * structure to be used outside of a take / modify / put cycle.
  */
-template <class T, class E = std::any> class MVar : public std::enable_shared_from_this<MVar<T, E>> {
+template <class T, class E = std::any>
+class MVar : public std::enable_shared_from_this<MVar<T, E>> {
 public:
     /**
      * Create an MVar that currently holds no data.
@@ -98,7 +101,8 @@ public:
      * @return A task which will update the stored value and then provide
      *         the return value provided by the predicate function.
      */
-    template <class U> Task<U, E> modify(const std::function<Task<std::tuple<T, U>, E>(const T&)>& predicate);
+    template <class U>
+    Task<U, E> modify(const std::function<Task<std::tuple<T, U>, E>(const T&)>& predicate);
 
 private:
     explicit MVar(const std::shared_ptr<Scheduler>& sched);
@@ -107,7 +111,8 @@ private:
     std::shared_ptr<Ref<mvar::MVarState<T, E>, E>> stateRef;
 };
 
-template <class T, class E> MVarRef<T, E> MVar<T, E>::empty(const std::shared_ptr<Scheduler>& sched) {
+template <class T, class E>
+MVarRef<T, E> MVar<T, E>::empty(const std::shared_ptr<Scheduler>& sched) {
     return std::shared_ptr<MVar<T, E>>(new MVar<T, E>(sched));
 }
 
@@ -124,7 +129,8 @@ template <class T, class E>
 MVar<T, E>::MVar(const std::shared_ptr<Scheduler>& sched, const T& value)
     : stateRef(Ref<mvar::MVarState<T, E>, E>::create(mvar::MVarState<T, E>(sched, value))) {}
 
-template <class T, class E> Task<None, E> MVar<T, E>::put(const T& value) {
+template <class T, class E>
+Task<None, E> MVar<T, E>::put(const T& value) {
     return stateRef
         ->template modify<Task<None, E>>([value](auto state) {
             return state.put(value);
@@ -134,7 +140,8 @@ template <class T, class E> Task<None, E> MVar<T, E>::put(const T& value) {
         });
 }
 
-template <class T, class E> bool MVar<T, E>::tryPut(const T& value) {
+template <class T, class E>
+bool MVar<T, E>::tryPut(const T& value) {
     using IntermediateResult = std::tuple<bool, std::function<void()>>;
 
     auto result_opt = stateRef
@@ -162,7 +169,8 @@ template <class T, class E> bool MVar<T, E>::tryPut(const T& value) {
     }
 }
 
-template <class T, class E> Task<T, E> MVar<T, E>::take() {
+template <class T, class E>
+Task<T, E> MVar<T, E>::take() {
     return stateRef
         ->template modify<Task<T, E>>([](auto state) {
             return state.take();
@@ -172,7 +180,8 @@ template <class T, class E> Task<T, E> MVar<T, E>::take() {
         });
 }
 
-template <class T, class E> Task<T, E> MVar<T, E>::read() {
+template <class T, class E>
+Task<T, E> MVar<T, E>::read() {
     auto self = this->shared_from_this();
     return take().template flatMap<T>([self](auto value) {
         return self->put(value).template map<T>([value](auto) {

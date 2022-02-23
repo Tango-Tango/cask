@@ -12,7 +12,8 @@
 
 namespace cask::observable {
 
-template <class T, class E> class BufferObservable final : public Observable<BufferRef<T>, E> {
+template <class T, class E>
+class BufferObservable final : public Observable<BufferRef<T>, E> {
 public:
     explicit BufferObservable(const std::shared_ptr<const Observable<T, E>>& upstream, uint32_t buffer_size);
     FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,

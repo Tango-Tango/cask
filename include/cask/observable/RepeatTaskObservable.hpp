@@ -15,7 +15,8 @@ namespace cask::observable {
  * Represents and observable that repeatedly evaluates the given task and supplies the result
  * to the downstream observer. Usually obtained via `Observable<T>::repeatTask`.
  */
-template <class T, class E> class RepeatTaskObservable final : public Observable<T, E> {
+template <class T, class E>
+class RepeatTaskObservable final : public Observable<T, E> {
 public:
     explicit RepeatTaskObservable(const Task<T, E>& task);
     FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,

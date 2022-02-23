@@ -15,7 +15,8 @@ namespace cask::observable {
  * Represents an observable that transforms each error from an upstream observable
  * using the given predicate function. Normally obtained by calling `Observable<T>::mapError`.
  */
-template <class T, class EI, class EO> class MapErrorObservable final : public Observable<T, EO> {
+template <class T, class EI, class EO>
+class MapErrorObservable final : public Observable<T, EO> {
 public:
     MapErrorObservable(const std::shared_ptr<const Observable<T, EI>>& upstream,
                        const std::function<EO(const EI&)>& predicate);

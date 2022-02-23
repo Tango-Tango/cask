@@ -11,7 +11,8 @@
 
 namespace cask::observable {
 
-template <class T, class E> class VectorObservable final : public Observable<T, E> {
+template <class T, class E>
+class VectorObservable final : public Observable<T, E> {
 public:
     explicit VectorObservable(const std::vector<T>& source);
     FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,

@@ -11,7 +11,8 @@
 
 namespace cask::observable {
 
-template <class T, class E> class DeferTaskObservable final : public Observable<T, E> {
+template <class T, class E>
+class DeferTaskObservable final : public Observable<T, E> {
 public:
     explicit DeferTaskObservable(const std::function<Task<T, E>()>& predicate);
     FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,

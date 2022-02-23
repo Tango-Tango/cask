@@ -32,7 +32,8 @@ namespace cask {
  * more pessimistic (and correspondingly more heavyweight) approach
  * works better with those structures.
  */
-template <class T, class E = std::any> class Ref : public std::enable_shared_from_this<Ref<T, E>> {
+template <class T, class E = std::any>
+class Ref : public std::enable_shared_from_this<Ref<T, E>> {
 public:
     /**
      * Create a new Ref instance which stores the given initial value.
@@ -66,14 +67,16 @@ public:
      * @return A task which will update the stored value and then provide
      *         the return value provided by the predicate function.
      */
-    template <typename U> Task<U, E> modify(std::function<std::tuple<T, U>(T&)> predicate);
+    template <typename U>
+    Task<U, E> modify(std::function<std::tuple<T, U>(T&)> predicate);
 
 private:
     explicit Ref(const T& initialValue);
     std::shared_ptr<T> data;
 };
 
-template <class T, class E> std::shared_ptr<Ref<T, E>> Ref<T, E>::create(const T& initialValue) {
+template <class T, class E>
+std::shared_ptr<Ref<T, E>> Ref<T, E>::create(const T& initialValue) {
     return std::shared_ptr<Ref<T, E>>(new Ref<T, E>(initialValue));
 }
 
@@ -81,14 +84,16 @@ template <class T, class E>
 Ref<T, E>::Ref(const T& initialValue)
     : data(std::make_shared<T>(initialValue)) {}
 
-template <class T, class E> Task<T, E> Ref<T, E>::get() {
+template <class T, class E>
+Task<T, E> Ref<T, E>::get() {
     auto self = this->shared_from_this();
     return Task<T, E>::eval([self]() {
         return *(self->data);
     });
 }
 
-template <class T, class E> Task<None, E> Ref<T, E>::update(std::function<T(T&)> predicate) {
+template <class T, class E>
+Task<None, E> Ref<T, E>::update(std::function<T(T&)> predicate) {
     auto self = this->shared_from_this();
     return Task<bool, E>::eval([self, predicate]() {
                auto initial = std::atomic_load(&(self->data));

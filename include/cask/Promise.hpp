@@ -18,12 +18,15 @@
 
 namespace cask {
 
-template <class T, class E> class Promise;
+template <class T, class E>
+class Promise;
 
-template <class T = None, class E = std::any> using PromiseRef = std::shared_ptr<Promise<T, E>>;
+template <class T = None, class E = std::any>
+using PromiseRef = std::shared_ptr<Promise<T, E>>;
 
 namespace deferred {
-template <class T, class E> class PromiseDeferred;
+template <class T, class E>
+class PromiseDeferred;
 }
 
 /**
@@ -31,7 +34,8 @@ template <class T, class E> class PromiseDeferred;
  * completes an asynchronous operation by calling the `complete` method at which point all
  * consumers will be notified of the available result via an attached `Deferred` instance.
  */
-template <class T = None, class E = std::any> class Promise final : public Cancelable {
+template <class T = None, class E = std::any>
+class Promise final : public Cancelable {
 public:
     /**
      * Create a promise which executes any deffered callbacks or transformations
@@ -102,7 +106,8 @@ private:
     void onComplete(std::function<void(Either<T, E>)> callback);
 };
 
-template <class T, class E> std::shared_ptr<Promise<T, E>> Promise<T, E>::create(std::shared_ptr<Scheduler> sched) {
+template <class T, class E>
+std::shared_ptr<Promise<T, E>> Promise<T, E>::create(std::shared_ptr<Scheduler> sched) {
     return std::make_shared<Promise<T, E>>(sched);
 }
 
@@ -115,15 +120,18 @@ Promise<T, E>::Promise(std::shared_ptr<Scheduler> sched)
     , cancelCallbacks()
     , sched(std::move(sched)) {}
 
-template <class T, class E> void Promise<T, E>::success(const T& value) {
+template <class T, class E>
+void Promise<T, E>::success(const T& value) {
     complete(Either<T, E>::left(value));
 }
 
-template <class T, class E> void Promise<T, E>::error(const E& error) {
+template <class T, class E>
+void Promise<T, E>::error(const E& error) {
     complete(Either<T, E>::right(error));
 }
 
-template <class T, class E> void Promise<T, E>::complete(const Either<T, E>& value) {
+template <class T, class E>
+void Promise<T, E>::complete(const Either<T, E>& value) {
     bool runCallbacks = false;
 
     {
@@ -153,7 +161,8 @@ template <class T, class E> void Promise<T, E>::complete(const Either<T, E>& val
     }
 }
 
-template <class T, class E> void Promise<T, E>::cancel() {
+template <class T, class E>
+void Promise<T, E>::cancel() {
     bool runCallbacks = false;
 
     {
@@ -173,11 +182,13 @@ template <class T, class E> void Promise<T, E>::cancel() {
     }
 }
 
-template <class T, class E> bool Promise<T, E>::isCancelled() const {
+template <class T, class E>
+bool Promise<T, E>::isCancelled() const {
     return canceled;
 }
 
-template <class T, class E> std::optional<Either<T, E>> Promise<T, E>::get() const {
+template <class T, class E>
+std::optional<Either<T, E>> Promise<T, E>::get() const {
     std::lock_guard guard(mutex);
     if (canceled) {
         return {};
@@ -186,7 +197,8 @@ template <class T, class E> std::optional<Either<T, E>> Promise<T, E>::get() con
     }
 }
 
-template <class T, class E> void Promise<T, E>::onCancel(const std::function<void()>& callback) {
+template <class T, class E>
+void Promise<T, E>::onCancel(const std::function<void()>& callback) {
     bool runNow = false;
 
     {
@@ -203,13 +215,15 @@ template <class T, class E> void Promise<T, E>::onCancel(const std::function<voi
     }
 }
 
-template <class T, class E> void Promise<T, E>::onShutdown(const std::function<void()>& callback) {
+template <class T, class E>
+void Promise<T, E>::onShutdown(const std::function<void()>& callback) {
     onComplete([callback](auto) {
         return callback();
     });
 }
 
-template <class T, class E> void Promise<T, E>::onComplete(std::function<void(Either<T, E>)> callback) {
+template <class T, class E>
+void Promise<T, E>::onComplete(std::function<void(Either<T, E>)> callback) {
     bool immediateSubmit = false;
 
     {

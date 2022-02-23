@@ -68,7 +68,8 @@ public:
      *
      * @return The casted value.
      */
-    template <typename T> T& get() const;
+    template <typename T>
+    T& get() const;
 
     /**
      * If this instance is currently holding a value then free it.
@@ -166,7 +167,8 @@ inline Erased& Erased::operator=(T&& value) noexcept {
     return *this;
 }
 
-template <typename T> inline T& Erased::get() const {
+template <typename T>
+inline T& Erased::get() const {
     if (data != nullptr) {
         return *(static_cast<T*>(data));
     } else {

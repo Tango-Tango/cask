@@ -11,7 +11,8 @@
 
 namespace cask::observable {
 
-template <class T, class E> class EmptyObservable final : public Observable<T, E> {
+template <class T, class E>
+class EmptyObservable final : public Observable<T, E> {
 public:
     FiberRef<None, None> subscribe(const std::shared_ptr<Scheduler>& sched,
                                    const std::shared_ptr<Observer<T, E>>& observer) const override;

@@ -17,7 +17,8 @@ namespace cask::mvar {
  * Represents the internal state of an MVar. It should not be used directly by consumers. It does
  * not provide any concurrency protection on its own and is expected to be protected by a `Ref`.
  */
-template <class T, class E> class MVarState {
+template <class T, class E>
+class MVarState {
 public:
     using PendingPut = std::tuple<PromiseRef<None, E>, T>;
 
@@ -97,7 +98,8 @@ std::tuple<MVarState<T, E>, bool, std::function<void()>> MVarState<T, E>::tryPut
     }
 }
 
-template <class T, class E> std::tuple<MVarState<T, E>, Task<None, E>> MVarState<T, E>::put(const T& value) const {
+template <class T, class E>
+std::tuple<MVarState<T, E>, Task<None, E>> MVarState<T, E>::put(const T& value) const {
     auto result = tryPut(value);
     auto nextState = std::get<0>(result);
     auto completed = std::get<1>(result);
@@ -119,7 +121,8 @@ template <class T, class E> std::tuple<MVarState<T, E>, Task<None, E>> MVarState
     }
 }
 
-template <class T, class E> std::tuple<MVarState<T, E>, Task<T, E>> MVarState<T, E>::take() const {
+template <class T, class E>
+std::tuple<MVarState<T, E>, Task<T, E>> MVarState<T, E>::take() const {
     auto filteredPuts = pendingPuts->dropWhile([](auto pending) {
         auto promise = std::get<0>(pending);
         return promise->isCancelled();

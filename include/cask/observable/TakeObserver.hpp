@@ -16,7 +16,8 @@ namespace cask::observable {
  * once set number of events is accumulated completes a promise and stops the stream. This
  * is normally used via the `Observable<T>::take` method.
  */
-template <class T, class E> class TakeObserver final : public Observer<T, E> {
+template <class T, class E>
+class TakeObserver final : public Observer<T, E> {
 public:
     TakeObserver(uint32_t amount, const std::weak_ptr<Promise<std::vector<T>, E>>& promise);
     Task<Ack, None> onNext(const T& value) override;
@@ -36,7 +37,8 @@ TakeObserver<T, E>::TakeObserver(uint32_t amount, const std::weak_ptr<Promise<st
     , entries()
     , promise(promise) {}
 
-template <class T, class E> Task<Ack, None> TakeObserver<T, E>::onNext(const T& value) {
+template <class T, class E>
+Task<Ack, None> TakeObserver<T, E>::onNext(const T& value) {
     entries.push_back(value);
     remaining -= 1;
 
@@ -50,7 +52,8 @@ template <class T, class E> Task<Ack, None> TakeObserver<T, E>::onNext(const T& 
     }
 }
 
-template <class T, class E> Task<None, None> TakeObserver<T, E>::onError(const E& error) {
+template <class T, class E>
+Task<None, None> TakeObserver<T, E>::onError(const E& error) {
     if (auto promiseLock = promise.lock()) {
         promiseLock->error(error);
     }
@@ -58,7 +61,8 @@ template <class T, class E> Task<None, None> TakeObserver<T, E>::onError(const E
     return Task<None, None>::none();
 }
 
-template <class T, class E> Task<None, None> TakeObserver<T, E>::onComplete() {
+template <class T, class E>
+Task<None, None> TakeObserver<T, E>::onComplete() {
     if (auto promiseLock = promise.lock()) {
         if (!promiseLock->get().has_value()) {
             promiseLock->success(entries);
@@ -68,7 +72,8 @@ template <class T, class E> Task<None, None> TakeObserver<T, E>::onComplete() {
     return Task<None, None>::none();
 }
 
-template <class T, class E> Task<None, None> TakeObserver<T, E>::onCancel() {
+template <class T, class E>
+Task<None, None> TakeObserver<T, E>::onCancel() {
     if (auto promiseLock = promise.lock()) {
         promiseLock->cancel();
     }
