@@ -42,7 +42,7 @@ public:
 private:
     using TimerEntry = std::tuple<int64_t, std::function<void()>>;
 
-    bool running;
+    std::atomic_bool should_run;
 
     std::mutex readyQueueMutex;
     std::condition_variable dataInQueue;
@@ -50,12 +50,12 @@ private:
     std::atomic_size_t idleThreads;
     std::mutex timerMutex;
     std::map<int64_t,std::vector<TimerEntry>> timers;
-    std::vector<std::thread> runThreads;
-    std::thread timerThread;
+    std::vector<std::atomic_bool*> threadStatus;
+    std::atomic_bool timerThreadStatus;
     int64_t ticks;
     int64_t next_id;
 
-    void run();
+    void run(unsigned int thread_index);
     void timer();
 
     class CancelableTimer final : public Cancelable {

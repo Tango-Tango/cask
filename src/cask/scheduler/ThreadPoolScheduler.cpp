@@ -9,37 +9,43 @@
 namespace cask::scheduler {
 
 ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
-    : running(true)
+    : should_run(true)
     , readyQueueMutex()
     , dataInQueue()
     , readyQueue()
     , idleThreads(poolSize)
     , timerMutex()
     , timers()
-    , runThreads()
-    , timerThread()
+    , threadStatus()
+    , timerThreadStatus(false)
     , ticks(0)
 {
-    for(unsigned int i =0; i < poolSize; i++) {
-        std::thread poolThread(std::bind(&ThreadPoolScheduler::run, this));
-        runThreads.push_back(std::move(poolThread));
+    threadStatus.reserve(poolSize);
+    for(unsigned int i = 0; i < poolSize; i++) {
+        threadStatus.push_back(new std::atomic_bool(false));
+        std::thread poolThread(std::bind(&ThreadPoolScheduler::run, this, i));
+        poolThread.detach();
     }
 
-    timerThread = std::thread(std::bind(&ThreadPoolScheduler::timer, this));
+    std::thread timerThread(std::bind(&ThreadPoolScheduler::timer, this));
+    timerThread.detach();
+
+    for(unsigned int i = 0; i < poolSize; i++) {
+        while(!threadStatus[i]->load());
+    }
+
+    while(!timerThreadStatus.load());
 }
 
 ThreadPoolScheduler::~ThreadPoolScheduler() {
-    running = false;
+    should_run.store(false);
 
-    for(auto& thread: runThreads) {
-        try {
-            thread.join();
-        } catch(const std::system_error& error) {}
+    for(auto& t : threadStatus) {
+        while(t->load());
+        delete t;
     }
 
-    try {
-        timerThread.join();
-    } catch(const std::system_error& error) {}
+    while(timerThreadStatus.load());
 }
 
 void ThreadPoolScheduler::submit(const std::function<void()>& task) {
@@ -82,16 +88,18 @@ CancelableRef ThreadPoolScheduler::submitAfter(int64_t milliseconds, const std::
 }
 
 bool ThreadPoolScheduler::isIdle() const {
-    return idleThreads.load() == runThreads.size() && readyQueue.empty();
+    return idleThreads.load() == threadStatus.size() && readyQueue.empty();
 }
 
-void ThreadPoolScheduler::run() {
+void ThreadPoolScheduler::run(unsigned int thread_index) {
     std::unique_lock<std::mutex> readyQueueLock(readyQueueMutex, std::defer_lock);
     std::chrono::milliseconds max_wait_time(10);
     std::function<void()> task;
     bool idling = true;
 
-    while(running) {
+    threadStatus[thread_index]->store(true);
+
+    while(should_run.load()) {
         readyQueueLock.lock();
 
         if(!idling && readyQueue.empty()) {
@@ -113,12 +121,16 @@ void ThreadPoolScheduler::run() {
             readyQueueLock.unlock();
         }
     }
+
+    threadStatus[thread_index]->store(false);
 }
 
 void ThreadPoolScheduler::timer() {
     const static std::chrono::milliseconds sleep_time(10);
 
-    while(running) {
+    timerThreadStatus.store(true);
+
+    while(should_run.load()) {
         auto before = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(sleep_time);
         auto after = std::chrono::steady_clock::now();
@@ -150,6 +162,8 @@ void ThreadPoolScheduler::timer() {
             }
         }
     }
+
+    timerThreadStatus.store(false);
 }
 
 ThreadPoolScheduler::CancelableTimer::CancelableTimer(
