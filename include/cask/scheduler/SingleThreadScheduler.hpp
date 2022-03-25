@@ -47,8 +47,10 @@ public:
 private:
     using TimerEntry = std::tuple<int64_t, std::function<void()>>;
 
-    bool running;
-    bool idle;
+    std::atomic_bool should_run;
+    std::atomic_bool idle;
+    std::atomic_bool timer_running;
+    std::atomic_bool runner_running;
 
     std::condition_variable dataInQueue;
 
@@ -59,8 +61,6 @@ private:
     std::queue<std::function<void()>> readyQueue;
     std::mutex timerMutex;
     std::map<int64_t,std::vector<TimerEntry>> timers;
-    std::thread runThread;
-    std::thread timerThread;
     int64_t ticks;
     int64_t next_id;
 

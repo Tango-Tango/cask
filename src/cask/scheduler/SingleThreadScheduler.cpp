@@ -11,32 +11,33 @@ using namespace std::chrono_literals;
 namespace cask::scheduler {
 
 SingleThreadScheduler::SingleThreadScheduler()
-    : running(true)
+    : should_run(true)
     , idle(true)
+    , timer_running(false)
+    , runner_running(false)
     , dataInQueue()
     , readyQueueSize(0)
     , readyQueueLock(0)
     , readyQueue()
     , timerMutex()
     , timers()
-    , runThread()
-    , timerThread()
     , ticks(0)
 {
-    runThread = std::thread(std::bind(&SingleThreadScheduler::run, this));
-    timerThread = std::thread(std::bind(&SingleThreadScheduler::timer, this));
+    std::thread runThread(std::bind(&SingleThreadScheduler::run, this));
+    std::thread timerThread(std::bind(&SingleThreadScheduler::timer, this));
+
+    runThread.detach();
+    timerThread.detach();
+
+    while(!runner_running.load());
+    while(!timer_running.load());
 }
 
 SingleThreadScheduler::~SingleThreadScheduler() {
-    running = false;
+    should_run.store(false);
 
-    try {
-        runThread.join();
-    } catch(const std::system_error& error) {}
-
-    try {
-        timerThread.join();
-    } catch(const std::system_error& error) {}
+    while(runner_running.load());
+    while(timer_running.load());
 }
 
 void SingleThreadScheduler::submit(const std::function<void()>& task) {
@@ -87,11 +88,13 @@ bool SingleThreadScheduler::isIdle() const {
 void SingleThreadScheduler::run() {
     std::function<void()> task;
 
-    while(running) {
+    runner_running.store(true);
+
+    while(should_run.load()) {
         if(readyQueueSize.load() == 0) {
             idle = true;
             std::unique_lock<std::mutex> lock(idlingThreadMutex);
-            idlingThread.wait_for(lock, 10ms, [this]{ return readyQueueSize.load() != 0; });
+            idlingThread.wait_for(lock, 1ms, [this]{ return readyQueueSize.load() != 0 || !should_run.load(); });
         } else {
             idle = false;
             while(readyQueueLock.test_and_set());
@@ -101,14 +104,17 @@ void SingleThreadScheduler::run() {
             readyQueueLock.clear();
             task();
         }
-        
     }
+
+    runner_running.store(false);
 }
 
 void SingleThreadScheduler::timer() {
     const static std::chrono::milliseconds sleep_time(10);
 
-    while(running) {
+    timer_running.store(true);
+
+    while(should_run.load()) {
         auto before = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(sleep_time);
         auto after = std::chrono::steady_clock::now();
@@ -140,6 +146,8 @@ void SingleThreadScheduler::timer() {
             }
         }
     }
+
+    timer_running.store(false);
 }
 
 SingleThreadScheduler::CancelableTimer::CancelableTimer(
