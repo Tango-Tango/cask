@@ -129,6 +129,14 @@ public:
      */
     virtual T await() = 0;
 
+    /**
+     * Get the result of this deferred if it is available.
+     * 
+     * @return The result value (if available) of the asynchronous
+     *         computation.
+     */
+    virtual std::optional<Either<T,E>> get() = 0;
+
     virtual ~Deferred() {};
 };
 

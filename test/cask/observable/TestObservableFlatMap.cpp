@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 #include "gtest/trompeloeil.hpp"
 #include "cask/Observable.hpp"
+#include "cask/scheduler/SingleThreadScheduler.hpp"
 
 using cask::Observable;
 using cask::ObservableRef;
@@ -23,6 +24,28 @@ public:
     IMPLEMENT_MOCK0(onComplete);
     IMPLEMENT_MOCK0(onCancel);
 };
+
+TEST(ObservableFlatMap, Performance) {
+    int counter = 0;
+
+    auto sched = Scheduler::global();
+
+    auto before = std::chrono::steady_clock::now();
+    Observable<int>::repeatTask(Task<int>::eval([]{ return 1; }))
+        ->flatMap<float>([](auto value) {
+            return Observable<float>::pure(value * 1.5);
+        })
+        ->takeWhile([&counter](auto) {
+            return counter++ <= 1000;
+        })
+        ->last()
+        .run(sched)
+        ->await();
+    auto after = std::chrono::steady_clock::now();
+    auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(after - before).count();
+
+    std::cout << "Took " << delta << " milliseconds" << std::endl;
+}
 
 TEST(ObservableFlatMap, Pure) {
     auto sched = Scheduler::global();

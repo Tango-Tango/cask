@@ -32,6 +32,7 @@ public:
     void onShutdown(const std::function<void()>& callback) override;
     void cancel() override;
     T await() override;
+    std::optional<Either<T,E>> get() override;
 
     std::shared_ptr<Promise<T,E>> promise;
 private:
@@ -111,6 +112,11 @@ T PromiseDeferred<T,E>::await() {
     } else {
         throw result->get_right();
     }
+}
+
+template <class T, class E>
+std::optional<Either<T,E>> PromiseDeferred<T,E>::get() {
+    return promise->get();
 }
 
 } // namespace cask::deferred

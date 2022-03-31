@@ -25,6 +25,7 @@ public:
     void onShutdown(const std::function<void()>& callback) override;
     void cancel() override;
     T await() override;
+    std::optional<Either<T,E>> get() override;
 private:
 };
 
@@ -71,6 +72,11 @@ void PureDeferred<T,E>::cancel() {
 template <class T, class E>
 T PureDeferred<T,E>::await() {
     return value;
+}
+
+template <class T, class E>
+std::optional<Either<T,E>> PureDeferred<T,E>::get() {
+    return Either<T,E>::left(value);
 }
 
 } // namespace cask::deferred
