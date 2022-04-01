@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 #include "gtest/trompeloeil.hpp"
 #include "cask/Observable.hpp"
+#include "cask/scheduler/SingleThreadScheduler.hpp"
 
 using cask::Observable;
 using cask::ObservableRef;

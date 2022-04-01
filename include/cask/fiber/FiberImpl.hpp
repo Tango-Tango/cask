@@ -314,45 +314,56 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
     break;
     case ASYNC:
     {
-        suspended = true;
         if constexpr(Async) {
             const FiberOp::AsyncData* data = op->data.asyncData;
             auto deferred = (*data)(sched);
-            waitingOn = deferred;            
-            state.store(WAITING);
-            
-            deferred->onSuccess([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)](auto value) {
-                if(auto self = self_weak.lock()) {
-                    auto casted_self = std::static_pointer_cast<FiberImpl<T,E>>(self);
-                    if(auto sched = sched_weak.lock()) {
-                        casted_self->asyncSuccess(value);
-                        casted_self->reschedule(sched);
-                    }
-                }
-            });
 
-            deferred->onError([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)](auto error) {
-                if(auto self = self_weak.lock()) {
-                    auto casted_self = std::static_pointer_cast<FiberImpl<T,E>>(self);
-                    if(auto sched = sched_weak.lock()) {
-                        casted_self->asyncError(error);
-                        casted_self->reschedule(sched);
-                    }
+            if (auto result_opt = deferred->get()) {
+                if(result_opt->is_left()) {
+                    value.setValue(result_opt->get_left());
+                    op = nullptr;
+                } else {
+                    value.setError(result_opt->get_right());
+                    op = nullptr;
                 }
-            });
-
-            deferred->onCancel([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)]() {
-                if(auto self = self_weak.lock()) {
-                    if(auto sched = sched_weak.lock()) {
+            } else {
+                suspended = true;
+                waitingOn = deferred;            
+                state.store(WAITING);
+                
+                deferred->onSuccess([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)](auto value) {
+                    if(auto self = self_weak.lock()) {
                         auto casted_self = std::static_pointer_cast<FiberImpl<T,E>>(self);
-                        casted_self->asyncCancel();
-                        casted_self->reschedule(sched);
+                        if(auto sched = sched_weak.lock()) {
+                            casted_self->asyncSuccess(value);
+                            casted_self->reschedule(sched);
+                        }
                     }
-                }
-            });
+                });
 
+                deferred->onError([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)](auto error) {
+                    if(auto self = self_weak.lock()) {
+                        auto casted_self = std::static_pointer_cast<FiberImpl<T,E>>(self);
+                        if(auto sched = sched_weak.lock()) {
+                            casted_self->asyncError(error);
+                            casted_self->reschedule(sched);
+                        }
+                    }
+                });
+
+                deferred->onCancel([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)]() {
+                    if(auto self = self_weak.lock()) {
+                        if(auto sched = sched_weak.lock()) {
+                            auto casted_self = std::static_pointer_cast<FiberImpl<T,E>>(self);
+                            casted_self->asyncCancel();
+                            casted_self->reschedule(sched);
+                        }
+                    }
+                });
+            }
             
         } else {
+            suspended = true;
             state.store(READY);
         }
     }

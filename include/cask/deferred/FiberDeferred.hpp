@@ -22,7 +22,7 @@ public:
     void onShutdown(const std::function<void()>& callback) override;
     void cancel() override;
     T await() override;
-
+    std::optional<Either<T,E>> get() override;
 private:
     std::shared_ptr<Fiber<T,E>> fiber;
 };
@@ -79,6 +79,17 @@ void FiberDeferred<T,E>::cancel() {
 template <class T, class E>
 T FiberDeferred<T,E>::await() {
     return fiber->await();
+}
+
+template <class T, class E>
+std::optional<Either<T,E>> FiberDeferred<T,E>::get() {
+    if(auto value_opt = fiber->getValue()) {
+        return Either<T,E>::left(*value_opt);
+    } else if(auto error_opt = fiber->getError()) {
+        return Either<T,E>::right(*error_opt);
+    } else {
+        return {};
+    }
 }
 
 } // namespace cask::deferred

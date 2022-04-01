@@ -26,6 +26,7 @@ public:
     void onShutdown(const std::function<void()>& callback) override;
     void cancel() override;
     T2 await() override;
+    std::optional<Either<T2,E2>> get() override;
 
 private:
     DeferredRef<T1,E1> deferred;
@@ -90,6 +91,19 @@ T2 MapDeferred<T1,T2,E1,E2>::await() {
         return value_transform(deferred->await());
     } catch(const E1& error) {
         throw error_transform(error);
+    }
+}
+
+template <class T1, class T2, class E1, class E2>
+std::optional<Either<T2,E2>> MapDeferred<T1,T2,E1,E2>::get() {
+    if(auto value_opt = deferred->get()) {
+        if(value_opt->is_left()) {
+            return Either<T2,E2>::left(value_transform(value_opt->get_left()));
+        } else {
+            return Either<T2,E2>::right(error_transform(value_opt->get_right()));
+        }
+    } else {
+        return {};
     }
 }
 

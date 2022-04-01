@@ -3,6 +3,14 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+
+## 11.3
+- Add the `Observable::flatMapOptional` operator to speed up flows which simply
+  want to provide value or nothing downstream.
+- Add the `ref_uses_atomics` configuration flag. This provides a configurable
+  speedup on platforms which have poor support for `std::atomic` (such as some
+  MIPS platforms).
+
 ## 11.2
 - Add the `Queue::tryTake` method to allow for atomic takes on the queue without
   pending in the scheduler.
