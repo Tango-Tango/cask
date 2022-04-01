@@ -32,8 +32,8 @@ TEST(ObservableFlatMap, Performance) {
 
     auto before = std::chrono::steady_clock::now();
     Observable<int>::repeatTask(Task<int>::eval([]{ return 1; }))
-        ->flatMap<float>([](auto value) {
-            return Observable<float>::pure(value * 1.5);
+        ->flatMapOptional<float>([](auto value) {
+            return std::optional<float>(value * 1.5);
         })
         ->takeWhile([&counter](auto) {
             return counter++ <= 1000;

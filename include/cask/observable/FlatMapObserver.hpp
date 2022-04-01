@@ -63,7 +63,7 @@ Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(const TI& value) {
             return ack == Continue;
         })
         ->last()
-        .template map<Ack>([downstream = downstream](auto lastAckOpt) {
+        .template map<Ack>([](auto lastAckOpt) {
             if(lastAckOpt.has_value()) {
                 return *lastAckOpt;
             } else {
