@@ -7,6 +7,7 @@
 #define _CASK_REF_H_
 
 #include "Task.hpp"
+#include "cask/Config.hpp"
 #include <atomic>
 
 namespace cask {
@@ -72,6 +73,7 @@ public:
 private:
     explicit Ref(const T& initialValue);
     std::shared_ptr<T> data;
+    std::mutex mutex;
 };
 
 template <class T, class E>
@@ -82,6 +84,7 @@ std::shared_ptr<Ref<T,E>> Ref<T,E>::create(const T& initialValue) {
 template <class T, class E>
 Ref<T,E>::Ref(const T& initialValue)
     : data(std::make_shared<T>(initialValue))
+    , mutex()
 {}
 
 template <class T, class E>
@@ -95,36 +98,55 @@ Task<T,E> Ref<T,E>::get() {
 template <class T, class E>
 Task<None,E> Ref<T,E>::update(std::function<T(T&)> predicate) {
     auto self = this->shared_from_this();
-    return Task<bool,E>::eval([self, predicate]() {
-        auto initial = std::atomic_load(&(self->data));
-        auto updated = std::make_shared<T>(predicate(*initial));
-        return std::atomic_compare_exchange_weak(&(self->data), &initial, updated);
-    }).restartUntil([](auto exchangeCompleted) {
-        return exchangeCompleted;
-    }).template map<None>([](auto) {
-        return None();
-    });
+
+    if constexpr (ref_uses_atomics) {
+        return Task<bool,E>::eval([self, predicate]() {
+            auto initial = std::atomic_load(&(self->data));
+            auto updated = std::make_shared<T>(predicate(*initial));
+            return std::atomic_compare_exchange_weak(&(self->data), &initial, updated);
+        }).restartUntil([](auto exchangeCompleted) {
+            return exchangeCompleted;
+        }).template map<None>([](auto) {
+            return None();
+        });
+    } else {
+        return Task<None,E>::eval([self, predicate]() {
+            std::lock_guard guard(self->mutex);
+            self->data = std::make_shared<T>(predicate(*(self->data)));
+            return None();
+        });
+    }
 }
 
 template <class T, class E>
 template <typename U>
 Task<U,E> Ref<T,E>::modify(std::function<std::tuple<T,U>(T&)> predicate) {
-    using InternalResult = std::tuple<bool,U>;
-
     auto self = this->shared_from_this();
-    return Task<InternalResult,E>::eval([self, predicate]() {
-        auto initial = std::atomic_load(&(self->data));
-        auto [updated, result] = predicate(*initial);
-        auto updatedRef = std::make_shared<T>(updated);
-        auto exchangeCompleted = std::atomic_compare_exchange_weak(&(self->data), &initial, updatedRef);
-        return std::make_tuple(exchangeCompleted, result);
-    }).restartUntil([](InternalResult resultPair) {
-        const auto& exchangeCompleted = std::get<0>(resultPair);
-        return exchangeCompleted;
-    }).template map<U>([](InternalResult resultPair) {
-        const auto& result = std::get<1>(resultPair);
-        return result;
-    });
+
+    if constexpr (ref_uses_atomics) {
+        using InternalResult = std::tuple<bool,U>;
+        
+        return Task<InternalResult,E>::eval([self, predicate]() {
+            auto initial = std::atomic_load(&(self->data));
+            const auto& [updated, result] = predicate(*initial);
+            auto updatedRef = std::make_shared<T>(updated);
+            auto exchangeCompleted = std::atomic_compare_exchange_weak(&(self->data), &initial, updatedRef);
+            return std::make_tuple(exchangeCompleted, result);
+        }).restartUntil([](InternalResult resultPair) {
+            const auto& exchangeCompleted = std::get<0>(resultPair);
+            return exchangeCompleted;
+        }).template map<U>([](InternalResult resultPair) {
+            const auto& result = std::get<1>(resultPair);
+            return result;
+        });
+    } else {
+        return Task<U,E>::eval([self, predicate]() {
+            std::lock_guard guard(self->mutex);
+            const auto& [updated, result] = predicate(*(self->data));
+            self->data = std::make_shared<T>(updated);
+            return result;
+        });
+    }
 }
 
 } // namespace cask

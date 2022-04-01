@@ -11,7 +11,8 @@ if [ "$BUILD_TARGET" = "debug" ] || [ "$BUILD_TARGET" = "all" ]; then
         -Db_sanitize=address,undefined \
         -Db_coverage=true \
         -Dwarning_level=3 \
-        -Dwerror=true
+        -Dwerror=true \
+        -Dref_uses_atomics=false
 fi
 
 if [ "$BUILD_TARGET" = "release" ] || [ "$BUILD_TARGET" = "all" ]; then
@@ -19,7 +20,8 @@ if [ "$BUILD_TARGET" = "release" ] || [ "$BUILD_TARGET" = "all" ]; then
     CC=gcc CXX=g++ meson setup build_release \
         -Dbuildtype=release \
         -Dwarning_level=3 \
-        -Dwerror=true
+        -Dwerror=true \
+        -Dref_uses_atomics=true
 fi
 
 if [ "$BUILD_TARGET" = "clang" ] || [ "$BUILD_TARGET" = "all" ]; then
@@ -28,7 +30,8 @@ if [ "$BUILD_TARGET" = "clang" ] || [ "$BUILD_TARGET" = "all" ]; then
         -Doptimization=0 \
         -Ddebug=false \
         -Dwarning_level=3 \
-        -Dwerror=true
+        -Dwerror=true \
+        -Dref_uses_atomics=true
 fi
 
 if [ "$BUILD_TARGET" = "clang_debug" ] || [ "$BUILD_TARGET" = "all" ]; then
@@ -37,6 +40,7 @@ if [ "$BUILD_TARGET" = "clang_debug" ] || [ "$BUILD_TARGET" = "all" ]; then
         -Db_sanitize=address,undefined \
         -Db_coverage=true \
         -Dwarning_level=3 \
-        -Dwerror=true
+        -Dwerror=true \
+        -Dref_uses_atomics=false
 fi
 

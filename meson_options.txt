@@ -1,0 +1,1 @@
+option('ref_uses_atomics', type: 'boolean', value: true)

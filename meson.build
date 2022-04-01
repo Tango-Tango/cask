@@ -53,6 +53,7 @@ if run_clang_tidy.found()
 endif
 
 # Setup the 'cask' project structure
+subdir('include/cask')
 includes = include_directories('include')
 subdir('src')
 subdir('test')
