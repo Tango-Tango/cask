@@ -270,14 +270,10 @@ public:
     ObservableRef<T2,E> flatMap(const std::function<ObservableRef<T2,E>(const T&)>& predicate) const;
 
      /**
-     * For each element in stream emit a possible infinite series of elements
-     * downstream. Upstream events will be backpressured until all events
-     * from the newly created stream have been processed.
-     *
-     * NOTE: This method implements the same behavior as `concatMap` from rx.
+     * For each element in stream emit either a value or nothing downstream.
      *
      * @param predicate The function to apply to each element of the stream and
-     *                  which emits a new stream of events downstream.
+     *                  which emits a value or nothing downstream.
      * @return An observable which applies the given transform to each element of the stream.
      */
     template <class T2>

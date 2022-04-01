@@ -24,6 +24,7 @@ if not meson.is_subproject()
         'cask/observable/TestObservableConcat.cpp',
         'cask/observable/TestObservableFilter.cpp',
         'cask/observable/TestObservableFlatMap.cpp',
+        'cask/observable/TestObservableFlatMapOptional.cpp',
         'cask/observable/TestObservableFlatten.cpp',
         'cask/observable/TestObservableForeach.cpp',
         'cask/observable/TestObservableForeachTask.cpp',
