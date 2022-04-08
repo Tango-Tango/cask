@@ -30,7 +30,7 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
     std::thread runThread(std::bind(&SingleThreadScheduler::run, this));
     std::thread timerThread(std::bind(&SingleThreadScheduler::timer, this));
 
-#if __linux__
+#if __linux__ || __APPLE__
     auto which = PRIO_PROCESS;
     setpriority(which, runThread.native_handle(), priority);
     setpriority(which, timerThread.native_handle(), priority);
