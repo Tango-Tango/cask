@@ -101,9 +101,9 @@ Task<None,E> Ref<T,E>::update(std::function<T(T&)> predicate) {
 
     if constexpr (ref_uses_atomics) {
         return Task<bool,E>::eval([self, predicate]() {
-            auto initial = std::atomic_load(&(self->data));
+            auto initial = std::atomic_load_explicit(&(self->data), std::memory_order_relaxed);
             auto updated = std::make_shared<T>(predicate(*initial));
-            return std::atomic_compare_exchange_weak(&(self->data), &initial, updated);
+            return std::atomic_compare_exchange_weak_explicit(&(self->data), &initial, updated, std::memory_order_relaxed, std::memory_order_relaxed);
         }).restartUntil([](auto exchangeCompleted) {
             return exchangeCompleted;
         }).template map<None>([](auto) {
@@ -127,10 +127,10 @@ Task<U,E> Ref<T,E>::modify(std::function<std::tuple<T,U>(T&)> predicate) {
         using InternalResult = std::tuple<bool,U>;
         
         return Task<InternalResult,E>::eval([self, predicate]() {
-            auto initial = std::atomic_load(&(self->data));
+            auto initial = std::atomic_load_explicit(&(self->data), std::memory_order_relaxed);
             const auto& [updated, result] = predicate(*initial);
             auto updatedRef = std::make_shared<T>(updated);
-            auto exchangeCompleted = std::atomic_compare_exchange_weak(&(self->data), &initial, updatedRef);
+            auto exchangeCompleted = std::atomic_compare_exchange_weak_explicit(&(self->data), &initial, updatedRef, std::memory_order_relaxed, std::memory_order_relaxed);
             return std::make_tuple(exchangeCompleted, result);
         }).restartUntil([](InternalResult resultPair) {
             const auto& exchangeCompleted = std::get<0>(resultPair);
