@@ -25,7 +25,7 @@ jobs:
 
     strategy:
       matrix:
-        target: [debug, release, clang]
+        target: [debug, release, release_no_atomics, release_always_async, clang]
       fail-fast: false
 
     steps:

@@ -7,8 +7,10 @@
 #define _CASK_FIBER_IMPL_H_
 
 #include <atomic>
+#include <climits>
 #include <mutex>
 #include <map>
+#include "cask/Config.hpp"
 #include "cask/Deferred.hpp"
 #include "cask/Fiber.hpp"
 
@@ -97,12 +99,12 @@ FiberImpl<T,E>::~FiberImpl()
 
 template <class T, class E>
 bool FiberImpl<T,E>::resumeSync() {
-    return resumeUnsafe<false>(nullptr, 1024);
+    return resumeUnsafe<false>(nullptr, UINT_MAX);
 }
 
 template <class T, class E>
 bool FiberImpl<T,E>::resume(const std::shared_ptr<Scheduler>& sched) {
-    return resumeUnsafe<true>(sched, 1024);
+    return resumeUnsafe<true>(sched, batch_size);
 }
 
 template <class T, class E>
