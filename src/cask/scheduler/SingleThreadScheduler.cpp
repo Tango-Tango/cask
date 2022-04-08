@@ -6,7 +6,10 @@
 #include "cask/scheduler/SingleThreadScheduler.hpp"
 #include <chrono>
 
-#if __linux__ || __APPLE__
+#if __linux__
+#include <sys/resource.h>
+#elif __APPLE__
+#include <pthread.h>
 #include <sys/resource.h>
 #endif
 
@@ -30,10 +33,20 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
     std::thread runThread(std::bind(&SingleThreadScheduler::run, this));
     std::thread timerThread(std::bind(&SingleThreadScheduler::timer, this));
 
-#if __linux__ || __APPLE__
+#if __linux__
     auto which = PRIO_PROCESS;
     setpriority(which, runThread.native_handle(), priority);
     setpriority(which, timerThread.native_handle(), priority);
+#elif __APPLE__
+    auto which = PRIO_PROCESS;
+    uint64_t run_thread_id = 0;
+    uint64_t timer_thread_id = 0;
+
+    pthread_threadid_np(runThread.native_handle(), run_thread_id);
+    pthread_threadid_np(timerThread.native_handle(), timer_thread_id);
+
+    setpriority(which, run_thread_id, priority);
+    setpriority(which, timer_thread_id, priority);
 #endif
 
     runThread.detach();
