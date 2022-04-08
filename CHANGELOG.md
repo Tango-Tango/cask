@@ -3,6 +3,8 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 11.4
+- Allow a thread priority to be set for the single threaded scheduler.
 
 ## 11.3
 - Add the `Observable::flatMapOptional` operator to speed up flows which simply

@@ -32,7 +32,7 @@ public:
     /**
      * Construct a single threaded scheduler.
      */
-    SingleThreadScheduler();
+    SingleThreadScheduler(int priority = 0);
 
     /**
      * Destruct the scheduler. Destruction waits for all running and timer
