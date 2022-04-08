@@ -9,6 +9,7 @@
 namespace cask {
 
 static constexpr bool ref_uses_atomics = @ref_uses_atomics@;
+static constexpr unsigned int batch_size = @batch_size@;
 
 }
 

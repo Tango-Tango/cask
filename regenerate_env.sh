@@ -11,8 +11,7 @@ if [ "$BUILD_TARGET" = "debug" ] || [ "$BUILD_TARGET" = "all" ]; then
         -Db_sanitize=address,undefined \
         -Db_coverage=true \
         -Dwarning_level=3 \
-        -Dwerror=true \
-        -Dref_uses_atomics=false
+        -Dwerror=true
 fi
 
 if [ "$BUILD_TARGET" = "release" ] || [ "$BUILD_TARGET" = "all" ]; then
@@ -20,9 +19,28 @@ if [ "$BUILD_TARGET" = "release" ] || [ "$BUILD_TARGET" = "all" ]; then
     CC=gcc CXX=g++ meson setup build_release \
         -Dbuildtype=release \
         -Dwarning_level=3 \
-        -Dwerror=true \
-        -Dref_uses_atomics=true
+        -Dwerror=true
 fi
+
+if [ "$BUILD_TARGET" = "release_no_atomics" ] || [ "$BUILD_TARGET" = "all" ]; then
+    rm -rf build_release_no_atomics
+    CC=gcc CXX=g++ meson setup build_release_no_atomics \
+        -Dbuildtype=release \
+        -Dwarning_level=3 \
+        -Dwerror=true \
+        -Dref_uses_atomics=false
+fi
+
+
+if [ "$BUILD_TARGET" = "release_always_async" ] || [ "$BUILD_TARGET" = "all" ]; then
+    rm -rf build_release_always_async
+    CC=gcc CXX=g++ meson setup build_release_always_async \
+        -Dbuildtype=release \
+        -Dwarning_level=3 \
+        -Dwerror=true \
+        -Dbatch_size=1
+fi
+
 
 if [ "$BUILD_TARGET" = "clang" ] || [ "$BUILD_TARGET" = "all" ]; then
     rm -rf build_clang
