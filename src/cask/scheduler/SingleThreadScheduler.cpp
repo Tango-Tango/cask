@@ -6,11 +6,18 @@
 #include "cask/scheduler/SingleThreadScheduler.hpp"
 #include <chrono>
 
+#if __linux__
+#include <sys/resource.h>
+#elif __APPLE__
+#include <pthread.h>
+#include <sys/resource.h>
+#endif
+
 using namespace std::chrono_literals;
 
 namespace cask::scheduler {
 
-SingleThreadScheduler::SingleThreadScheduler()
+SingleThreadScheduler::SingleThreadScheduler(int priority)
     : should_run(true)
     , idle(true)
     , timer_running(false)
@@ -26,35 +33,51 @@ SingleThreadScheduler::SingleThreadScheduler()
     std::thread runThread(std::bind(&SingleThreadScheduler::run, this));
     std::thread timerThread(std::bind(&SingleThreadScheduler::timer, this));
 
+#if __linux__
+    auto which = PRIO_PROCESS;
+    setpriority(which, runThread.native_handle(), priority);
+    setpriority(which, timerThread.native_handle(), priority);
+#elif __APPLE__
+    auto which = PRIO_PROCESS;
+    uint64_t run_thread_id = 0;
+    uint64_t timer_thread_id = 0;
+
+    pthread_threadid_np(runThread.native_handle(), &run_thread_id);
+    pthread_threadid_np(timerThread.native_handle(), &timer_thread_id);
+
+    setpriority(which, run_thread_id, priority);
+    setpriority(which, timer_thread_id, priority);
+#endif
+
     runThread.detach();
     timerThread.detach();
 
-    while(!runner_running.load());
-    while(!timer_running.load());
+    while(!runner_running.load(std::memory_order_relaxed));
+    while(!timer_running.load(std::memory_order_relaxed));
 }
 
 SingleThreadScheduler::~SingleThreadScheduler() {
     should_run.store(false);
 
-    while(runner_running.load());
-    while(timer_running.load());
+    while(runner_running.load(std::memory_order_relaxed));
+    while(timer_running.load(std::memory_order_relaxed));
 }
 
 void SingleThreadScheduler::submit(const std::function<void()>& task) {
-    while(readyQueueLock.test_and_set());
+    while(readyQueueLock.test_and_set(std::memory_order_acquire));
     readyQueue.emplace(task);
-    readyQueueSize.fetch_add(1);
-    readyQueueLock.clear();
+    readyQueueSize.fetch_add(1, std::memory_order_relaxed);
+    readyQueueLock.clear(std::memory_order_release);
     idlingThread.notify_one();
 }
 
 void SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
-    while(readyQueueLock.test_and_set());
+    while(readyQueueLock.test_and_set(std::memory_order_acquire));
     for(auto& task: tasks) {
         readyQueue.emplace(task);
     }
-    readyQueueSize.fetch_add(tasks.size());
-    readyQueueLock.clear();
+    readyQueueSize.fetch_add(tasks.size(), std::memory_order_relaxed);
+    readyQueueLock.clear(std::memory_order_release);
     idlingThread.notify_one();
 }
 
@@ -88,33 +111,33 @@ bool SingleThreadScheduler::isIdle() const {
 void SingleThreadScheduler::run() {
     std::function<void()> task;
 
-    runner_running.store(true);
+    runner_running.store(true, std::memory_order_relaxed);
 
-    while(should_run.load()) {
-        if(readyQueueSize.load() == 0) {
+    while(should_run.load(std::memory_order_relaxed)) {
+        if(readyQueueSize.load(std::memory_order_relaxed) == 0) {
             idle = true;
             std::unique_lock<std::mutex> lock(idlingThreadMutex);
-            idlingThread.wait_for(lock, 1ms, [this]{ return readyQueueSize.load() != 0 || !should_run.load(); });
+            idlingThread.wait_for(lock, 1ms, [this]{ return readyQueueSize.load(std::memory_order_relaxed) != 0 || !should_run.load(std::memory_order_relaxed); });
         } else {
             idle = false;
-            while(readyQueueLock.test_and_set());
+            while(readyQueueLock.test_and_set(std::memory_order_acquire));
             task = readyQueue.front();
             readyQueue.pop();
-            readyQueueSize.fetch_sub(1);
-            readyQueueLock.clear();
+            readyQueueSize.fetch_sub(1, std::memory_order_relaxed);
+            readyQueueLock.clear(std::memory_order_release);
             task();
         }
     }
 
-    runner_running.store(false);
+    runner_running.store(false, std::memory_order_relaxed);
 }
 
 void SingleThreadScheduler::timer() {
     const static std::chrono::milliseconds sleep_time(10);
 
-    timer_running.store(true);
+    timer_running.store(true, std::memory_order_relaxed);
 
-    while(should_run.load()) {
+    while(should_run.load(std::memory_order_relaxed)) {
         auto before = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(sleep_time);
         auto after = std::chrono::steady_clock::now();
@@ -147,7 +170,7 @@ void SingleThreadScheduler::timer() {
         }
     }
 
-    timer_running.store(false);
+    timer_running.store(false, std::memory_order_relaxed);
 }
 
 SingleThreadScheduler::CancelableTimer::CancelableTimer(
