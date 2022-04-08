@@ -42,8 +42,8 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
     uint64_t run_thread_id = 0;
     uint64_t timer_thread_id = 0;
 
-    pthread_threadid_np(runThread.native_handle(), run_thread_id);
-    pthread_threadid_np(timerThread.native_handle(), timer_thread_id);
+    pthread_threadid_np(runThread.native_handle(), &run_thread_id);
+    pthread_threadid_np(timerThread.native_handle(), &timer_thread_id);
 
     setpriority(which, run_thread_id, priority);
     setpriority(which, timer_thread_id, priority);
