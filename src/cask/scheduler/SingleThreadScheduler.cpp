@@ -6,7 +6,7 @@
 #include "cask/scheduler/SingleThreadScheduler.hpp"
 #include <chrono>
 
-#if __linux__
+#if __linux__ || __APPLE__
 #include <sys/resource.h>
 #endif
 
