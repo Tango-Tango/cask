@@ -9,8 +9,8 @@
 #include <any>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <optional>
+#include <stdexcept>
 #include "Cancelable.hpp"
 #include "Either.hpp"
 #include "Scheduler.hpp"
@@ -96,7 +96,7 @@ private:
 
     std::optional<Either<T,E>> resultOpt;
     bool canceled;
-    mutable std::mutex mutex;
+    mutable std::atomic_flag lock;
     std::vector<std::function<void(Either<T,E>)>> completeCallbacks;
     std::vector<std::function<void()>> cancelCallbacks;
     std::vector<std::function<void(Either<T,E>, bool)>> eitherCallbacks;
@@ -115,7 +115,7 @@ template <class T, class E>
 Promise<T,E>::Promise(std::shared_ptr<Scheduler> sched)
     : resultOpt(std::nullopt)
     , canceled(false)
-    , mutex()
+    , lock(false)
     , completeCallbacks()
     , cancelCallbacks()
     , sched(std::move(sched))
@@ -136,19 +136,24 @@ void Promise<T,E>::complete(const Either<T,E>& value) {
     bool runCallbacks = false;
 
     {
-        std::lock_guard guard(mutex);
+        while(lock.test_and_set(std::memory_order_acquire));
+
         if(!resultOpt.has_value() && !canceled) {
             resultOpt = value;
             runCallbacks = true;
         } else {
             if(resultOpt.has_value()) {
                 if(resultOpt->is_left()) {
+                    lock.clear(std::memory_order_release);
                     throw std::runtime_error("Promise already successfully completed.");
                 } else {
+                    lock.clear(std::memory_order_release);
                     throw std::runtime_error("Promise already completed with an error.");
                 }
             }
         }
+
+        lock.clear(std::memory_order_release);
     }
 
     if(runCallbacks) {
@@ -167,11 +172,12 @@ void Promise<T,E>::cancel() {
     bool runCallbacks = false;
 
     {
-        std::lock_guard guard(mutex);
+        while(lock.test_and_set(std::memory_order_acquire));
         if(!resultOpt.has_value() && !canceled) {
             canceled = true;
             runCallbacks = true;
         }
+        lock.clear(std::memory_order_release);
     }
 
     if(runCallbacks) {
@@ -190,10 +196,12 @@ bool Promise<T,E>::isCancelled() const {
 
 template <class T, class E>
 std::optional<Either<T,E>> Promise<T,E>::get() const {
-    std::lock_guard guard(mutex);
+    while(lock.test_and_set(std::memory_order_acquire));
     if(canceled) {
+        lock.clear(std::memory_order_release);
         return {};
     } else {
+        lock.clear(std::memory_order_release);
         return resultOpt;
     }
 }
@@ -203,12 +211,13 @@ void Promise<T,E>::onCancel(const std::function<void()>& callback) {
     bool runNow = false;
 
     {
-        std::lock_guard guard(mutex);
+        while(lock.test_and_set(std::memory_order_acquire));
         if(canceled) {
             runNow = true;
         } else {
             cancelCallbacks.push_back(callback);
         }
+        lock.clear(std::memory_order_release);
     }
 
     if(runNow) {
@@ -228,12 +237,13 @@ void Promise<T,E>::onComplete(std::function<void(Either<T,E>)> callback) {
     bool immediateSubmit = false;
 
     {
-        std::lock_guard guard(mutex);
+        while(lock.test_and_set(std::memory_order_acquire));
         if(resultOpt.has_value()) {
             immediateSubmit = true;
         } else {
             completeCallbacks.push_back(callback);
         }
+        lock.clear(std::memory_order_release);
     }
     
     if(immediateSubmit) {
