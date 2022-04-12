@@ -11,7 +11,7 @@ namespace cask {
 template <std::size_t BlockSize>
 class Pool {
 public:
-    Pool();
+    Pool(std::size_t initial_size = 0);
     ~Pool();
 
     template <class T, class... Args>
@@ -30,7 +30,13 @@ private:
 };
 
 template <std::size_t BlockSize>
-Pool<BlockSize>::Pool() : free_blocks(nullptr) {}
+Pool<BlockSize>::Pool(std::size_t initial_size) : free_blocks(nullptr) {
+    while(initial_size-- > 0) {
+        auto block = new Block();
+        block->next = free_blocks.load();
+        free_blocks.store(block);
+    }
+}
 
 template <std::size_t BlockSize>
 Pool<BlockSize>::~Pool() {
@@ -51,7 +57,7 @@ T* Pool<BlockSize>::allocate(Args&&... args) {
     } else {
         while (true) {
             auto head = free_blocks.load(std::memory_order_relaxed);
-            if (head && free_blocks.compare_exchange_strong(head, head->next, std::memory_order_acquire, std::memory_order_relaxed)) {
+            if (head && free_blocks.compare_exchange_strong(head, head->next, std::memory_order_relaxed, std::memory_order_relaxed)) {
                 return new (head->memory) T(std::forward<Args>(args)...);   
             } else if(!head) {
                 auto block = new Block();
@@ -75,7 +81,7 @@ void Pool<BlockSize>::deallocate(T* ptr) {
             auto head = free_blocks.load(std::memory_order_relaxed);
             block->next.store(head, std::memory_order_relaxed);
 
-            if(free_blocks.compare_exchange_strong(head, block, std::memory_order_release, std::memory_order_relaxed)) {
+            if(free_blocks.compare_exchange_strong(head, block, std::memory_order_relaxed, std::memory_order_relaxed)) {
                 break;
             }
         }
