@@ -35,13 +35,8 @@ TEST(Pool, AllocatesLIFO) {
 TEST(Pool, AllocatesLargeObjectOnHeap) {
     Pool<1> pool;
 
-    int* thing1 = pool.allocate<int>();
-    pool.deallocate<int>(thing1);
-
-    int* thing2 = pool.allocate<int>();
-    pool.deallocate<int>(thing2);
-
-    EXPECT_NE(thing1, thing2);
+    auto thing1 = pool.allocate<uint64_t>();
+    delete thing1;
 }
 
 TEST(Pool, Preallocates) {
