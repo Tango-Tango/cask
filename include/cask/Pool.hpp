@@ -46,6 +46,8 @@ T* Pool::allocate(Args&&... args) {
 
 template <class T>
 void Pool::deallocate(T* ptr) {
+    bool is_from_pool = false;
+
     while(memory_pool_lock.test_and_set(std::memory_order_acquire));
 
     auto search = allocated_blocks.find(ptr);
@@ -53,11 +55,16 @@ void Pool::deallocate(T* ptr) {
         const auto& block = search->second;
         free_list.push(block);
         allocated_blocks.erase(search);
-    } else {
-        delete ptr;
+        is_from_pool = true;
     }
 
     memory_pool_lock.clear(std::memory_order_release);
+
+    if(is_from_pool) {
+        std::destroy_at<T>(ptr);
+    } else {
+        delete ptr;
+    }
 }
 
 }
