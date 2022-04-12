@@ -3,13 +3,14 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
+#include "cask/Config.hpp"
 #include "cask/Deferred.hpp"
 #include "cask/fiber/FiberOp.hpp"
 #include <utility>
 
 namespace cask::fiber {
 
-Pool<128> FiberOp::pool(1024);
+Pool<FiberOp::block_size> FiberOp::pool(fiber_op_startup_blocks);
 
 FiberOp::FiberOp(AsyncData* async) noexcept
     : opType(ASYNC)

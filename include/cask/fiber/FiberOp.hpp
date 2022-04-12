@@ -116,7 +116,8 @@ public:
     ~FiberOp();
     
 private:
-    static Pool<128> pool;
+    static constexpr std::size_t block_size = 128;
+    static Pool<block_size> pool;
 
     static std::shared_ptr<const FiberOp> fixed_predicate(
         const FlatMapPredicate& input_predicate,

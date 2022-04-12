@@ -1,3 +1,3 @@
 #include "cask/Erased.hpp"
 
-cask::Pool<128> cask::Erased::pool(1024);
+cask::Pool<cask::erased_pool_block_size> cask::Erased::pool(cask::erased_pool_startup_blocks);

@@ -6,6 +6,8 @@
 #ifndef _CASK_ERASED_H_
 #define _CASK_ERASED_H_
 
+#include "cask/Config.hpp"
+
 #include <atomic>
 #include <stdexcept>
 #include <functional>
@@ -85,7 +87,7 @@ public:
 
     ~Erased();
 private:
-    static Pool<128> pool;
+    static Pool<erased_pool_block_size> pool;
 
     void* data;
     void (*deleter)(void*);
