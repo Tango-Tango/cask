@@ -30,8 +30,9 @@ private:
 
 template <class T, class... Args>
 T* Pool::allocate(Args&&... args) {
-    while(memory_pool_lock.test_and_set(std::memory_order_acquire));
 
+    
+    while(memory_pool_lock.test_and_set(std::memory_order_acquire));
     if(free_list.empty() || sizeof(T) > block_size) {
         memory_pool_lock.clear(std::memory_order_release);
         return new T(std::forward<Args>(args)...);
@@ -47,23 +48,32 @@ T* Pool::allocate(Args&&... args) {
 template <class T>
 void Pool::deallocate(T* ptr) {
     bool is_from_pool = false;
+    std::size_t found_block;
 
     while(memory_pool_lock.test_and_set(std::memory_order_acquire));
 
     auto search = allocated_blocks.find(ptr);
     if (search != allocated_blocks.end()) {
         const auto& block = search->second;
-        free_list.push(block);
-        allocated_blocks.erase(search);
         is_from_pool = true;
+        found_block = block;
+        allocated_blocks.erase(search);
     }
 
     memory_pool_lock.clear(std::memory_order_release);
 
     if(is_from_pool) {
         std::destroy_at<T>(ptr);
+
+        while(memory_pool_lock.test_and_set(std::memory_order_acquire));
+        free_list.push(found_block);
+        memory_pool_lock.clear(std::memory_order_release);
     } else {
-        delete ptr;
+        if constexpr (std::is_array_v<T>) {
+            delete [] ptr;
+        } else {
+            delete ptr;
+        }
     }
 }
 

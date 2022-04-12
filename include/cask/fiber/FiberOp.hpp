@@ -16,6 +16,7 @@
 #include "../Either.hpp"
 #include "../Erased.hpp"
 #include "../Scheduler.hpp"
+#include "../Pool.hpp"
 
 namespace cask {
 
@@ -91,6 +92,15 @@ public:
      */
     std::shared_ptr<const FiberOp> flatMap(const FlatMapPredicate& predicate) const noexcept;
 
+    union {
+        AsyncData* asyncData;
+        ConstantData* constantData;
+        ThunkData* thunkData;
+        FlatMapData* flatMapData;
+        DelayData* delayData;
+        RaceData* raceData;
+    } data;
+
     /**
      * Construct a fiber op of the given type. Should not be called directly and instead
      * users should use the static construction methods provided.
@@ -101,18 +111,12 @@ public:
     explicit FiberOp(FlatMapData* flatMap) noexcept;
     explicit FiberOp(DelayData* delay) noexcept;
     explicit FiberOp(RaceData* race) noexcept;
-    explicit FiberOp(bool cancel_flag) noexcept;
-
-    union {
-        AsyncData* asyncData;
-        ConstantData* constantData;
-        ThunkData* thunkData;
-        FlatMapData* flatMapData;
-        DelayData* delayData;
-        RaceData* raceData;
-    } data;
+    explicit FiberOp(bool cancel_flag) noexcept;    
 
     ~FiberOp();
+    
+private:
+    static Pool pool;
 };
 
 } // namespace cask::fiber
