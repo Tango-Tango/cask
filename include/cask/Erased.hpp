@@ -85,7 +85,7 @@ public:
 
     ~Erased();
 private:
-    static Pool pool;
+    static Pool<128> pool;
 
     void* data;
     void (*deleter)(void*);

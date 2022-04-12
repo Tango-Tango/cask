@@ -1,3 +1,3 @@
 #include "cask/Erased.hpp"
 
-cask::Pool cask::Erased::pool;
+cask::Pool<128> cask::Erased::pool;

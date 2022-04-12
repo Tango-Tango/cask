@@ -9,7 +9,7 @@
 
 namespace cask::fiber {
 
-Pool FiberOp::pool;
+Pool<128> FiberOp::pool;
 
 FiberOp::FiberOp(AsyncData* async) noexcept
     : opType(ASYNC)

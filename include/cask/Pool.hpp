@@ -4,10 +4,11 @@
 #include <atomic>
 #include <cstdint>
 #include <stack>
-#include <map>
+#include <unordered_map>
 
 namespace cask {
 
+template <std::size_t BlockSize>
 class Pool {
 public:
     Pool();
@@ -20,59 +21,63 @@ public:
     void deallocate(T* ptr);
 
 private:
-    const std::uint32_t block_size = 1024;
-    const std::uint32_t num_blocks = 1024;
-    std::uint8_t** memory_pool;
-    std::map<void*,std::size_t> allocated_blocks;
-    std::stack<std::size_t> free_list;
-    std::atomic_flag memory_pool_lock = ATOMIC_FLAG_INIT;
+    struct Block {
+        uint8_t memory[BlockSize];
+        std::atomic<Block*> next;
+    };
+
+    std::atomic<Block*> free_blocks;
 };
 
-template <class T, class... Args>
-T* Pool::allocate(Args&&... args) {
+template <std::size_t BlockSize>
+Pool<BlockSize>::Pool() : free_blocks(nullptr) {}
 
-    
-    while(memory_pool_lock.test_and_set(std::memory_order_acquire));
-    if(free_list.empty() || sizeof(T) > block_size) {
-        memory_pool_lock.clear(std::memory_order_release);
-        return new T(std::forward<Args>(args)...);
-    } else {
-        auto block = free_list.top();
-        free_list.pop();
-        allocated_blocks.emplace(static_cast<void*>(memory_pool[block]), block);
-        memory_pool_lock.clear(std::memory_order_release);
-        return new (memory_pool[block]) T(std::forward<Args>(args)...);   
+template <std::size_t BlockSize>
+Pool<BlockSize>::~Pool() {
+    auto current = free_blocks.load();
+
+    while(current) {
+        auto old = current->next.load();
+        delete current;
+        current = old;
     }
 }
 
-template <class T>
-void Pool::deallocate(T* ptr) {
-    bool is_from_pool = false;
-    std::size_t found_block;
-
-    while(memory_pool_lock.test_and_set(std::memory_order_acquire));
-
-    auto search = allocated_blocks.find(ptr);
-    if (search != allocated_blocks.end()) {
-        const auto& block = search->second;
-        is_from_pool = true;
-        found_block = block;
-        allocated_blocks.erase(search);
+template <std::size_t BlockSize>
+template <class T, class... Args>
+T* Pool<BlockSize>::allocate(Args&&... args) {
+    if constexpr (sizeof(T) > BlockSize) {
+        return new T(std::forward<Args>(args)...);
+    } else {
+        while (true) {
+            auto head = free_blocks.load(std::memory_order_relaxed);
+            if (head && free_blocks.compare_exchange_strong(head, head->next, std::memory_order_acquire, std::memory_order_relaxed)) {
+                return new (head->memory) T(std::forward<Args>(args)...);   
+            } else if(!head) {
+                auto block = new Block();
+                return new (block->memory) T(std::forward<Args>(args)...);   
+            }
+        }
     }
+}
 
-    memory_pool_lock.clear(std::memory_order_release);
-
-    if(is_from_pool) {
+template <std::size_t BlockSize>
+template <class T>
+void Pool<BlockSize>::deallocate(T* ptr) {
+    if constexpr (sizeof(T) > BlockSize) {
+        delete ptr;
+    } else {
         std::destroy_at<T>(ptr);
 
-        while(memory_pool_lock.test_and_set(std::memory_order_acquire));
-        free_list.push(found_block);
-        memory_pool_lock.clear(std::memory_order_release);
-    } else {
-        if constexpr (std::is_array_v<T>) {
-            delete [] ptr;
-        } else {
-            delete ptr;
+        auto block = reinterpret_cast<Block*>(ptr);
+
+        while (true) {
+            auto head = free_blocks.load(std::memory_order_relaxed);
+            block->next.store(head, std::memory_order_relaxed);
+
+            if(free_blocks.compare_exchange_strong(head, block, std::memory_order_release, std::memory_order_relaxed)) {
+                break;
+            }
         }
     }
 }

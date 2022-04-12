@@ -116,7 +116,7 @@ public:
     ~FiberOp();
     
 private:
-    static Pool pool;
+    static Pool<128> pool;
 };
 
 } // namespace cask::fiber

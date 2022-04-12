@@ -10,11 +10,11 @@
 using cask::Pool;
 
 TEST(Pool, Constructs) {
-    Pool pool;
+    Pool<128> pool;
 }
 
 TEST(Pool, AllocatesAndFrees) {
-    Pool pool;
+    Pool<128> pool;
 
     int* thing = pool.allocate<int>();
     pool.deallocate<int>(thing);
