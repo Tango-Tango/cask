@@ -11,7 +11,7 @@ namespace cask {
 template <std::size_t BlockSize>
 class Pool {
 public:
-    Pool(std::size_t initial_size = 0);
+    explicit Pool(std::size_t initial_size = 0);
     ~Pool();
 
     template <class T, class... Args>
@@ -88,6 +88,6 @@ void Pool<BlockSize>::deallocate(T* ptr) {
     }
 }
 
-}
+} // namespace cask
 
 #endif
