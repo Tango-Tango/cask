@@ -138,15 +138,21 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
         case FLATMAP:
         {
             FiberOp::FlatMapData* data = this->data.flatMapData;
-            auto fixedPredicate = [inputPredicate = data->second, outputPredicate = predicate](auto value) {
-                return inputPredicate(value)->flatMap(outputPredicate);
-            };
-            auto flatMapData = FiberOp::pool.allocate<FlatMapData>(data->first, fixedPredicate);
+            auto fixed = std::bind(FiberOp::fixed_predicate, data->second, predicate, std::placeholders::_1);
+            auto flatMapData = FiberOp::pool.allocate<FlatMapData>(data->first, fixed);
             return std::make_shared<FiberOp>(flatMapData);
         }
         break;
     }
     __builtin_unreachable();
+}
+
+std::shared_ptr<const FiberOp> FiberOp::fixed_predicate(
+    const FlatMapPredicate& input_predicate,
+    const FlatMapPredicate& output_predicate,
+    const FiberValue& value
+) {
+    return input_predicate(value)->flatMap(output_predicate);
 }
 
 } // namespace cask::fiber

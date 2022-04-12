@@ -117,6 +117,12 @@ public:
     
 private:
     static Pool<128> pool;
+
+    static std::shared_ptr<const FiberOp> fixed_predicate(
+        const FlatMapPredicate& input_predicate,
+        const FlatMapPredicate& output_predicate,
+        const FiberValue& value
+    );
 };
 
 } // namespace cask::fiber
