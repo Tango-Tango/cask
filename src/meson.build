@@ -1,6 +1,7 @@
 cask_sources = [
     'cask/fiber/FiberOp.cpp',
     'cask/fiber/FiberValue.cpp',
+    'cask/Erased.cpp',
     'cask/Scheduler.cpp',
     'cask/scheduler/BenchScheduler.cpp',
     'cask/scheduler/SingleThreadScheduler.cpp',

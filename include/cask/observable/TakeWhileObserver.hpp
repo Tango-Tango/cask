@@ -74,7 +74,7 @@ Task<Ack,None> TakeWhileObserver<T,E>::onNext(const T& value) {
 
 template <class T, class E>
 Task<None,None> TakeWhileObserver<T,E>::onError(const E& error) {
-    if(!completed.test_and_set()) {
+    if(!completed.test_and_set(std::memory_order_relaxed)) {
         return downstream->onError(error);
     } else {
         return Task<None,None>::none();
@@ -83,7 +83,7 @@ Task<None,None> TakeWhileObserver<T,E>::onError(const E& error) {
 
 template <class T, class E>
 Task<None,None> TakeWhileObserver<T,E>::onComplete() {
-    if(!completed.test_and_set()) {
+    if(!completed.test_and_set(std::memory_order_relaxed)) {
         return downstream->onComplete();
     } else {
         return Task<None,None>::none();
@@ -92,7 +92,7 @@ Task<None,None> TakeWhileObserver<T,E>::onComplete() {
 
 template <class T, class E>
 Task<None,None> TakeWhileObserver<T,E>::onCancel() {
-    if(!completed.test_and_set()) {
+    if(!completed.test_and_set(std::memory_order_relaxed)) {
         return downstream->onCancel();
     } else {
         return Task<None,None>::none();

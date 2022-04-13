@@ -3,11 +3,14 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
+#include "cask/Config.hpp"
 #include "cask/Deferred.hpp"
 #include "cask/fiber/FiberOp.hpp"
 #include <utility>
 
 namespace cask::fiber {
+
+Pool<FiberOp::block_size> FiberOp::pool(fiber_op_startup_blocks);
 
 FiberOp::FiberOp(AsyncData* async) noexcept
     : opType(ASYNC)
@@ -59,22 +62,22 @@ FiberOp::~FiberOp() {
     switch(opType) {
         case VALUE:
         case ERROR:
-            delete data.constantData;
+            FiberOp::pool.deallocate<ConstantData>(data.constantData);
         break;
         case THUNK:
-            delete data.thunkData;
+            FiberOp::pool.deallocate<ThunkData>(data.thunkData);
         break;
         case ASYNC:
-            delete data.asyncData;
+            FiberOp::pool.deallocate<AsyncData>(data.asyncData);
         break;
         case FLATMAP:
-            delete data.flatMapData;
+            FiberOp::pool.deallocate<FlatMapData>(data.flatMapData);
         break;
         case DELAY:
-            delete data.delayData;
+            FiberOp::pool.deallocate<DelayData>(data.delayData);
         break;
         case RACE:
-            delete data.raceData;
+            FiberOp::pool.deallocate<RaceData>(data.raceData);
         break;
         case CANCEL:
         break;
@@ -82,37 +85,37 @@ FiberOp::~FiberOp() {
 }
 
 std::shared_ptr<const FiberOp> FiberOp::value(const Erased& v) noexcept {
-    auto constant = new ConstantData(Either<Erased,Erased>::left(v));
+    auto constant = FiberOp::pool.allocate<ConstantData>(Either<Erased,Erased>::left(v));
     return std::make_shared<FiberOp>(constant);
 }
 
 std::shared_ptr<const FiberOp> FiberOp::value(Erased&& v) noexcept {
-    auto constant = new ConstantData(Either<Erased,Erased>::left(v));
+    auto constant = FiberOp::pool.allocate<ConstantData>(Either<Erased,Erased>::left(v));
     return std::make_shared<FiberOp>(constant);
 }
 
 std::shared_ptr<const FiberOp> FiberOp::error(const Erased& e) noexcept {
-    return std::make_shared<FiberOp>(new ConstantData(Either<Erased,Erased>::right(e)));
+    return std::make_shared<FiberOp>(FiberOp::pool.allocate<ConstantData>(Either<Erased,Erased>::right(e)));
 }
 
 std::shared_ptr<const FiberOp> FiberOp::async(const  std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept {
-    return std::make_shared<FiberOp>(new AsyncData(predicate));
+    return std::make_shared<FiberOp>(FiberOp::pool.allocate<AsyncData>(predicate));
 }
 
 std::shared_ptr<const FiberOp> FiberOp::thunk(const std::function<Erased()>& thunk) noexcept {
-    return std::make_shared<FiberOp>(new ThunkData(thunk));
+    return std::make_shared<FiberOp>(FiberOp::pool.allocate<ThunkData>(thunk));
 }
 
 std::shared_ptr<const FiberOp> FiberOp::delay(int64_t delay_ms) noexcept {
-    return std::make_shared<FiberOp>(new DelayData(delay_ms));
+    return std::make_shared<FiberOp>(FiberOp::pool.allocate<DelayData>(delay_ms));
 }
 
 std::shared_ptr<const FiberOp> FiberOp::race(const std::vector<std::shared_ptr<const FiberOp>>& race) noexcept {
-    return std::make_shared<FiberOp>(new RaceData(race));
+    return std::make_shared<FiberOp>(FiberOp::pool.allocate<RaceData>(race));
 }
 
 std::shared_ptr<const FiberOp> FiberOp::race(std::vector<std::shared_ptr<const FiberOp>>&& race) noexcept {
-    return std::make_shared<FiberOp>(new RaceData(std::move(race)));
+    return std::make_shared<FiberOp>(FiberOp::pool.allocate<RaceData>(std::move(race)));
 }
 
 std::shared_ptr<const FiberOp> FiberOp::cancel() noexcept {
@@ -129,22 +132,28 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
         case RACE:
         case CANCEL:
         {
-            auto data = new FlatMapData(this->shared_from_this(), predicate);
+            auto data = FiberOp::pool.allocate<FlatMapData>(this->shared_from_this(), predicate);
             return std::make_shared<FiberOp>(data);
         }
         break;
         case FLATMAP:
         {
             FiberOp::FlatMapData* data = this->data.flatMapData;
-            auto fixedPredicate = [inputPredicate = data->second, outputPredicate = predicate](auto value) {
-                return inputPredicate(value)->flatMap(outputPredicate);
-            };
-            auto flatMapData = new FlatMapData(data->first, fixedPredicate);
+            auto fixed = std::bind(FiberOp::fixed_predicate, data->second, predicate, std::placeholders::_1);
+            auto flatMapData = FiberOp::pool.allocate<FlatMapData>(data->first, fixed);
             return std::make_shared<FiberOp>(flatMapData);
         }
         break;
     }
     __builtin_unreachable();
+}
+
+std::shared_ptr<const FiberOp> FiberOp::fixed_predicate(
+    const FlatMapPredicate& input_predicate,
+    const FlatMapPredicate& output_predicate,
+    const FiberValue& value
+) {
+    return input_predicate(value)->flatMap(output_predicate);
 }
 
 } // namespace cask::fiber

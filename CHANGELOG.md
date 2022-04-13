@@ -3,6 +3,12 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 12.0
+- Add the `Pool` type as a simple memory pool.
+- Add pooling to `Erased` and `FiberOp` object creations.
+- Add configuration options to control the pool block sizes and initial
+  pool sizes.
+
 ## 11.4
 - Allow a thread priority to be set for the single threaded scheduler.
 

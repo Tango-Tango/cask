@@ -11,6 +11,7 @@ if not meson.is_subproject()
         'cask/TestList.cpp',
         'cask/TestMVar.cpp',
         'cask/TestObservable.cpp',
+        'cask/TestPool.cpp',
         'cask/TestPromiseDeferred.cpp',
         'cask/TestQueue.cpp',
         'cask/TestRef.cpp',

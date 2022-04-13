@@ -6,10 +6,15 @@
 #ifndef _CASK_CONFIG_H_
 #define _CASK_CONFIG_H_
 
+#include <cstddef>
+
 namespace cask {
 
 static constexpr bool ref_uses_atomics = @ref_uses_atomics@;
 static constexpr unsigned int batch_size = @batch_size@;
+static constexpr std::size_t erased_pool_block_size = @erased_pool_block_size@;
+static constexpr std::size_t erased_pool_startup_blocks = @erased_pool_startup_blocks@;
+static constexpr std::size_t fiber_op_startup_blocks = @fiber_op_startup_blocks@;
 
 }
 
