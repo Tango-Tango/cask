@@ -8,20 +8,21 @@
 #include "cask/Pool.hpp"
 
 using cask::Pool;
+using cask::pool::BlockPool;
 
 TEST(Pool, Constructs) {
-    Pool<128> pool;
+    Pool pool;
 }
 
 TEST(Pool, AllocatesAndFrees) {
-    Pool<128> pool;
+    Pool pool;
 
     int* thing = pool.allocate<int>();
     pool.deallocate<int>(thing);
 }
 
 TEST(Pool, AllocatesLIFO) {
-    Pool<128> pool;
+    Pool pool;
 
     int* thing1 = pool.allocate<int>();
     pool.deallocate<int>(thing1);
@@ -32,22 +33,8 @@ TEST(Pool, AllocatesLIFO) {
     EXPECT_EQ(thing1, thing2);
 }
 
-TEST(Pool, AllocatesLargeObjectOnHeap) {
-    Pool<1> pool;
-
-    auto thing1 = pool.allocate<uint64_t>();
-    delete thing1;
-}
-
-TEST(Pool, Preallocates) {
-    Pool<128> pool(32);
-
-    int* thing1 = pool.allocate<int>();
-    pool.deallocate<int>(thing1);
-}
-
 TEST(Pool, RepeatedlyAllocates) {
-    Pool<128> pool;
+    Pool pool;
 
     int* thing1 = pool.allocate<int>();
     int* thing2 = pool.allocate<int>();
@@ -56,5 +43,18 @@ TEST(Pool, RepeatedlyAllocates) {
 
     pool.deallocate<int>(thing1);
     pool.deallocate<int>(thing2);
+}
+
+TEST(Pool, AllocatesLotsOfSmallObjects) {
+    Pool pool;
+    std::deque<int*> allocations;
+
+    for(std::size_t i = 0; i < 2048*1024; i++) {
+        allocations.push_back(pool.allocate<int>());
+    }
+
+    for(auto& ptr : allocations) {
+        pool.deallocate<int>(ptr);
+    }
 }
 

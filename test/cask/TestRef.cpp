@@ -38,7 +38,7 @@ TEST(Ref,ContendedUpdates) {
 
     std::vector<FiberRef<None,std::any>> fibers;
 
-    for(int i = 0; i < 1000; i++) {
+    for(int i = 0; i < 100000; i++) {
         auto first = ref->update([](auto value) {
             auto [left, right] = value;
             return std::make_tuple(left + 1, right);
@@ -66,6 +66,6 @@ TEST(Ref,ContendedUpdates) {
         .run(Scheduler::global())
         ->await();
 
-    EXPECT_EQ(left, 1000);
-    EXPECT_EQ(right, 1000);
+    EXPECT_EQ(left, 100000);
+    EXPECT_EQ(right, 100000);
 }

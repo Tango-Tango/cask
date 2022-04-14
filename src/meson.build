@@ -1,8 +1,8 @@
 cask_sources = [
+    'cask/Scheduler.cpp',
     'cask/fiber/FiberOp.cpp',
     'cask/fiber/FiberValue.cpp',
-    'cask/Erased.cpp',
-    'cask/Scheduler.cpp',
+    'cask/pool/InternalPool.cpp',
     'cask/scheduler/BenchScheduler.cpp',
     'cask/scheduler/SingleThreadScheduler.cpp',
     'cask/scheduler/ThreadPoolScheduler.cpp'

@@ -14,7 +14,7 @@
 #include <type_traits>
 #include <typeinfo>
 #include <stack>
-#include "Pool.hpp"
+#include "cask/pool/InternalPool.hpp"
 
 namespace cask {
 
@@ -35,28 +35,16 @@ class Erased {
 public:
     Erased() noexcept;
     Erased(const Erased& other) noexcept;
-    Erased(Erased&& other) noexcept;
 
     template <typename T,
               std::enable_if_t<!std::is_same<T,Erased>::value, bool> = true>
     Erased(const T& value) noexcept; // NOLINT(google-explicit-constructor)
 
-    template <typename T,
-              typename T2 = typename std::remove_const<typename std::remove_reference<T>::type>::type,
-              std::enable_if_t<!std::is_same<T2,Erased>::value, bool> = true>
-    Erased(T&& value) noexcept; // NOLINT(google-explicit-constructor,bugprone-forwarding-reference-overload)
-
     Erased& operator=(const Erased& other) noexcept;
-    Erased& operator=(Erased&& other) noexcept;
 
     template <typename T,
               std::enable_if_t<!std::is_same<T,Erased>::value, bool> = true>
     Erased& operator=(const T& value) noexcept;
-
-    template <typename T,
-              typename T2 = typename std::remove_const<typename std::remove_reference<T>::type>::type,
-              std::enable_if_t<!std::is_same<T2,Erased>::value, bool> = true>
-    Erased& operator=(T&& value) noexcept;
 
     /**
      * Check if this instance is currently holding a value.
@@ -87,8 +75,6 @@ public:
 
     ~Erased();
 private:
-    static Pool<erased_pool_block_size> pool;
-
     void* data;
     void (*deleter)(void*);
     void* (*copier)(void*);
@@ -97,54 +83,26 @@ private:
 
 template <typename T, std::enable_if_t<!std::is_same<T,Erased>::value, bool>>
 inline Erased::Erased(const T& value) noexcept
-    : data(Erased::pool.allocate<T>(value))
-    , deleter([](void* ptr) -> void { Erased::pool.deallocate<T>(static_cast<T*>(ptr)); })
-    , copier([](void* ptr) -> void* { return Erased::pool.allocate<T>(*(static_cast<T*>(ptr))); })
+    : data(cask::pool::global_pool().allocate<T>(value))
+    , deleter([](void* ptr) -> void { cask::pool::global_pool().deallocate<T>(static_cast<T*>(ptr)); })
+    , copier([](void* ptr) -> void* { return cask::pool::global_pool().allocate<T>(*(static_cast<T*>(ptr))); })
     , info(&typeid(T))
 {}
-
-template <typename T, typename T2, std::enable_if_t<!std::is_same<T2,Erased>::value, bool>>
-inline Erased::Erased(T&& value) noexcept {  // NOLINT(google-explicit-constructor,bugprone-forwarding-reference-overload)
-    data = Erased::pool.allocate<T2>(value);
-    deleter = [](void* ptr) -> void { Erased::pool.deallocate<T2>(static_cast<T2*>(ptr)); };
-    copier = [](void* ptr) -> void* { return Erased::pool.allocate<T2>(*(static_cast<T2*>(ptr)));};
-    info = &typeid(T2);
-}
 
 template <typename T, std::enable_if_t<!std::is_same<T,Erased>::value, bool>>
 inline Erased& Erased::operator=(const T& value) noexcept {
     if(data == nullptr) {
-        data = Erased::pool.allocate<T>(value);
-        deleter = [](void* ptr) -> void { Erased::pool.deallocate<T>(static_cast<T*>(ptr)); };
-        copier = [](void* ptr) -> void* { return Erased::pool.allocate<T>(*static_cast<T*>(ptr)); };
+        data = cask::pool::global_pool().allocate<T>(value);
+        deleter = [](void* ptr) -> void { cask::pool::global_pool().deallocate<T>(static_cast<T*>(ptr)); };
+        copier = [](void* ptr) -> void* { return cask::pool::global_pool().allocate<T>(*static_cast<T*>(ptr)); };
         info = &typeid(T);
     } else if(typeid(T) == *info) {
         *static_cast<T*>(data) = value;
     } else {
         deleter(data);
-        data = Erased::pool.allocate<T>(value);
-        deleter = [](void* ptr) -> void { Erased::pool.deallocate<T>(ptr); };
-        copier = [](void* ptr) -> void* { return Erased::pool.allocate<T>(*static_cast<T*>(ptr)); };
-        info = &typeid(T);
-    }
-
-    return *this;
-}
-
-template <typename T, typename T2, std::enable_if_t<!std::is_same<T2,Erased>::value, bool>>
-inline Erased& Erased::operator=(T&& value) noexcept {
-    if(data == nullptr) {
-        data = Erased::pool.allocate<T>(value);
-        deleter = [](void* ptr) -> void { Erased::pool.deallocate<T>(static_cast<T*>(ptr)); };
-        copier = [](void* ptr) -> void* { return Erased::pool.allocate<T>(*static_cast<T*>(ptr)); };
-        info = &typeid(T);
-    } else if(typeid(T) == *info) {
-        *static_cast<T*>(data) = value;
-    } else {
-        deleter(data);
-        data = Erased::pool.allocate<T>(value);
-        deleter = [](void* ptr) -> void { Erased::pool.deallocate<T>(static_cast<T*>(ptr)); };
-        copier = [](void* ptr) -> void* { return Erased::pool.allocate<T>(*static_cast<T*>(ptr)); };
+        data = cask::pool::global_pool().allocate<T>(value);
+        deleter = [](void* ptr) -> void { cask::pool::global_pool().deallocate<T>(static_cast<T*>(ptr)); };
+        copier = [](void* ptr) -> void* { return cask::pool::global_pool().allocate<T>(*static_cast<T*>(ptr)); };
         info = &typeid(T);
     }
 
@@ -180,15 +138,6 @@ inline Erased::Erased(const Erased& other) noexcept
     }
 }
 
-inline Erased::Erased(Erased&& other) noexcept
-    : data(other.data)
-    , deleter(other.deleter)
-    , copier(other.copier)
-    , info(other.info)
-{
-    other.data = nullptr;
-}
-
 inline Erased& Erased::operator=(const Erased& other) noexcept {
     if(this != &other) {
         reset();
@@ -197,20 +146,6 @@ inline Erased& Erased::operator=(const Erased& other) noexcept {
             this->copier = other.copier;
             this->data = other.copier(other.data);
             this->info = other.info;
-        }
-    }
-    return *this;
-}
-
-inline Erased& Erased::operator=(Erased&& other) noexcept  {
-    if(this != &other) {
-        reset();
-        if(other.data != nullptr) {
-            this->deleter = other.deleter;
-            this->copier = other.copier;
-            this->data = other.data;
-            this->info = other.info;
-            other.data = nullptr;
         }
     }
     return *this;
