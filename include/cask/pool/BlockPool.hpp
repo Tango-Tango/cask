@@ -126,15 +126,16 @@ void BlockPool<BlockSize,ChunkSize,Alignment>::deallocate(T* ptr) {
 
     auto block = reinterpret_cast<Block*>(ptr);
 
+#if CASK_ASAN_ENABLED
+    // Poison the memory for asan
+    __asan_poison_memory_region(block->memory, BlockSize);
+#endif
+
     while (true) {
         auto head = free_blocks.load();
         block->next.store(head);
 
         if(free_blocks.compare_exchange_weak(head, block)) {
-#if CASK_ASAN_ENABLED
-            // Poison the memory for asan
-            __asan_poison_memory_region(block->memory, BlockSize);
-#endif
             break;
         }
     }

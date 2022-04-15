@@ -62,3 +62,19 @@ if [ "$BUILD_TARGET" = "clang_debug" ] || [ "$BUILD_TARGET" = "all" ]; then
         -Dref_uses_atomics=false
 fi
 
+if [ "$BUILD_TARGET" = "mips" ] || [ "$BUILD_TARGET" = "all" ]; then
+    rm -rf build_mips
+    meson setup build_mips --cross-file mips.ini \
+        -Dbuildtype=release \
+        -Dwarning_level=3 \
+        -Dwerror=true
+fi
+
+if [ "$BUILD_TARGET" = "arm" ] || [ "$BUILD_TARGET" = "all" ]; then
+    rm -rf build_arm
+    meson setup build_arm --cross-file arm.ini \
+        -Dbuildtype=release \
+        -Dwarning_level=3 \
+        -Dwerror=true
+fi
+
