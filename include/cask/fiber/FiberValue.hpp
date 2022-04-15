@@ -22,10 +22,8 @@ public:
     bool isCanceled() const;
 
     void setValue(const Erased& value);
-    void setValue(Erased&& value);
 
     void setError(const Erased& value);
-    void setError(Erased&& value);
 
     void setCanceled();
 
