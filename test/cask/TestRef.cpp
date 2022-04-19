@@ -66,6 +66,6 @@ TEST(Ref,ContendedUpdates) {
         .run(Scheduler::global())
         ->await();
 
-    EXPECT_EQ(left, 1000);
-    EXPECT_EQ(right, 1000);
+    EXPECT_EQ(left, 10000);
+    EXPECT_EQ(right, 10000);
 }
