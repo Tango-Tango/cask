@@ -196,6 +196,6 @@ BlockPool<BlockSize,ChunkSize,Alignment>::Chunk::Chunk()
     , next(nullptr)
 {}
 
-} // namespace cask
+} // namespace cask::pool
 
 #endif
