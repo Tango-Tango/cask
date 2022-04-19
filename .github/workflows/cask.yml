@@ -25,7 +25,7 @@ jobs:
 
     strategy:
       matrix:
-        target: [debug, release, release_no_atomics, release_always_async, clang]
+        target: [debug, release, release_no_atomics, release_always_async, clang, mips, arm]
       fail-fast: false
 
     steps:
@@ -38,7 +38,7 @@ jobs:
     - name: Update Apt Cache
       run: sudo apt-get update
     - name: Install Apt Development Dependencies
-      run: sudo apt-get install -y ninja-build build-essential python3-pip gcovr clang
+      run: sudo apt-get install -y ninja-build build-essential python3-pip gcovr clang g++-10-arm-linux-gnueabihf g++-10-mipsel-linux-gnu qemu-user
     - name: Install Python Development Dependencies
       run: sudo python3 -m pip install meson==0.61.1
     - name: Run the Pre-Build Release Stage

@@ -7,7 +7,6 @@ project(
     meson_version: '>= 0.57.0'
 )
 
-
 cpp = meson.get_compiler('cpp')
 
 # Discover Number of CPU Threads
@@ -19,6 +18,41 @@ endif
 
 # Declare Dependencies
 dependencies = []
+
+# Check if libatomic is needed
+cxx_atomics_check_code = '''
+#include <atomic>
+#include <cstdint>
+struct Block {
+    void* ptr;
+    std::uint16_t counter;
+
+    Block() : ptr(nullptr), counter(0) {}
+};
+
+int main() {
+    Block initial_block;
+    std::atomic<Block> head(initial_block);
+
+    Block old_head = head.load();
+    Block new_head;
+    new_head.ptr = old_head.ptr;
+    new_head.counter = old_head.counter + 1;
+    head.compare_exchange_weak(old_head, new_head);
+	return 0;
+}
+'''
+
+if not cpp.links(cxx_atomics_check_code, name: 'std::atomic')
+    libatomic = cpp.find_library('atomic')
+    
+    assert(
+        cpp.links(cxx_atomics_check_code, dependencies: libatomic, name: 'std::atomic with libatomic'),
+        'Cask requires support for C++ std::atomic either builtin or via libatomic'
+    )
+
+    dependencies += libatomic
+endif
 
 # Setup the doxygen docs task
 doxygen = find_program('doxygen', required : false)

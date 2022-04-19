@@ -47,7 +47,7 @@ Task<Ack, None> LastObserver<T,E>::onNext(const T& value) {
 
 template <class T, class E>
 Task<None,None> LastObserver<T,E>::onError(const E& error) {
-    if(!completed.test_and_set(std::memory_order_relaxed)) {
+    if(!completed.test_and_set()) {
         if(auto promiseLock = promise.lock()) {
             promiseLock->error(error);
         }
@@ -58,7 +58,7 @@ Task<None,None> LastObserver<T,E>::onError(const E& error) {
 
 template <class T, class E>
 Task<None,None>  LastObserver<T,E>::onComplete() {
-    if(!completed.test_and_set(std::memory_order_relaxed)) {
+    if(!completed.test_and_set()) {
         if(auto promiseLock = promise.lock()) {
             promiseLock->success(lastValue);
         }
@@ -69,7 +69,7 @@ Task<None,None>  LastObserver<T,E>::onComplete() {
 
 template <class T, class E>
 Task<None,None>  LastObserver<T,E>::onCancel() {
-    if(!completed.test_and_set(std::memory_order_relaxed)) {
+    if(!completed.test_and_set()) {
         if(auto promiseLock = promise.lock()) {
             promiseLock->cancel();
         }

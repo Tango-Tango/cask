@@ -1,19 +1,15 @@
 #ifndef _CASK_POOL_H_
 #define _CASK_POOL_H_
 
-#include <atomic>
 #include <cstdint>
-#include <stack>
-#include <unordered_map>
+#include <cstddef>
+#include <new>
+#include "pool/BlockPool.hpp"
 
 namespace cask {
 
-template <std::size_t BlockSize>
 class Pool {
 public:
-    explicit Pool(std::size_t initial_size = 0);
-    ~Pool();
-
     template <class T, class... Args>
     T* allocate(Args&&... args);
 
@@ -21,70 +17,65 @@ public:
     void deallocate(T* ptr);
 
 private:
-    struct Block {
-        uint8_t memory[BlockSize];
-        std::atomic<Block*> next;
-    };
+    #ifdef __cpp_lib_hardware_interference_size
+        using std::hardware_destructive_interference_size; 
+    #elif __mips__
+        static constexpr std::size_t hardware_destructive_interference_size = 32;
+    #else
+        static constexpr std::size_t hardware_destructive_interference_size = 64;
+    #endif
 
-    std::atomic<Block*> free_blocks;
+    static constexpr std::size_t smallest_block_num_entries = 2048;
+    static constexpr std::size_t smallest_block_size = hardware_destructive_interference_size * smallest_block_num_entries;
+
+    pool::BlockPool<hardware_destructive_interference_size, smallest_block_size, alignof(std::max_align_t)> small_pool;
+    pool::BlockPool<hardware_destructive_interference_size*2, smallest_block_size / 2, alignof(std::max_align_t)> medium_pool;
+    pool::BlockPool<hardware_destructive_interference_size*4, smallest_block_size / 4, alignof(std::max_align_t)> large_pool;
+    pool::BlockPool<hardware_destructive_interference_size*8, smallest_block_size / 8, alignof(std::max_align_t)> xlarge_pool;
+    pool::BlockPool<hardware_destructive_interference_size*16, smallest_block_size / 16, alignof(std::max_align_t)> xxlarge_pool;
+    pool::BlockPool<hardware_destructive_interference_size*32, smallest_block_size / 32, alignof(std::max_align_t)> xxxlarge_pool;
+    pool::BlockPool<hardware_destructive_interference_size*64, smallest_block_size / 64, alignof(std::max_align_t)> xxxxlarge_pool;
 };
 
-template <std::size_t BlockSize>
-Pool<BlockSize>::Pool(std::size_t initial_size) : free_blocks(nullptr) {
-    while(initial_size-- > 0) {
-        auto block = new Block();
-        block->next = free_blocks.load();
-        free_blocks.store(block);
-    }
-}
-
-template <std::size_t BlockSize>
-Pool<BlockSize>::~Pool() {
-    auto current = free_blocks.load();
-
-    while(current) {
-        auto old = current->next.load();
-        delete current;
-        current = old;
-    }
-}
-
-template <std::size_t BlockSize>
 template <class T, class... Args>
-T* Pool<BlockSize>::allocate(Args&&... args) {
-    if constexpr (sizeof(T) > BlockSize) {
-        return new T(std::forward<Args>(args)...);
+T* Pool::allocate(Args&&... args) {
+    if constexpr (sizeof(T) <= hardware_destructive_interference_size) {
+        return small_pool.template allocate<T,Args...>(std::forward<Args>(args)...);
+    } else if constexpr (sizeof(T) <= hardware_destructive_interference_size * 2) {
+        return medium_pool.template allocate<T,Args...>(std::forward<Args>(args)...);
+    } else if constexpr (sizeof(T) <= hardware_destructive_interference_size * 4) {
+        return large_pool.template allocate<T,Args...>(std::forward<Args>(args)...);
+    } else if constexpr (sizeof(T) <= hardware_destructive_interference_size * 8) {
+        return xlarge_pool.template allocate<T,Args...>(std::forward<Args>(args)...);
+    } else if constexpr (sizeof(T) <= hardware_destructive_interference_size * 16) {
+        return xxlarge_pool.template allocate<T,Args...>(std::forward<Args>(args)...);
+    } else if constexpr (sizeof(T) <= hardware_destructive_interference_size * 32) {
+        return xxxlarge_pool.template allocate<T,Args...>(std::forward<Args>(args)...);
+    } else if constexpr (sizeof(T) <= hardware_destructive_interference_size * 64)  {
+        return xxxxlarge_pool.template allocate<T,Args...>(std::forward<Args>(args)...);
     } else {
-        while (true) {
-            auto head = free_blocks.load(std::memory_order_relaxed);
-            if (head && free_blocks.compare_exchange_strong(head, head->next, std::memory_order_relaxed, std::memory_order_relaxed)) {
-                return new (head->memory) T(std::forward<Args>(args)...);   
-            } else if(!head) {
-                auto block = new Block();
-                return new (block->memory) T(std::forward<Args>(args)...);   
-            }
-        }
+        return new T(std::forward<Args>(args)...);
     }
 }
 
-template <std::size_t BlockSize>
 template <class T>
-void Pool<BlockSize>::deallocate(T* ptr) {
-    if constexpr (sizeof(T) > BlockSize) {
-        delete ptr;
+void Pool::deallocate(T* ptr) {
+    if constexpr (sizeof(T) <= hardware_destructive_interference_size) {
+        return small_pool.template deallocate<T>(ptr);
+    } else if constexpr (sizeof(T) <= hardware_destructive_interference_size * 2) {
+        return medium_pool.template deallocate<T>(ptr);
+    } else if constexpr (sizeof(T) <= hardware_destructive_interference_size * 4) {
+        return large_pool.template deallocate<T>(ptr);
+    } else if constexpr (sizeof(T) <= hardware_destructive_interference_size * 8) {
+        return xlarge_pool.template deallocate<T>(ptr);
+    } else if constexpr (sizeof(T) <= hardware_destructive_interference_size * 16) {
+        return xxlarge_pool.template deallocate<T>(ptr);
+    } else if constexpr (sizeof(T) <= hardware_destructive_interference_size * 32) {
+        return xxxlarge_pool.template deallocate<T>(ptr);
+    } else if constexpr (sizeof(T) <= hardware_destructive_interference_size * 64)  {
+        return xxxxlarge_pool.template deallocate<T>(ptr);
     } else {
-        std::destroy_at<T>(ptr);
-
-        auto block = reinterpret_cast<Block*>(ptr);
-
-        while (true) {
-            auto head = free_blocks.load(std::memory_order_relaxed);
-            block->next.store(head, std::memory_order_relaxed);
-
-            if(free_blocks.compare_exchange_strong(head, block, std::memory_order_relaxed, std::memory_order_relaxed)) {
-                break;
-            }
-        }
+        delete ptr;
     }
 }
 

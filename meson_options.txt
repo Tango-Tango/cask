@@ -1,5 +1,2 @@
 option('ref_uses_atomics', type: 'boolean', value: true)
 option('batch_size', type: 'integer', min: 1, value: 1024)
-option('erased_pool_block_size', type: 'integer', min: 8, value: 128)
-option('erased_pool_startup_blocks', type: 'integer', min: 0, value: 1024)
-option('fiber_op_startup_blocks', type: 'integer', min: 0, value: 1024)

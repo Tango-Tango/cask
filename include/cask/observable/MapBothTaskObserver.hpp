@@ -68,7 +68,7 @@ Task<Ack,None> MapBothTaskObserver<TI,TO,EI,EO>::onNext(const TI& value) {
 
 template <class TI, class TO, class EI, class EO>
 Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onError(const EI& error) {
-    if(!completed->test_and_set(std::memory_order_relaxed)) {
+    if(!completed->test_and_set()) {
         return errorPredicate(error).template flatMapBoth<None,None>(
             [downstream = downstream](TO downstreamValue) -> Task<None,None> {
                 return downstream->onNext(downstreamValue).template flatMap<None>(
@@ -88,7 +88,7 @@ Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onError(const EI& error) {
 
 template <class TI, class TO, class EI, class EO>
 Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onComplete() {
-    if(!completed->test_and_set(std::memory_order_relaxed)) {
+    if(!completed->test_and_set()) {
         return downstream->onComplete();
     } else {
         return Task<None,None>::none();
@@ -97,7 +97,7 @@ Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onComplete() {
 
 template <class TI, class TO, class EI, class EO>
 Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onCancel() {
-    if(!completed->test_and_set(std::memory_order_relaxed)) {
+    if(!completed->test_and_set()) {
         return downstream->onCancel();
     } else {
         return Task<None,None>::none();

@@ -73,25 +73,6 @@ TEST(Erased, OverwritesDuringAssignment) {
     EXPECT_EQ(second.get<int>(), 123);
 }
 
-TEST(Erased, MoveConstructs) {
-    Erased first(123);
-    Erased second(std::move(first));
-
-    EXPECT_FALSE(first.has_value()); // NOLINT
-    EXPECT_TRUE(second.has_value());
-    EXPECT_EQ(second.get<int>(), 123);
-}
-
-TEST(Erased, MoveAssigns) {
-    Erased first(123);
-    Erased second(std::string("foo"));
-    second = std::move(first);
-
-    EXPECT_FALSE(first.has_value()); // NOLINT
-    EXPECT_TRUE(second.has_value());
-    EXPECT_EQ(second.get<int>(), 123);
-}
-
 TEST(Erased, ThrowsEmptyGet) {
     try {
         Erased foo;

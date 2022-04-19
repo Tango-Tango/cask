@@ -8,6 +8,8 @@ echo "=====> Regnerating Build Environments"
 if [ "$BUILD_TARGET" = "debug" ] || [ "$BUILD_TARGET" = "all" ]; then
     rm -rf build_debug
     CC=gcc CXX=g++ meson setup build_debug \
+        -Ddebug=true \
+        -Doptimization=0 \
         -Db_sanitize=address,undefined \
         -Db_coverage=true \
         -Dwarning_level=3 \
@@ -17,7 +19,8 @@ fi
 if [ "$BUILD_TARGET" = "release" ] || [ "$BUILD_TARGET" = "all" ]; then
     rm -rf build_release
     CC=gcc CXX=g++ meson setup build_release \
-        -Dbuildtype=release \
+        -Ddebug=true \
+        -Doptimization=s \
         -Dwarning_level=3 \
         -Dwerror=true
 fi
@@ -60,5 +63,21 @@ if [ "$BUILD_TARGET" = "clang_debug" ] || [ "$BUILD_TARGET" = "all" ]; then
         -Dwarning_level=3 \
         -Dwerror=true \
         -Dref_uses_atomics=false
+fi
+
+if [ "$BUILD_TARGET" = "mips" ] || [ "$BUILD_TARGET" = "all" ]; then
+    rm -rf build_mips
+    meson setup build_mips --cross-file mips.ini \
+        -Dbuildtype=release \
+        -Dwarning_level=3 \
+        -Dwerror=true
+fi
+
+if [ "$BUILD_TARGET" = "arm" ] || [ "$BUILD_TARGET" = "all" ]; then
+    rm -rf build_arm
+    meson setup build_arm --cross-file arm.ini \
+        -Dbuildtype=release \
+        -Dwarning_level=3 \
+        -Dwerror=true
 fi
 

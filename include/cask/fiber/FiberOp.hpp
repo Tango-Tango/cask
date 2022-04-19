@@ -16,7 +16,6 @@
 #include "../Either.hpp"
 #include "../Erased.hpp"
 #include "../Scheduler.hpp"
-#include "../Pool.hpp"
 
 namespace cask {
 
@@ -116,9 +115,6 @@ public:
     ~FiberOp();
     
 private:
-    static constexpr std::size_t block_size = 128;
-    static Pool<block_size> pool;
-
     static std::shared_ptr<const FiberOp> fixed_predicate(
         const FlatMapPredicate& input_predicate,
         const FlatMapPredicate& output_predicate,

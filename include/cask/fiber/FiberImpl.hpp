@@ -156,7 +156,7 @@ template <class T, class E>
 std::optional<T> FiberImpl<T,E>::getValue() {
     std::optional<T> result;
 
-    if(state.load(std::memory_order_relaxed) == COMPLETED && value.isValue()) {
+    if(state.load(std::memory_order_acquire) == COMPLETED && value.isValue()) {
         result = value.underlying().template get<T>();
     }
 
@@ -167,7 +167,7 @@ template <class T, class E>
 std::optional<E> FiberImpl<T,E>::getError() {
     std::optional<E> result;
 
-    if(state.load(std::memory_order_relaxed) == COMPLETED && value.isError()) {
+    if(state.load(std::memory_order_acquire) == COMPLETED && value.isError()) {
         result = value.underlying().template get<E>();
     }
 
@@ -549,7 +549,7 @@ void FiberImpl<T,E>::onFiberShutdown(const std::function<void(Fiber<T,E>*)>& cal
 
     {
         std::lock_guard<std::mutex> guard(callback_mutex);
-        auto current_state = state.load(std::memory_order_relaxed);
+        auto current_state = state.load(std::memory_order_acquire);
         if(current_state != COMPLETED && current_state != CANCELED) {
             callbacks.emplace_back(callback);
         } else {
@@ -564,7 +564,7 @@ void FiberImpl<T,E>::onFiberShutdown(const std::function<void(Fiber<T,E>*)>& cal
 
 template <class T, class E>
 T FiberImpl<T,E>::await() {
-    auto current_state = state.load(std::memory_order_relaxed);
+    auto current_state = state.load(std::memory_order_acquire);
 
     if(current_state != COMPLETED && current_state != CANCELED) {
         std::mutex mutex;

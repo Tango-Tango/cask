@@ -43,19 +43,7 @@ void FiberValue::setValue(const Erased& value) {
     this->canceled = false;
 }
 
-void FiberValue::setValue(Erased&& value) {
-    this->value = value;
-    this->error = false;
-    this->canceled = false;
-}
-
 void FiberValue::setError(const Erased& value) {
-    this->value = value;
-    this->error = true;
-    this->canceled = false;
-}
-
-void FiberValue::setError(Erased&& value) {
     this->value = value;
     this->error = true;
     this->canceled = false;
