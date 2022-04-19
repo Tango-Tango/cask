@@ -4,6 +4,7 @@
 //          https://www.boost.org/LICENSE_1_0.txt)
 
 #include <algorithm>
+#include <random>
 #include <thread>
 #include "gtest/gtest.h"
 #include "cask/Erased.hpp"
@@ -54,7 +55,7 @@ TEST(Pool, AllocatesLotsOfSmallObjects) {
             allocations.push_back(pool.allocate<int>());
         }
 
-        std::random_shuffle(allocations.begin(), allocations.end());
+        std::shuffle(allocations.begin(), allocations.end(), std::default_random_engine());
 
         for(auto& ptr : allocations) {
             pool.deallocate<int>(ptr);
