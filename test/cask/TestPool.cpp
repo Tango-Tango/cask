@@ -3,6 +3,8 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
+#include <algorithm>
+#include <thread>
 #include "gtest/gtest.h"
 #include "cask/Erased.hpp"
 #include "cask/Pool.hpp"
@@ -36,25 +38,44 @@ TEST(Pool, AllocatesLIFO) {
 TEST(Pool, RepeatedlyAllocates) {
     Pool pool;
 
-    int* thing1 = pool.allocate<int>();
-    int* thing2 = pool.allocate<int>();
-    
-    EXPECT_NE(thing1, thing2);
-
-    pool.deallocate<int>(thing1);
-    pool.deallocate<int>(thing2);
+    for(std::size_t i = 0; i < 100000000; i++) {
+        int* thing = pool.allocate<int>();
+        pool.deallocate<int>(thing);
+    }
 }
 
 TEST(Pool, AllocatesLotsOfSmallObjects) {
     Pool pool;
-    std::deque<int*> allocations;
 
-    for(std::size_t i = 0; i < 2048*1024; i++) {
-        allocations.push_back(pool.allocate<int>());
-    }
+    for(std::size_t i = 0; i < 10000; i++) {
+        std::vector<int*> allocations;
 
-    for(auto& ptr : allocations) {
-        pool.deallocate<int>(ptr);
+        for(std::size_t i = 0; i < 32; i++) {
+            allocations.push_back(pool.allocate<int>());
+        }
+
+        std::random_shuffle(allocations.begin(), allocations.end());
+
+        for(auto& ptr : allocations) {
+            pool.deallocate<int>(ptr);
+        }
     }
 }
 
+TEST(Pool, RepeatedlyAllocatesParallel) {
+    Pool pool;
+    std::vector<std::thread> threads;
+
+    for(std::size_t i = 0; i < 32; i++) {
+        threads.emplace_back([&pool] {
+            for(std::size_t i = 0; i < 10000; i++) {
+                int* thing = pool.allocate<int>();
+                pool.deallocate<int>(thing);
+            }
+        });
+    }
+
+    for(auto& thread : threads) {
+        thread.join();
+    }
+}

@@ -8,6 +8,8 @@ echo "=====> Regnerating Build Environments"
 if [ "$BUILD_TARGET" = "debug" ] || [ "$BUILD_TARGET" = "all" ]; then
     rm -rf build_debug
     CC=gcc CXX=g++ meson setup build_debug \
+        -Ddebug=true \
+        -Doptimization=0 \
         -Db_sanitize=address,undefined \
         -Db_coverage=true \
         -Dwarning_level=3 \
@@ -17,7 +19,8 @@ fi
 if [ "$BUILD_TARGET" = "release" ] || [ "$BUILD_TARGET" = "all" ]; then
     rm -rf build_release
     CC=gcc CXX=g++ meson setup build_release \
-        -Dbuildtype=release \
+        -Ddebug=true \
+        -Doptimization=s \
         -Dwarning_level=3 \
         -Dwerror=true
 fi

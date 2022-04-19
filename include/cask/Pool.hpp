@@ -25,13 +25,16 @@ private:
         static constexpr std::size_t hardware_destructive_interference_size = 64;
     #endif
 
-    pool::BlockPool<hardware_destructive_interference_size, 512, alignof(std::max_align_t)> small_pool;
-    pool::BlockPool<hardware_destructive_interference_size*2, 256, alignof(std::max_align_t)> medium_pool;
-    pool::BlockPool<hardware_destructive_interference_size*4, 128, alignof(std::max_align_t)> large_pool;
-    pool::BlockPool<hardware_destructive_interference_size*8, 64, alignof(std::max_align_t)> xlarge_pool;
-    pool::BlockPool<hardware_destructive_interference_size*16, 32, alignof(std::max_align_t)> xxlarge_pool;
-    pool::BlockPool<hardware_destructive_interference_size*32, 16, alignof(std::max_align_t)> xxxlarge_pool;
-    pool::BlockPool<hardware_destructive_interference_size*64, 8, alignof(std::max_align_t)> xxxxlarge_pool;
+    static constexpr std::size_t smallest_block_num_entries = 2048;
+    static constexpr std::size_t smallest_block_size = hardware_destructive_interference_size * smallest_block_num_entries;
+
+    pool::BlockPool<hardware_destructive_interference_size, smallest_block_size, alignof(std::max_align_t)> small_pool;
+    pool::BlockPool<hardware_destructive_interference_size*2, smallest_block_size / 2, alignof(std::max_align_t)> medium_pool;
+    pool::BlockPool<hardware_destructive_interference_size*4, smallest_block_size / 4, alignof(std::max_align_t)> large_pool;
+    pool::BlockPool<hardware_destructive_interference_size*8, smallest_block_size / 8, alignof(std::max_align_t)> xlarge_pool;
+    pool::BlockPool<hardware_destructive_interference_size*16, smallest_block_size / 16, alignof(std::max_align_t)> xxlarge_pool;
+    pool::BlockPool<hardware_destructive_interference_size*32, smallest_block_size / 32, alignof(std::max_align_t)> xxxlarge_pool;
+    pool::BlockPool<hardware_destructive_interference_size*64, smallest_block_size / 64, alignof(std::max_align_t)> xxxxlarge_pool;
 };
 
 template <class T, class... Args>
