@@ -2,7 +2,6 @@
 #define _CASK_FIXED_SIZE_POOL_H_
 
 #include <atomic>
-#include <cassert>
 #include <cstdint>
 
 #if defined(__SANITIZE_ADDRESS__)
@@ -117,7 +116,6 @@ T* BlockPool<BlockSize,ChunkSize,Alignment>::allocate(Args&&... args) {
             new_head.ptr = old_head.ptr->next;
             new_head.counter = old_head.counter + 1;
             if(free_blocks.compare_exchange_weak(old_head, new_head, std::memory_order_acquire, std::memory_order_relaxed)) {
-                assert(old_head.ptr != old_head.ptr->next);
                 UNPOISON_BLOCK(old_head.ptr);
                 old_head.ptr->next = nullptr;
                 return new (old_head.ptr->memory) T(std::forward<Args>(args)...);
@@ -143,7 +141,6 @@ void BlockPool<BlockSize,ChunkSize,Alignment>::deallocate(T* ptr) {
     Head<Block> new_head;
 
     do {
-        assert(old_head.ptr != block);
         new_head.ptr = block;
         new_head.ptr->next = old_head.ptr;
         new_head.counter = old_head.counter + 1;
