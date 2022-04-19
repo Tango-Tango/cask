@@ -3,6 +3,14 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+# 13.0
+- Update the `Pool` to solve various bugs, to allocate into block sizes based on
+  best fit for ag iven type, and to allocate memory in large chunks for better
+  performance.
+- Add a global pool that is used internally for `Erased` and `FiberOp`.
+- Remove `constexpr` from various places where it had no effect / was confusing.
+- Remove move constructors from `Erased` to clarify behavior for the compiler.
+
 ## 12.0
 - Add the `Pool` type as a simple memory pool.
 - Add pooling to `Erased` and `FiberOp` object creations.
