@@ -274,6 +274,54 @@ TEST(TestFiber, RacesSeveralPureValuesSync) {
     EXPECT_FALSE(result.has_value());
 }
 
+TEST(TestFiber, RacesAndCancels) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto promise1 = Promise<Erased,Erased>::create(sched);
+    auto promise2 = Promise<Erased,Erased>::create(sched);
+    auto promise3 = Promise<Erased,Erased>::create(sched);
+
+    bool promise1_canceled = false;
+    bool promise2_canceled = false;
+    bool promise3_canceled = false;
+
+    auto op1 = FiberOp::async([promise1](auto) {
+        return Deferred<Erased,Erased>::forPromise(promise1);
+    })->flatMap([&promise1_canceled](auto fiber_value) {
+        promise1_canceled = fiber_value.isCanceled();
+        return FiberOp::value(fiber_value.isCanceled());
+    });
+
+    auto op2 = FiberOp::async([promise2](auto) {
+        return Deferred<Erased,Erased>::forPromise(promise2);
+    })->flatMap([&promise2_canceled](auto fiber_value) {
+        promise2_canceled = fiber_value.isCanceled();
+        return FiberOp::value(fiber_value.isCanceled());
+    });
+
+    auto op3 = FiberOp::async([promise3](auto) {
+        return Deferred<Erased,Erased>::forPromise(promise3);
+    })->flatMap([&promise3_canceled](auto fiber_value) {
+        promise3_canceled = fiber_value.isCanceled();
+        return FiberOp::value(fiber_value.isCanceled());
+    });
+
+    auto race = FiberOp::race({op1, op2, op3});
+    auto fiber = Fiber<bool,std::string>::run(race, sched);
+
+    sched->run_ready_tasks();
+    fiber->cancel();
+    sched->run_ready_tasks();
+    promise1->success(123);
+    promise2->success(456);
+    promise3->success(789);
+    sched->run_ready_tasks();
+
+    EXPECT_TRUE(fiber->isCanceled());
+    EXPECT_TRUE(promise1_canceled);
+    EXPECT_TRUE(promise2_canceled);
+    EXPECT_TRUE(promise3_canceled);
+}
+
 TEST(TestFiber, MapBothValue) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
