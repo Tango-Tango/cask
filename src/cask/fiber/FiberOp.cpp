@@ -87,40 +87,55 @@ FiberOp::~FiberOp() {
 
 std::shared_ptr<const FiberOp> FiberOp::value(const Erased& v) noexcept {
     auto constant = global_pool().allocate<ConstantData>(Either<Erased,Erased>::left(v));
-    return std::make_shared<FiberOp>(constant);
+    auto op = global_pool().allocate<FiberOp>(constant); 
+    return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>());
 }
 
 std::shared_ptr<const FiberOp> FiberOp::value(Erased&& v) noexcept {
     auto constant = global_pool().allocate<ConstantData>(Either<Erased,Erased>::left(v));
-    return std::make_shared<FiberOp>(constant);
+    auto op = global_pool().allocate<FiberOp>(constant); 
+    return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>());
 }
 
 std::shared_ptr<const FiberOp> FiberOp::error(const Erased& e) noexcept {
-    return std::make_shared<FiberOp>(global_pool().allocate<ConstantData>(Either<Erased,Erased>::right(e)));
+    auto constant = global_pool().allocate<ConstantData>(Either<Erased,Erased>::right(e));
+    auto op = global_pool().allocate<FiberOp>(constant); 
+    return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>());
 }
 
 std::shared_ptr<const FiberOp> FiberOp::async(const  std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept {
-    return std::make_shared<FiberOp>(global_pool().allocate<AsyncData>(predicate));
+    auto async_data = global_pool().allocate<AsyncData>(predicate);
+    auto op = global_pool().allocate<FiberOp>(async_data); 
+    return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>());
 }
 
 std::shared_ptr<const FiberOp> FiberOp::thunk(const std::function<Erased()>& thunk) noexcept {
-    return std::make_shared<FiberOp>(global_pool().allocate<ThunkData>(thunk));
+    auto thunk_data = global_pool().allocate<ThunkData>(thunk);
+    auto op = global_pool().allocate<FiberOp>(thunk_data); 
+    return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>());
 }
 
 std::shared_ptr<const FiberOp> FiberOp::delay(int64_t delay_ms) noexcept {
-    return std::make_shared<FiberOp>(global_pool().allocate<DelayData>(delay_ms));
+    auto delay_data = global_pool().allocate<DelayData>(delay_ms);
+    auto op = global_pool().allocate<FiberOp>(delay_data); 
+    return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>());
 }
 
 std::shared_ptr<const FiberOp> FiberOp::race(const std::vector<std::shared_ptr<const FiberOp>>& race) noexcept {
-    return std::make_shared<FiberOp>(global_pool().allocate<RaceData>(race));
+    auto race_data = global_pool().allocate<RaceData>(race);
+    auto op = global_pool().allocate<FiberOp>(race_data); 
+    return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>());
 }
 
 std::shared_ptr<const FiberOp> FiberOp::race(std::vector<std::shared_ptr<const FiberOp>>&& race) noexcept {
-    return std::make_shared<FiberOp>(global_pool().allocate<RaceData>(std::move(race)));
+    auto race_data = global_pool().allocate<RaceData>(std::move(race));
+    auto op = global_pool().allocate<FiberOp>(race_data); 
+    return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>());
 }
 
 std::shared_ptr<const FiberOp> FiberOp::cancel() noexcept {
-    return std::make_shared<FiberOp>(true);
+    auto op = global_pool().allocate<FiberOp>(true); 
+    return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>());
 }
 
 std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicate) const noexcept {
@@ -134,7 +149,8 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
         case CANCEL:
         {
             auto data = global_pool().allocate<FlatMapData>(this->shared_from_this(), predicate);
-            return std::make_shared<FiberOp>(data);
+            auto op = global_pool().allocate<FiberOp>(data); 
+            return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>());
         }
         break;
         case FLATMAP:
@@ -142,7 +158,8 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
             FiberOp::FlatMapData* data = this->data.flatMapData;
             auto fixed = std::bind(FiberOp::fixed_predicate, data->second, predicate, std::placeholders::_1);
             auto flatMapData = global_pool().allocate<FlatMapData>(data->first, fixed);
-            return std::make_shared<FiberOp>(flatMapData);
+            auto op = global_pool().allocate<FiberOp>(flatMapData); 
+            return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>());
         }
         break;
     }
