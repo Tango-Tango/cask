@@ -241,7 +241,7 @@ bool FiberImpl<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& 
 
     FiberState expected = RACING;
     if(state.compare_exchange_strong(expected, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
-        value = racer->getRawValue();
+        if(!value.isCanceled()) value = racer->getRawValue();
 
         std::vector<FiberRef<Erased,Erased>> local_racers;
 
@@ -479,11 +479,13 @@ void FiberImpl<T,E>::cancel() {
         if(state == COMPLETED || state == CANCELED) {
             return;
         } else if (state != RUNNING) {
-            if(state.compare_exchange_strong(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
+            if(state.compare_exchange_weak(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
                 break;
             }
         }
     }
+
+    value.setCanceled();
 
     if(current_state == WAITING) {
         state.store(WAITING, std::memory_order_release);
@@ -509,8 +511,7 @@ void FiberImpl<T,E>::cancel() {
         }
         return;
     }
-
-    value.setCanceled();
+    
     if(!finishIteration()) {
         state.store(READY, std::memory_order_release);
 
