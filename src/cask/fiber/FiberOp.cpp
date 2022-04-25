@@ -13,6 +13,14 @@ using cask::pool::global_pool;
 
 namespace cask::fiber {
 
+template <class T>
+class PoolDeleter {
+public:
+    void operator()(T* ptr) {
+        global_pool().deallocate<T>(ptr);
+    }
+};
+
 FiberOp::FiberOp(AsyncData* async) noexcept
     : opType(ASYNC)
 {

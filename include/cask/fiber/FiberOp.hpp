@@ -16,7 +16,6 @@
 #include "../Either.hpp"
 #include "../Erased.hpp"
 #include "../Scheduler.hpp"
-#include "../pool/InternalPool.hpp"
 
 namespace cask {
 
@@ -29,15 +28,6 @@ using DeferredRef = std::shared_ptr<Deferred<T,E>>;
 }
 
 namespace cask::fiber {
-
-template <class T>
-class PoolDeleter {
-public:
-    void operator()(T* ptr) {
-        pool::global_pool().deallocate<T>(ptr);
-    }
-};
-
 
 enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE, CANCEL };
 
