@@ -482,6 +482,11 @@ void FiberImpl<T,E>::cancel() {
             if(state.compare_exchange_weak(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
                 break;
             }
+        } else if (auto sched = last_used_scheduler.lock()) {
+            sched->submit([self = this->shared_from_this()] {
+                self->cancel();
+            });
+            return;
         }
     }
 

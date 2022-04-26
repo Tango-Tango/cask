@@ -6,14 +6,17 @@
 #include "gtest/gtest.h"
 #include "cask/Fiber.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "cask/scheduler/SingleThreadScheduler.hpp"
 
 using cask::Deferred;
 using cask::Fiber;
+using cask::FiberRef;
 using cask::Erased;
 using cask::None;
 using cask::Promise;
 using cask::fiber::FiberOp;
 using cask::scheduler::BenchScheduler;
+using cask::scheduler::SingleThreadScheduler;
 
 TEST(TestFiber, Constructs) {
     auto sched = std::make_shared<BenchScheduler>();
@@ -320,6 +323,41 @@ TEST(TestFiber, RacesAndCancels) {
     EXPECT_TRUE(promise1_canceled);
     EXPECT_TRUE(promise2_canceled);
     EXPECT_TRUE(promise3_canceled);
+}
+
+TEST(TestFiber, CancelDoesntDeadlockSync) {
+    auto sched = std::make_shared<SingleThreadScheduler>();
+
+    FiberRef<int,std::string> fiber = nullptr;
+
+    auto op = FiberOp::thunk([&fiber] {
+        while(fiber == nullptr);
+        fiber->cancel();
+        return 123;
+    });
+
+    fiber = Fiber<int,std::string>::run(op, sched);
+    fiber->await();
+}
+
+TEST(TestFiber, CancelDoesntDeadlockAsync) {
+    auto sched = std::make_shared<SingleThreadScheduler>();
+    auto promise = Promise<Erased,Erased>::create(sched);
+
+    FiberRef<int,std::string> fiber = nullptr;
+
+    auto op = FiberOp::async([&fiber, promise](auto) {
+        while(fiber == nullptr);
+        fiber->cancel();
+        return Deferred<Erased,Erased>::forPromise(promise);
+    });
+
+    fiber = Fiber<int,std::string>::run(op, sched);
+
+    try {
+        fiber->await();
+        FAIL();
+    } catch(std::runtime_error&) {}
 }
 
 TEST(TestFiber, MapBothValue) {
