@@ -12,8 +12,8 @@
 namespace cask::observable {
 
 /**
- * Represents an observable that transforms each element from an upstream observable
- * using the given predicate function. Normally obtained by calling `Observable<T>::map`.
+ * Represents an observable that suppresses consecutive events that are the same - emitting
+ * only the first.
  */
 template <class T, class E>
 class DistinctUntilChangedObservable final : public Observable<T,E> {

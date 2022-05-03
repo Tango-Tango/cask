@@ -12,9 +12,8 @@
 namespace cask::observable {
 
 /**
- * Implements an observer that memoizes the latest event in the stream and, upon stream
- * completion, completes a promise with the last event seen (or nothing, if the stream
- * was empty). Normally obtained by using `Observer<T>::last()`.
+ * Implements an observer that suppresses consecutive events in the stream that
+ * are the same - emitting downstream only the first.
  */
 template <class T, class E>
 class DistinctUntilChangedObserver final : public Observer<T,E> {
