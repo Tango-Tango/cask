@@ -195,6 +195,15 @@ public:
      */
     ObservableRef<T,E> concat(const ObservableRef<T,E>& other) const;
 
+
+    /**
+     * Given a sequence of emit values suppress duplicate consecutive events
+     * emitted by the source.
+     * 
+     * @return A new observable which removes duplicate consecutive events.
+     */
+    ObservableRef<T,E> distinctUntilChanged() const;
+
     /**
      * Transform each element of the stream using the provided transforming predicate
      * function.
@@ -420,6 +429,7 @@ public:
 #include "observable/CallbackObserver.hpp"
 #include "observable/DeferObservable.hpp"
 #include "observable/DeferTaskObservable.hpp"
+#include "observable/DistinctUntilChangedObservable.hpp"
 #include "observable/EmptyObservable.hpp"
 #include "observable/EvalObservable.hpp"
 #include "observable/FilterObservable.hpp"
@@ -527,6 +537,12 @@ template <class T, class E>
 ObservableRef<T,E> Observable<T,E>::concat(const ObservableRef<T,E>& other) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::AppendAllObservable<T,E>>(self, other);
+}
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::distinctUntilChanged() const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::DistinctUntilChangedObservable<T,E>>(self);
 }
 
 template <class T, class E>
