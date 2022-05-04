@@ -18,7 +18,7 @@ namespace cask::observable {
 template <class T, class E>
 class DistinctUntilChangedObserver final : public Observer<T,E> {
 public:
-    explicit DistinctUntilChangedObserver(const std::shared_ptr<Observer<T,E>>& downstream);
+    explicit DistinctUntilChangedObserver(const std::shared_ptr<Observer<T,E>>& downstream, const std::function<bool(const T&, const T&)>& comparator);
 
     Task<Ack,None> onNext(const T& value) override;
     Task<None,None> onError(const E& error) override;
@@ -26,17 +26,20 @@ public:
     Task<None,None> onCancel() override;
 private:
     std::shared_ptr<Observer<T,E>> downstream;
+    std::function<bool(const T&, const T&)> comparator;
     std::optional<T> previous_value;
 };
 
 template <class T, class E>
-DistinctUntilChangedObserver<T,E>::DistinctUntilChangedObserver(const std::shared_ptr<Observer<T,E>>& downstream)
+DistinctUntilChangedObserver<T,E>::DistinctUntilChangedObserver(const std::shared_ptr<Observer<T,E>>& downstream, const std::function<bool(const T&, const T&)>& comparator)
     : downstream(downstream)
+    , comparator(comparator)
+    , previous_value()
 {}
 
 template <class T, class E>
 Task<Ack, None> DistinctUntilChangedObserver<T,E>::onNext(const T& value) {
-    if(previous_value.has_value() && *previous_value == value) {
+    if(previous_value.has_value() && comparator(*previous_value, value)) {
         return Task<Ack,None>::pure(Continue);
     } else {
         previous_value = value;

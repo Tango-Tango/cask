@@ -18,20 +18,22 @@ namespace cask::observable {
 template <class T, class E>
 class DistinctUntilChangedObservable final : public Observable<T,E> {
 public:
-    explicit DistinctUntilChangedObservable(const std::shared_ptr<const Observable<T,E>>& upstream);
+    explicit DistinctUntilChangedObservable(const std::shared_ptr<const Observable<T,E>>& upstream, const std::function<bool(const T&, const T&)>& comparator);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     std::shared_ptr<const Observable<T,E>> upstream;
+    std::function<bool(const T&, const T&)> comparator;
 };
 
 template <class T, class E>
-DistinctUntilChangedObservable<T,E>::DistinctUntilChangedObservable(const std::shared_ptr<const Observable<T,E>>& upstream)
+DistinctUntilChangedObservable<T,E>::DistinctUntilChangedObservable(const std::shared_ptr<const Observable<T,E>>& upstream, const std::function<bool(const T&, const T&)>& comparator)
     : upstream(upstream)
+    , comparator(comparator)
 {}
 
 template <class T, class E>
 FiberRef<None,None> DistinctUntilChangedObservable<T,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const {
-    auto distinctObserver = std::make_shared<DistinctUntilChangedObserver<T,E>>(observer);
+    auto distinctObserver = std::make_shared<DistinctUntilChangedObserver<T,E>>(observer, comparator);
     return upstream->subscribe(sched, distinctObserver);
 }
 

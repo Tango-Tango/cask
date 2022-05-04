@@ -5,6 +5,7 @@ in this file. This project follows [semantic versioning](https://semver.org/).
 
 # 13.1
 - Add the `distinctUntilChanged` operator to `Observable`.
+- Add the `distinctUntilChangedBy` operator to `Observable`.
 
 # 13.0
 - Update the `Pool` to solve various bugs, to allocate into block sizes based on
