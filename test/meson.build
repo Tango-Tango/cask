@@ -23,6 +23,8 @@ if not meson.is_subproject()
         'cask/observable/TestObservableAppendAll.cpp',
         'cask/observable/TestObservableBuffer.cpp',
         'cask/observable/TestObservableConcat.cpp',
+        'cask/observable/TestObservableDistinctUntilChanged.cpp',
+        'cask/observable/TestObservableDistinctUntilChangedBy.cpp',
         'cask/observable/TestObservableFilter.cpp',
         'cask/observable/TestObservableFlatMap.cpp',
         'cask/observable/TestObservableFlatMapOptional.cpp',

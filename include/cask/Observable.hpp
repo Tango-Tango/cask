@@ -195,6 +195,26 @@ public:
      */
     ObservableRef<T,E> concat(const ObservableRef<T,E>& other) const;
 
+
+    /**
+     * Given a sequence of emit values suppress duplicate consecutive events
+     * emitted by the source.
+     * 
+     * @return A new observable which removes duplicate consecutive events.
+     */
+    ObservableRef<T,E> distinctUntilChanged() const;
+
+    /**
+     * Given a sequence of emit values suppress duplicate consecutive events
+     * emitted by the source using the provided comparator to check
+     * equality.
+     * 
+     * @param comparator A comparator to use for testing the equality of
+     *                   two values.
+     * @return A new observable which removes duplicate consecutive events.
+     */
+    ObservableRef<T,E> distinctUntilChangedBy(const std::function<bool(const T&, const T&)>& comparator) const;
+
     /**
      * Transform each element of the stream using the provided transforming predicate
      * function.
@@ -420,6 +440,7 @@ public:
 #include "observable/CallbackObserver.hpp"
 #include "observable/DeferObservable.hpp"
 #include "observable/DeferTaskObservable.hpp"
+#include "observable/DistinctUntilChangedObservable.hpp"
 #include "observable/EmptyObservable.hpp"
 #include "observable/EvalObservable.hpp"
 #include "observable/FilterObservable.hpp"
@@ -527,6 +548,17 @@ template <class T, class E>
 ObservableRef<T,E> Observable<T,E>::concat(const ObservableRef<T,E>& other) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::AppendAllObservable<T,E>>(self, other);
+}
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::distinctUntilChanged() const {
+    return distinctUntilChangedBy([](auto left, auto right) { return left == right; });
+}
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::distinctUntilChangedBy(const std::function<bool(const T&, const T&)>& comparator) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::DistinctUntilChangedObservable<T,E>>(self, comparator);
 }
 
 template <class T, class E>
