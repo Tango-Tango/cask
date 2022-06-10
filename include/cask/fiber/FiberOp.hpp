@@ -104,17 +104,19 @@ public:
      * Construct a fiber op of the given type. Should not be called directly and instead
      * users should use the static construction methods provided.
      */
-    explicit FiberOp(AsyncData* async) noexcept;
-    explicit FiberOp(ConstantData* constant) noexcept;
-    explicit FiberOp(ThunkData* thunk) noexcept;
-    explicit FiberOp(FlatMapData* flatMap) noexcept;
-    explicit FiberOp(DelayData* delay) noexcept;
-    explicit FiberOp(RaceData* race) noexcept;
+    explicit FiberOp(AsyncData* async, const std::shared_ptr<Pool>& pool) noexcept;
+    explicit FiberOp(ConstantData* constant, const std::shared_ptr<Pool>& pool) noexcept;
+    explicit FiberOp(ThunkData* thunk, const std::shared_ptr<Pool>& pool) noexcept;
+    explicit FiberOp(FlatMapData* flatMap, const std::shared_ptr<Pool>& pool) noexcept;
+    explicit FiberOp(DelayData* delay, const std::shared_ptr<Pool>& pool) noexcept;
+    explicit FiberOp(RaceData* race, const std::shared_ptr<Pool>& pool) noexcept;
     explicit FiberOp(bool cancel_flag) noexcept;    
 
     ~FiberOp();
     
 private:
+    std::shared_ptr<Pool> pool;
+
     static std::shared_ptr<const FiberOp> fixed_predicate(
         const FlatMapPredicate& input_predicate,
         const FlatMapPredicate& output_predicate,
