@@ -3,6 +3,16 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+# 14.0
+
+- Allow the pool cache line size to be directly configured rather than guessed via
+  the `cache_line_size` configure parameter.
+- Allow the initial size of the internal block pools to be directly configured via
+  the `initial_blocks_per_pool` configure parameter.
+- Change the global internal pool to use `std::shared_ptr` to safely track its allocations
+  and remove issues at shutdown time due to the previously undefined behavior of the pool's
+  static destruction.
+
 # 13.1
 - Add the `distinctUntilChanged` operator to `Observable`.
 - Add the `distinctUntilChangedBy` operator to `Observable`.
