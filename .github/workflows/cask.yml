@@ -3,14 +3,14 @@ name: Build, Test, and Release
 on:
   workflow_dispatch:
   push:
-    branches: [ master ]
+    branches: [ main ]
     paths:
     - 'src/**'
     - 'include/**'
     - 'meson.build'
     - 'VERSION'
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
     paths-ignore:
     - '*.md'
     - '*.txt'
@@ -115,7 +115,7 @@ jobs:
     name: Release
     runs-on: ubuntu-20.04
     needs: [build-linux, build-mac, analyze]
-    if: contains(github.ref, 'master') && github.actor != 'engineering-at-tangotango'
+    if: contains(github.ref, 'main') && github.actor != 'engineering-at-tangotango'
 
     steps:
     - uses: actions/checkout@v2
