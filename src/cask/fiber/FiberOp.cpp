@@ -16,7 +16,7 @@ namespace cask::fiber {
 template <class T>
 class PoolDeleter {
 public:
-    PoolDeleter(const std::shared_ptr<Pool>& pool)
+    explicit PoolDeleter(const std::shared_ptr<Pool>& pool)
         : pool(pool)
     {}
 
