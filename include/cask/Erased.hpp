@@ -75,34 +75,38 @@ public:
 
     ~Erased();
 private:
+    std::shared_ptr<Pool> pool;
     void* data;
-    void (*deleter)(void*);
-    void* (*copier)(void*);
+    void (*deleter)(void*, const std::shared_ptr<Pool>& pool);
+    void* (*copier)(void*, const std::shared_ptr<Pool>& pool);
     const std::type_info * info;
 };
 
 template <typename T, std::enable_if_t<!std::is_same<T,Erased>::value, bool>>
 inline Erased::Erased(const T& value) noexcept
-    : data(cask::pool::global_pool().allocate<T>(value))
-    , deleter([](void* ptr) -> void { cask::pool::global_pool().deallocate<T>(static_cast<T*>(ptr)); })
-    , copier([](void* ptr) -> void* { return cask::pool::global_pool().allocate<T>(*(static_cast<T*>(ptr))); })
+    : pool(cask::pool::global_pool())
+    , data(pool->allocate<T>(value))
+    , deleter([](void* ptr, const std::shared_ptr<Pool>& pool) -> void { pool->deallocate<T>(static_cast<T*>(ptr)); })
+    , copier([](void* ptr, const std::shared_ptr<Pool>& pool) -> void* { return pool->allocate<T>(*(static_cast<T*>(ptr))); })
     , info(&typeid(T))
 {}
 
 template <typename T, std::enable_if_t<!std::is_same<T,Erased>::value, bool>>
 inline Erased& Erased::operator=(const T& value) noexcept {
     if(data == nullptr) {
-        data = cask::pool::global_pool().allocate<T>(value);
-        deleter = [](void* ptr) -> void { cask::pool::global_pool().deallocate<T>(static_cast<T*>(ptr)); };
-        copier = [](void* ptr) -> void* { return cask::pool::global_pool().allocate<T>(*static_cast<T*>(ptr)); };
+        pool = cask::pool::global_pool();
+        data = pool->allocate<T>(value);
+        deleter = [](void* ptr, const std::shared_ptr<Pool>& pool) -> void { pool->deallocate<T>(static_cast<T*>(ptr)); };
+        copier = [](void* ptr, const std::shared_ptr<Pool>& pool) -> void* { return pool->allocate<T>(*static_cast<T*>(ptr)); };
         info = &typeid(T);
     } else if(typeid(T) == *info) {
         *static_cast<T*>(data) = value;
     } else {
-        deleter(data);
-        data = cask::pool::global_pool().allocate<T>(value);
-        deleter = [](void* ptr) -> void { cask::pool::global_pool().deallocate<T>(static_cast<T*>(ptr)); };
-        copier = [](void* ptr) -> void* { return cask::pool::global_pool().allocate<T>(*static_cast<T*>(ptr)); };
+        deleter(data, pool);
+        pool = cask::pool::global_pool();
+        data = pool->allocate<T>(value);
+        deleter = [](void* ptr, const std::shared_ptr<Pool>& pool) -> void { pool->deallocate<T>(static_cast<T*>(ptr)); };
+        copier = [](void* ptr, const std::shared_ptr<Pool>& pool) -> void* { return pool->allocate<T>(*static_cast<T*>(ptr)); };
         info = &typeid(T);
     }
 
@@ -119,22 +123,25 @@ inline T& Erased::get() const {
 }
 
 inline Erased::Erased() noexcept
-    : data(nullptr)
+    : pool()
+    , data(nullptr)
     , deleter()
     , copier()
     , info(nullptr)
 {}
 
 inline Erased::Erased(const Erased& other) noexcept
-    : data(nullptr)
+    : pool()
+    , data(nullptr)
     , deleter()
     , copier()
     , info(other.info)
 {
     if(other.data != nullptr) {
+        this->pool = other.pool;
         this->deleter = other.deleter;
         this->copier = other.copier;
-        this->data = other.copier(other.data);
+        this->data = other.copier(other.data, other.pool);
     }
 }
 
@@ -142,9 +149,10 @@ inline Erased& Erased::operator=(const Erased& other) noexcept {
     if(this != &other) {
         reset();
         if(other.data != nullptr) {
+            this->pool = other.pool;
             this->deleter = other.deleter;
             this->copier = other.copier;
-            this->data = other.copier(other.data);
+            this->data = other.copier(other.data, other.pool);
             this->info = other.info;
         }
     }
@@ -157,15 +165,17 @@ inline bool Erased::has_value() const noexcept {
 
 inline void Erased::reset() noexcept {
     if(data != nullptr) {
-        deleter(data);
+        deleter(data, pool);
         data = nullptr;
+        pool = nullptr;
     }
 }
 
 inline Erased::~Erased() { 
     if(data != nullptr) {
-        deleter(data);
+        deleter(data, pool);
         data = nullptr;
+        pool = nullptr;
     }
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks): delete is happening within the deleter lambda
 

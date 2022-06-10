@@ -12,6 +12,8 @@ namespace cask {
 
 static constexpr bool ref_uses_atomics = @ref_uses_atomics@;
 static constexpr unsigned int batch_size = @batch_size@;
+static constexpr unsigned int initial_blocks_per_pool = @initial_blocks_per_pool@;
+static constexpr unsigned int cache_line_size = @cache_line_size@;
 
 }
 
