@@ -21,13 +21,15 @@ on:
 jobs:
   build-linux:
     name: Linux Build and Test
-    runs-on: ubuntu-20.04
     if: github.actor != 'engineering-at-tangotango'
 
     strategy:
       matrix:
+        os: [ubuntu-20.04]
         target: [debug, release, release_no_atomics, release_always_async, clang, mips, arm]
       fail-fast: false
+
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v2
@@ -55,7 +57,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-10.15, macos-11]
+        os: [macos-11]
         target: [clang]
       fail-fast: false
 
