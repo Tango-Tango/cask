@@ -50,19 +50,25 @@ jobs:
   
   build-mac:
     name: Mac Build and Test
-    runs-on: [self-hosted, macOS, M1]
     if: github.actor != 'engineering-at-tangotango'
 
     strategy:
       matrix:
+        os: [macos-10.15, macos-11]
         target: [clang]
       fail-fast: false
+
+    runs-on: {{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 2
         token: ${{ github.token }}
+    - name: Install Brew Development Dependencies
+      run: brew install ninja
+    - name: Install Python Development Dependencies
+      run: sudo python3 -m pip install meson==0.61.1
     - name: Generate the Build Environment
       run: ./regenerate_env.sh ${{ matrix.target }}
     - name: Build and Test
