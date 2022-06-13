@@ -25,7 +25,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04]
+        os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
         target: [debug, release, release_no_atomics, release_always_async, clang, mips, arm]
       fail-fast: false
 
@@ -39,7 +39,7 @@ jobs:
     - name: Update Apt Cache
       run: sudo apt-get update
     - name: Install Apt Development Dependencies
-      run: sudo apt-get install -y ninja-build build-essential python3-pip gcovr clang g++-10-arm-linux-gnueabihf g++-10-mipsel-linux-gnu qemu-user
+      run: sudo apt-get install -y ninja-build build-essential python3-pip gcovr clang g++-arm-linux-gnueabihf g++-mipsel-linux-gnu qemu-user
     - name: Install Python Development Dependencies
       run: sudo python3 -m pip install meson==0.61.1
     - name: Generate the Build Environment
@@ -47,9 +47,6 @@ jobs:
     - name: Build and Test
       working-directory: build_${{ matrix.target }}
       run: meson test --verbose
-    - name: Generate Coverage Reports
-      if: ${{ matrix.target == 'debug' }}
-      run: ninja coverage -C build_${{ matrix.target }}
   
   build-mac:
     name: Mac Build and Test
@@ -57,7 +54,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-11]
+        os: [macos-10.15, macos-11, macos-12]
         target: [clang]
       fail-fast: false
 
