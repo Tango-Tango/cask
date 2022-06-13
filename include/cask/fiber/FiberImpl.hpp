@@ -247,7 +247,8 @@ bool FiberImpl<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& 
 
         {
             std::lock_guard<std::mutex> guard(racing_fibers_mutex);
-            for(auto& [fiber_id, fiber]: racing_fibers) {
+            for(const auto& entry: racing_fibers) {
+                const auto& fiber = std::get<1>(entry);
                 local_racers.emplace_back(fiber);
             }
         }
@@ -509,7 +510,8 @@ void FiberImpl<T,E>::cancel() {
 
         {
             std::lock_guard<std::mutex> guard(racing_fibers_mutex);
-            for(auto& [fiber_id, fiber]: racing_fibers) {
+            for(const auto& entry: racing_fibers) {
+                const auto& fiber = std::get<1>(entry);
                 local_racers.emplace_back(fiber);
             }
         }
