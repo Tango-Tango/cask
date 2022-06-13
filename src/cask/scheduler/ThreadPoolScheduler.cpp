@@ -8,6 +8,10 @@
 
 namespace cask::scheduler {
 
+int64_t current_time_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
     : should_run(true)
     , readyQueueMutex()
@@ -18,7 +22,8 @@ ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
     , timers()
     , threadStatus()
     , timerThreadStatus(false)
-    , ticks(0)
+    , next_id(0)
+    , last_execution_ms(current_time_ms())
 {
     threadStatus.reserve(poolSize);
     for(unsigned int i = 0; i < poolSize; i++) {
@@ -66,7 +71,7 @@ void ThreadPoolScheduler::submitBulk(const std::vector<std::function<void()>>& t
 
 CancelableRef ThreadPoolScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
     std::lock_guard<std::mutex> guard(timerMutex);
-    int64_t executionTick = ticks + milliseconds;
+    const auto executionTick = current_time_ms() + milliseconds;
 
     auto id = next_id++;
     auto tasks = timers.find(executionTick);
@@ -131,20 +136,15 @@ void ThreadPoolScheduler::timer() {
     timerThreadStatus.store(true);
 
     while(should_run.load()) {
-        auto before = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(sleep_time);
-        auto after = std::chrono::steady_clock::now();
-        
-        auto delta = after - before;
-        auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
 
         {
             std::lock_guard<std::mutex> guard(timerMutex);
 
-            int64_t previous_ticks = ticks;
-            ticks += milliseconds;
+            int64_t previous_ticks = last_execution_ms;
+            last_execution_ms = current_time_ms();
 
-            for(int64_t i = previous_ticks; i <= ticks; i++) {
+            for(int64_t i = previous_ticks; i <= last_execution_ms; i++) {
                 auto tasks = timers.find(i);
                 if(tasks != timers.end()) {
                     std::vector<std::function<void()>> submittedTasks;
