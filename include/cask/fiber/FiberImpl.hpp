@@ -116,7 +116,7 @@ bool FiberImpl<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsig
         return false;
     }
 
-    last_used_scheduler = std::weak_ptr(sched);
+    last_used_scheduler = std::weak_ptr<Scheduler>(sched);
 
     while(batch_size-- > 0) {
         if(this->template evaluateOp<Async>(sched)) {
