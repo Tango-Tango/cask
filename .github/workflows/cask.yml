@@ -74,6 +74,38 @@ jobs:
     - name: Build and Test
       working-directory: build_${{ matrix.target }}
       run: meson test --verbose
+
+  build-windows:
+    name: Windows Build and Test
+    if: github.actor != 'engineering-at-tangotango'
+
+    strategy:
+      matrix:
+        os: [windows-2019, windows-2022]
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 2
+        token: ${{ github.token }}
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    - name: Prepare MSVC
+      uses: bus1/cabuild/action/msdevshell@v1
+      with:
+        architecture: x64
+    - name: Install Python Development Dependencies
+      run: python3 -m pip install meson==0.61.1 ninja
+    - name: Generate the Build Environment
+      run: meson setup builddir
+    - name: Build and Test
+      working-directory: builddir
+      run: meson test --verbose
   
   analyze:
     name: Analyze
