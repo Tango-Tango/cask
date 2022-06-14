@@ -71,7 +71,7 @@ void ThreadPoolScheduler::submitBulk(const std::vector<std::function<void()>>& t
 
 CancelableRef ThreadPoolScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
     std::lock_guard<std::mutex> guard(timerMutex);
-    const auto executionTick = current_time_ms() + milliseconds;
+    const auto executionTick = current_time_ms() + milliseconds + 1;
 
     auto id = next_id++;
     auto tasks = timers.find(executionTick);
