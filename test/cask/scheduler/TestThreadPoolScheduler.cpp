@@ -142,7 +142,6 @@ TEST_P(ThreadPoolSchedulerTest, RegistersCallbackAfterCancelled) {
 
 TEST_P(ThreadPoolSchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
     bool shutdown = false;
-    std::mutex timer_mutex;
     std::mutex shutdown_mutex;
 
     shutdown_mutex.lock();
