@@ -13,7 +13,7 @@ cpp = meson.get_compiler('cpp')
 num_cpu_threads = 1
 bash = find_program('bash', required : false)
 if bash.found()
-    threads_result = run_command('/bin/bash', '-c', 'cat /proc/cpuinfo | grep processor | wc -l')
+    threads_result = run_command(bash, '-c', 'cat /proc/cpuinfo | grep processor | wc -l')
     if threads_result.returncode() == 0
         num_cpu_threads = threads_result.stdout().strip()
     endif
