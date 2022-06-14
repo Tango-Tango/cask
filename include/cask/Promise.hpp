@@ -6,6 +6,7 @@
 #ifndef _CASK_PROMISE_H_
 #define _CASK_PROMISE_H_
 
+#include <atomic>
 #include <any>
 #include <functional>
 #include <memory>

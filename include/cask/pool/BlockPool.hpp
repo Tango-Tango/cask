@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <type_traits>
 
 #if defined(__SANITIZE_ADDRESS__)
 #define CASK_ASAN_ENABLED 1
@@ -27,9 +28,6 @@ namespace cask::pool {
 template <std::size_t BlockSize, std::size_t ChunkSize, std::size_t Alignment>
 class BlockPool {
 public:
-    static constexpr std::size_t TotalBlockSize = BlockSize + sizeof(void*);
-    static constexpr std::size_t PadSize = (Alignment - (TotalBlockSize % Alignment)) % Alignment;
-
     explicit BlockPool();
     ~BlockPool();
 
@@ -39,14 +37,36 @@ public:
     template <class T>
     void deallocate(T* ptr);
 
+private:
+    static constexpr std::size_t TotalBlockSize = BlockSize + sizeof(void*);
+    static constexpr std::size_t PadSize = (Alignment - (TotalBlockSize % Alignment)) % Alignment;
+
     struct Chunk;
 
-    struct Block {
+    // A block which as at least one byte of padding.
+    struct BlockWithPad {
+        BlockWithPad() : memory(), next(nullptr), padding() {}
+
         uint8_t memory[BlockSize];
-        Block* next;
-        std::uint8_t padding[PadSize];
-        Block();
+        BlockWithPad* next;
+        std::uint8_t padding[PadSize == 0 ? 1 : PadSize];
     };
+
+    // A block with no padding.
+    struct BlockWithoutPad {
+        BlockWithoutPad() : memory(), next(nullptr) {}
+
+        uint8_t memory[BlockSize];
+        BlockWithoutPad* next;
+    };
+
+    // Choose the block type. Most of the time at least some padding is required, but
+    // occasionally no padding is required and we must account for that to avoid
+    // compile errors about 0-sized arrays.
+    typedef typename std::conditional<PadSize == 0, BlockWithoutPad, BlockWithPad>::type Block;
+
+    static_assert(sizeof(Block) == TotalBlockSize + PadSize);
+    static_assert(offsetof(Block, memory) == 0);
 
     struct Chunk {
         Block blocks[ChunkSize];
@@ -61,7 +81,6 @@ public:
         Head();
     };
 
-private:
     void allocate_chunk();
     
     std::atomic<Head<Block>> free_blocks;
@@ -182,13 +201,6 @@ void BlockPool<BlockSize,ChunkSize,Alignment>::allocate_chunk() {
         allocating_chunk.store(false, std::memory_order_relaxed);
     }
 }
-
-template <std::size_t BlockSize, std::size_t ChunkSize, std::size_t Alignment>
-BlockPool<BlockSize,ChunkSize,Alignment>::Block::Block()
-    : memory()
-    , next(nullptr)
-    , padding()
-{}
 
 template <std::size_t BlockSize, std::size_t ChunkSize, std::size_t Alignment>
 BlockPool<BlockSize,ChunkSize,Alignment>::Chunk::Chunk()
