@@ -196,7 +196,9 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
         }
         break;
     }
+#ifdef __GNUC__
     __builtin_unreachable();
+#endif
 }
 
 std::shared_ptr<const FiberOp> FiberOp::fixed_predicate(

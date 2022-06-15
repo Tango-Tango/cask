@@ -6,14 +6,21 @@ project(
     license: 'BSL-1.0',
     meson_version: '>= 0.57.0'
 )
-
 cpp = meson.get_compiler('cpp')
+
+# Enable /bigobj on msvc
+if cpp.get_id() == 'msvc'
+	add_project_arguments('/bigobj', language: 'cpp')
+endif
 
 # Discover Number of CPU Threads
 num_cpu_threads = 1
-threads_result = run_command('/bin/bash', '-c', 'cat /proc/cpuinfo | grep processor | wc -l')
-if threads_result.returncode() == 0
-    num_cpu_threads = threads_result.stdout().strip()
+bash = find_program('bash', required : false)
+if bash.found()
+    threads_result = run_command(bash, '-c', 'cat /proc/cpuinfo | grep processor | wc -l')
+    if threads_result.returncode() == 0
+        num_cpu_threads = threads_result.stdout().strip()
+    endif
 endif
 
 # Declare Dependencies

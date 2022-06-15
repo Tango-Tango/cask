@@ -27,7 +27,7 @@ public:
 private:
     std::function<Task<TO,E>(const TI&)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
-    std::atomic_flag completed;
+    std::atomic_flag completed = ATOMIC_FLAG_INIT;
 };
 
 
@@ -35,7 +35,6 @@ template <class TI, class TO, class E>
 MapTaskObserver<TI,TO,E>::MapTaskObserver(const std::function<Task<TO,E>(const TI&)>& predicate, const ObserverRef<TO,E>& downstream)
     : predicate(predicate)
     , downstream(downstream)
-    , completed(false)
 {}
 
 template <class TI, class TO, class E>

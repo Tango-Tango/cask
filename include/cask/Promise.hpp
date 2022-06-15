@@ -6,6 +6,7 @@
 #ifndef _CASK_PROMISE_H_
 #define _CASK_PROMISE_H_
 
+#include <atomic>
 #include <any>
 #include <functional>
 #include <memory>
@@ -96,7 +97,7 @@ private:
 
     std::optional<Either<T,E>> resultOpt;
     bool canceled;
-    mutable std::atomic_flag lock;
+    mutable std::atomic_flag lock = ATOMIC_FLAG_INIT;
     std::vector<std::function<void(Either<T,E>)>> completeCallbacks;
     std::vector<std::function<void()>> cancelCallbacks;
     std::vector<std::function<void(Either<T,E>, bool)>> eitherCallbacks;
@@ -115,7 +116,6 @@ template <class T, class E>
 Promise<T,E>::Promise(std::shared_ptr<Scheduler> sched)
     : resultOpt(std::nullopt)
     , canceled(false)
-    , lock(false)
     , completeCallbacks()
     , cancelCallbacks()
     , sched(std::move(sched))

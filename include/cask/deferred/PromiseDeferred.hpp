@@ -89,20 +89,20 @@ T PromiseDeferred<T,E>::await() {
     std::optional<Either<T,E>> result = promise->get();
 
     if(!result.has_value()) {
-        std::mutex mutex;
-        mutex.lock();
+        std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>();
+        mutex->lock();
 
-        promise->onComplete([&mutex, &result](Either<T,E> newResult){
+        promise->onComplete([mutex, &result](Either<T,E> newResult){
             result = newResult;
-            mutex.unlock();
+            mutex->unlock();
         });
 
-        promise->onCancel([&mutex, &canceled](){
+        promise->onCancel([mutex, &canceled](){
             canceled = true;
-            mutex.unlock();
+            mutex->unlock();
         });
 
-        mutex.lock();
+        mutex->lock();
     }
 
     if(canceled) {

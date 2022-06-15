@@ -24,11 +24,10 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
     , runner_running(false)
     , dataInQueue()
     , readyQueueSize(0)
-    , readyQueueLock(0)
     , readyQueue()
     , timerMutex()
     , timers()
-    , ticks(0)
+    , last_execution_ms(current_time_ms())
 {
     std::thread runThread(std::bind(&SingleThreadScheduler::run, this));
     std::thread timerThread(std::bind(&SingleThreadScheduler::timer, this));
@@ -83,7 +82,7 @@ void SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>&
 
 CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
     std::lock_guard<std::mutex> guard(timerMutex);
-    int64_t executionTick = ticks + milliseconds;
+    int64_t executionTick = current_time_ms() + milliseconds + 1;
 
     auto id = next_id++;
     auto tasks = timers.find(executionTick);
@@ -138,20 +137,15 @@ void SingleThreadScheduler::timer() {
     timer_running.store(true, std::memory_order_relaxed);
 
     while(should_run.load(std::memory_order_relaxed)) {
-        auto before = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(sleep_time);
-        auto after = std::chrono::steady_clock::now();
-        
-        auto delta = after - before;
-        auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
 
         {
             std::lock_guard<std::mutex> guard(timerMutex);
 
-            int64_t previous_ticks = ticks;
-            ticks += milliseconds;
+            int64_t previous_ticks = last_execution_ms;
+            last_execution_ms = current_time_ms();
 
-            for(int64_t i = previous_ticks; i <= ticks; i++) {
+            for(int64_t i = previous_ticks; i <= last_execution_ms; i++) {
                 auto tasks = timers.find(i);
                 if(tasks != timers.end()) {
                     std::vector<std::function<void()>> submittedTasks;
@@ -171,6 +165,10 @@ void SingleThreadScheduler::timer() {
     }
 
     timer_running.store(false, std::memory_order_relaxed);
+}
+
+int64_t SingleThreadScheduler::current_time_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 SingleThreadScheduler::CancelableTimer::CancelableTimer(

@@ -36,8 +36,10 @@ template <class T, class E>
 GuaranteeObserver<T,E>::GuaranteeObserver(const std::shared_ptr<Observer<T,E>>& downstream, const Task<None,None>& task)
     : downstream(downstream)
     , task(task)
-    , completed(std::make_shared<std::atomic_flag>(false))
-{}
+    , completed(std::make_shared<std::atomic_flag>())
+{
+    completed->clear();
+}
 
 template <class T, class E>
 Task<Ack,None> GuaranteeObserver<T,E>::onNext(const T& value) {

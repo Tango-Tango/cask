@@ -116,7 +116,7 @@ bool FiberImpl<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsig
         return false;
     }
 
-    last_used_scheduler = std::weak_ptr(sched);
+    last_used_scheduler = std::weak_ptr<Scheduler>(sched);
 
     while(batch_size-- > 0) {
         if(this->template evaluateOp<Async>(sched)) {
@@ -247,7 +247,8 @@ bool FiberImpl<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& 
 
         {
             std::lock_guard<std::mutex> guard(racing_fibers_mutex);
-            for(auto& [fiber_id, fiber]: racing_fibers) {
+            for(const auto& entry: racing_fibers) {
+                const auto& fiber = std::get<1>(entry);
                 local_racers.emplace_back(fiber);
             }
         }
@@ -272,7 +273,7 @@ bool FiberImpl<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& 
 template <class T, class E>
 void FiberImpl<T,E>::reschedule(const std::shared_ptr<Scheduler>& sched) {
     last_used_scheduler = sched;
-    sched->submit([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)] {
+    sched->submit([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr<Scheduler>(sched)] {
         if(auto self = self_weak.lock()) {
             if(auto sched = sched_weak.lock()) {
                 std::static_pointer_cast<FiberImpl<T,E>>(self)->resume(sched);
@@ -333,7 +334,7 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
                 waitingOn = deferred;            
                 state.store(WAITING, std::memory_order_release);
                 
-                deferred->onSuccess([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)](auto value) {
+                deferred->onSuccess([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr<Scheduler>(sched)](auto value) {
                     if(auto self = self_weak.lock()) {
                         auto casted_self = std::static_pointer_cast<FiberImpl<T,E>>(self);
                         if(auto sched = sched_weak.lock()) {
@@ -343,7 +344,7 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
                     }
                 });
 
-                deferred->onError([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)](auto error) {
+                deferred->onError([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr<Scheduler>(sched)](auto error) {
                     if(auto self = self_weak.lock()) {
                         auto casted_self = std::static_pointer_cast<FiberImpl<T,E>>(self);
                         if(auto sched = sched_weak.lock()) {
@@ -353,7 +354,7 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
                     }
                 });
 
-                deferred->onCancel([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)]() {
+                deferred->onCancel([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr<Scheduler>(sched)]() {
                     if(auto self = self_weak.lock()) {
                         if(auto sched = sched_weak.lock()) {
                             auto casted_self = std::static_pointer_cast<FiberImpl<T,E>>(self);
@@ -382,7 +383,7 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
         suspended = true;
         if constexpr(Async) {
             const FiberOp::DelayData* data = op->data.delayData;
-            delayedBy = sched->submitAfter(*data, [self_weak = this->weak_from_this(), sched_weak = std::weak_ptr(sched)] {
+            delayedBy = sched->submitAfter(*data, [self_weak = this->weak_from_this(), sched_weak = std::weak_ptr<Scheduler>(sched)] {
                 if(auto self = self_weak.lock()) {
                     if(auto sched = sched_weak.lock()) {
                         auto casted_self = std::static_pointer_cast<FiberImpl<T,E>>(self);
@@ -409,7 +410,10 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
                 std::lock_guard<std::mutex> guard(racing_fibers_mutex);
                 for(auto& racer: *data) {
                     auto fiber = std::make_shared<FiberImpl<Erased,Erased>>(racer);
-                    fiber->onFiberShutdown([self_weak = this->weak_from_this(), fiber_weak = std::weak_ptr(fiber), sched_weak = std::weak_ptr(sched)](auto){
+                    fiber->onFiberShutdown([
+                        self_weak = this->weak_from_this(),
+                        fiber_weak = std::weak_ptr<FiberImpl<Erased,Erased>>(fiber),
+                        sched_weak = std::weak_ptr<Scheduler>(sched)](auto){
                         if(auto self = self_weak.lock()) {
                             if(auto fiber = fiber_weak.lock()) {
                                 if(auto sched = sched_weak.lock()) {
@@ -506,7 +510,8 @@ void FiberImpl<T,E>::cancel() {
 
         {
             std::lock_guard<std::mutex> guard(racing_fibers_mutex);
-            for(auto& [fiber_id, fiber]: racing_fibers) {
+            for(const auto& entry: racing_fibers) {
+                const auto& fiber = std::get<1>(entry);
                 local_racers.emplace_back(fiber);
             }
         }
@@ -573,14 +578,14 @@ T FiberImpl<T,E>::await() {
     auto current_state = state.load(std::memory_order_acquire);
 
     if(current_state != COMPLETED && current_state != CANCELED) {
-        std::mutex mutex;
-        mutex.lock();
+        std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>();
+        mutex->lock();
 
-        onFiberShutdown([&mutex](auto){
-            mutex.unlock();
+        onFiberShutdown([mutex](auto){
+            mutex->unlock();
         });
 
-        mutex.lock();
+        mutex->lock();
     }
 
     if(auto value_opt = value.getValue()) {

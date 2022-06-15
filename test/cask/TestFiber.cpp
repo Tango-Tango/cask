@@ -325,41 +325,6 @@ TEST(TestFiber, RacesAndCancels) {
     EXPECT_TRUE(promise3_canceled);
 }
 
-TEST(TestFiber, CancelDoesntDeadlockSync) {
-    auto sched = std::make_shared<SingleThreadScheduler>();
-
-    FiberRef<int,std::string> fiber = nullptr;
-
-    auto op = FiberOp::thunk([&fiber] {
-        while(fiber == nullptr);
-        fiber->cancel();
-        return 123;
-    });
-
-    fiber = Fiber<int,std::string>::run(op, sched);
-    fiber->await();
-}
-
-TEST(TestFiber, CancelDoesntDeadlockAsync) {
-    auto sched = std::make_shared<SingleThreadScheduler>();
-    auto promise = Promise<Erased,Erased>::create(sched);
-
-    FiberRef<int,std::string> fiber = nullptr;
-
-    auto op = FiberOp::async([&fiber, promise](auto) {
-        while(fiber == nullptr);
-        fiber->cancel();
-        return Deferred<Erased,Erased>::forPromise(promise);
-    });
-
-    fiber = Fiber<int,std::string>::run(op, sched);
-
-    try {
-        fiber->await();
-        FAIL();
-    } catch(std::runtime_error&) {}
-}
-
 TEST(TestFiber, MapBothValue) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);

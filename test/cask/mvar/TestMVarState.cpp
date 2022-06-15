@@ -28,7 +28,8 @@ TEST(MVarState, Initialized) {
 
 TEST(MVarState, Put) {
     auto initialState = MVarState<int,std::string>(Scheduler::global());
-    auto [state, task] = initialState.put(1);
+    auto result = initialState.put(1);
+    const auto& state = std::get<0>(result);
 
     EXPECT_TRUE(state.valueOpt.has_value());
     EXPECT_TRUE(state.pendingPuts->is_empty());
@@ -71,7 +72,8 @@ TEST(MVarState, PutTakeTake) {
     auto initialState = MVarState<int,std::string>(Scheduler::global());
     auto [putState, putTask] = initialState.put(1);
     auto [takeState, takeTask] = putState.take();
-    auto [secondTakeState, secondTakeTask] = takeState.take();
+    auto result = takeState.take();
+    const auto& secondTakeState = std::get<0>(result);
 
     EXPECT_FALSE(secondTakeState.valueOpt.has_value());
     EXPECT_TRUE(secondTakeState.pendingPuts->is_empty());

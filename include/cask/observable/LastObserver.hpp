@@ -29,14 +29,13 @@ public:
 private:
     std::optional<T> lastValue;
     std::weak_ptr<Promise<std::optional<T>,E>> promise;
-    std::atomic_flag completed;
+    std::atomic_flag completed = ATOMIC_FLAG_INIT;
 };
 
 template <class T, class E>
 LastObserver<T,E>::LastObserver(const std::weak_ptr<Promise<std::optional<T>,E>>& promise)
     : lastValue()
     , promise(promise)
-    , completed(false)
 {}
 
 template <class T, class E>

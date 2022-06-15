@@ -142,23 +142,18 @@ TEST_P(ThreadPoolSchedulerTest, RegistersCallbackAfterCancelled) {
 
 TEST_P(ThreadPoolSchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
     bool shutdown = false;
-    std::mutex timer_mutex;
     std::mutex shutdown_mutex;
 
-    timer_mutex.lock();
     shutdown_mutex.lock();
 
     auto before = std::chrono::high_resolution_clock::now();
-    auto cancelable = sched->submitAfter(25, [&timer_mutex] {
-        timer_mutex.unlock();
-    });
+    auto cancelable = sched->submitAfter(25, [] {});
 
     cancelable->onShutdown([&shutdown, &shutdown_mutex] {
         shutdown = true;
         shutdown_mutex.unlock();
     });
 
-    timer_mutex.lock();
     shutdown_mutex.lock();
     auto after = std::chrono::high_resolution_clock::now();
 

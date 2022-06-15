@@ -75,5 +75,5 @@ if not meson.is_subproject()
         dependencies: dependencies + test_dependencies
     )
 
-    test('cask unit tests', testexe, timeout: 300, env: ['ASAN_OPTIONS=detect_leaks=1'])
+    test('cask unit tests', testexe, timeout: 600, env: ['ASAN_OPTIONS=detect_leaks=1'])
 endif

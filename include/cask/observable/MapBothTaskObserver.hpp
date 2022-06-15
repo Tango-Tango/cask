@@ -45,8 +45,10 @@ MapBothTaskObserver<TI,TO,EI,EO>::MapBothTaskObserver(
     : successPredicate(successPredicate)
     , errorPredicate(errorPredicate)
     , downstream(downstream)
-    , completed(std::make_shared<std::atomic_flag>(false))
-{}
+    , completed(std::make_shared<std::atomic_flag>())
+{
+    completed->clear();
+}
 
 template <class TI, class TO, class EI, class EO>
 Task<Ack,None> MapBothTaskObserver<TI,TO,EI,EO>::onNext(const TI& value) {

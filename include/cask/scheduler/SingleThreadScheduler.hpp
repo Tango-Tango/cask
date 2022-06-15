@@ -57,15 +57,16 @@ private:
     mutable std::mutex idlingThreadMutex;
     mutable std::condition_variable idlingThread;
     mutable std::atomic_size_t readyQueueSize;
-    mutable std::atomic_flag readyQueueLock;
+    mutable std::atomic_flag readyQueueLock = ATOMIC_FLAG_INIT;
     std::queue<std::function<void()>> readyQueue;
     std::mutex timerMutex;
     std::map<int64_t,std::vector<TimerEntry>> timers;
-    int64_t ticks;
+    int64_t last_execution_ms;
     int64_t next_id;
 
     void run();
     void timer();
+    static int64_t current_time_ms();
 
     class CancelableTimer final : public Cancelable {
     public:

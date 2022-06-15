@@ -39,7 +39,7 @@ TEST(Pool, AllocatesLIFO) {
 TEST(Pool, RepeatedlyAllocates) {
     Pool pool;
 
-    for(std::size_t i = 0; i < 100000000; i++) {
+    for(std::size_t i = 0; i < 100000; i++) {
         int* thing = pool.allocate<int>();
         pool.deallocate<int>(thing);
     }
