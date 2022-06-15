@@ -30,16 +30,18 @@ FiberRef<None,None> EvalObservable<T,E>::subscribe(
     const std::shared_ptr<Scheduler>& sched,
     const std::shared_ptr<Observer<T,E>>& observer) const
 {
-    try {
-        return observer->onNext(predicate())
-            .template flatMap<None>([observer](auto) {
-                return observer->onComplete();
-            })
-            .doOnCancel(Task<None,None>::defer([observer] { return observer->onCancel(); }))
-            .run(sched);
-    } catch(E& error) {
-        return observer->onError(error).run(sched);
-    }
+    return Task<None,None>::defer([observer, predicate = predicate] {
+            try {
+                return observer->onNext(predicate())
+                    .template flatMap<None>([observer](auto) {
+                        return observer->onComplete();
+                    });
+            } catch(E& error) {
+                return observer->onError(error);
+            }
+        })
+        .doOnCancel(Task<None,None>::defer([observer] { return observer->onCancel(); }))
+        .run(sched);
 }
 
 } // namespace cask::observable

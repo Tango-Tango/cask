@@ -24,7 +24,15 @@ FiberRef<None,None> EmptyObservable<T,E>::subscribe(
     const std::shared_ptr<Scheduler>& sched,
     const std::shared_ptr<Observer<T,E>>& observer) const
 {
-    return observer->onComplete().run(sched);
+    return Task<None,None>::defer([observer] {
+            return observer->onComplete();
+        })
+        .doOnCancel(Task<None,None>::defer([observer] {
+            std::cout << "[EmptyObservable] Canceled" << std::endl;
+            return observer->onCancel();
+        }))
+        .run(sched);
+
 }
 
 } // namespace cask::observable

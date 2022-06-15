@@ -27,7 +27,7 @@ MergeObservable<T,E>::MergeObservable(const ObservableConstRef<ObservableConstRe
 
 template <class T, class E>
 FiberRef<None,None> MergeObservable<T,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const {
-    auto mergeObserver = std::make_shared<MergeObserver<T,E>>(observer);
+    auto mergeObserver = std::make_shared<MergeObserver<T,E>>(observer, sched);
     return upstream->subscribe(sched, mergeObserver);
 }
 

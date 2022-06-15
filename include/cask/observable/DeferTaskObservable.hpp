@@ -50,6 +50,7 @@ FiberRef<None,None> DeferTaskObservable<T,E>::subscribe(
 
     return downstreamTask
         .doOnCancel(Task<None,None>::defer([observer] {
+            std::cout << "[DeferTaskObservable] Canceling" << std::endl;
             return observer->onCancel();
         }))
         .run(sched);
