@@ -578,14 +578,14 @@ T FiberImpl<T,E>::await() {
     auto current_state = state.load(std::memory_order_acquire);
 
     if(current_state != COMPLETED && current_state != CANCELED) {
-        std::mutex mutex;
-        mutex.lock();
+        std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>();
+        mutex->lock();
 
-        onFiberShutdown([&mutex](auto){
-            mutex.unlock();
+        onFiberShutdown([mutex](auto){
+            mutex->unlock();
         });
 
-        mutex.lock();
+        mutex->lock();
     }
 
     if(auto value_opt = value.getValue()) {
