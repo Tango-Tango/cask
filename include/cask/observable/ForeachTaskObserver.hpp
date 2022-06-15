@@ -18,7 +18,7 @@ namespace cask::observable {
  * was empty). Normally obtained by using `Observer<T>::last()`.
  */
 template <class T, class E>
-class ForeachTaskObserver final : public Observer<T,E> {
+class ForeachTaskObserver final : public Observer<T,E>, public std::enable_shared_from_this<ForeachTaskObserver<T,E>> {
 public:
     explicit ForeachTaskObserver(
         const std::weak_ptr<Promise<None,E>>& promise,

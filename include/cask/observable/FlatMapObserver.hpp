@@ -16,7 +16,7 @@ namespace cask::observable {
  * then subscribring to the resulting observable.
  */
 template <class TI, class TO, class E>
-class FlatMapObserver final : public Observer<TI,E> {
+class FlatMapObserver final : public Observer<TI,E>, public std::enable_shared_from_this<FlatMapObserver<TI,TO,E>> {
 public:
     FlatMapObserver(const std::function<ObservableRef<TO,E>(const TI&)>& predicate,
                     const std::shared_ptr<Observer<TO,E>>& downstream);

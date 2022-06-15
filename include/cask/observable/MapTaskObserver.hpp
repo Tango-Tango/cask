@@ -16,7 +16,7 @@ namespace cask::observable {
  * then subscribring to the resulting observable.
  */
 template <class TI, class TO, class E>
-class MapTaskObserver final : public Observer<TI,E> {
+class MapTaskObserver final : public Observer<TI,E>, public std::enable_shared_from_this<MapTaskObserver<TI,TO,E>> {
 public:
     MapTaskObserver(const std::function<Task<TO,E>(const TI&)>& predicate, const std::shared_ptr<Observer<TO,E>>& downstream);
 

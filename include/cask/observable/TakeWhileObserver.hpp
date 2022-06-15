@@ -17,7 +17,7 @@ namespace cask::observable {
  * is normally used via the `Observable<T>::take` method.
  */
 template <class T, class E>
-class TakeWhileObserver final : public Observer<T,E> {
+class TakeWhileObserver final : public Observer<T,E>, public std::enable_shared_from_this<TakeWhileObserver<T,E>> {
 public:
     TakeWhileObserver(
         const ObserverRef<T,E>& downstream,
