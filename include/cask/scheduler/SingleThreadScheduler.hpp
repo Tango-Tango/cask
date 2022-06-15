@@ -57,7 +57,7 @@ private:
     mutable std::mutex idlingThreadMutex;
     mutable std::condition_variable idlingThread;
     mutable std::atomic_size_t readyQueueSize;
-    mutable std::atomic_flag readyQueueLock;
+    mutable std::atomic_flag readyQueueLock = ATOMIC_FLAG_INIT;
     std::queue<std::function<void()>> readyQueue;
     std::mutex timerMutex;
     std::map<int64_t,std::vector<TimerEntry>> timers;
