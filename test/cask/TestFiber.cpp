@@ -355,3 +355,25 @@ TEST(TestFiber, MapBothError) {
     EXPECT_TRUE(fiber->getError().has_value());
     EXPECT_EQ(*(fiber->getError()), 1337);
 }
+
+TEST(TestFiber, CurrentIdNone) {
+    auto current_id = Fiber<int,std::string>::currentFiberId();
+    EXPECT_FALSE(current_id.has_value());
+}
+
+TEST(TestFiber, CurrentId){
+    auto sched = std::make_shared<BenchScheduler>();
+    auto op = FiberOp::thunk([] {
+        return Fiber<int,std::string>::currentFiberId();
+    });
+    auto fiber = Fiber<std::optional<uint64_t>,std::string>::run(op, sched);
+
+    sched->run_ready_tasks();
+
+    EXPECT_TRUE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getValue()), fiber->getId());
+
+    auto current_id = Fiber<int,std::string>::currentFiberId();
+    EXPECT_FALSE(current_id.has_value());
+}

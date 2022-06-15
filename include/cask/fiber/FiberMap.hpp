@@ -20,7 +20,7 @@ public:
         const std::function<E2(const E1&)>& error_transform
     );
 
-    int getId() override;
+    uint64_t getId() override;
     const FiberValue& getRawValue() override;
     std::optional<T2> getValue() override;
     std::optional<E2> getError() override;
@@ -49,7 +49,7 @@ FiberMap<T1,T2,E1,E2>::FiberMap(
 {}
 
 template <class T1, class T2, class E1, class E2>
-int FiberMap<T1,T2,E1,E2>::getId() {
+uint64_t FiberMap<T1,T2,E1,E2>::getId() {
     return parent->getId();
 }
 
