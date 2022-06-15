@@ -29,7 +29,7 @@ public:
 private:
     std::function<ObservableRef<TO,E>(TI)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
-    std::atomic_flag completed;
+    std::atomic_flag completed = ATOMIC_FLAG_INIT;
 };
 
 
@@ -39,7 +39,6 @@ FlatMapObserver<TI,TO,E>::FlatMapObserver(
     const std::shared_ptr<Observer<TO,E>>& downstream)
     : predicate(predicate)
     , downstream(downstream)
-    , completed(false)
 {}
 
 template <class TI, class TO, class E>

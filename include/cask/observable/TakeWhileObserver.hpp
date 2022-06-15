@@ -32,7 +32,7 @@ private:
     ObserverRef<T,E> downstream;
     std::function<bool(const T&)> predicate;
     bool inclusive;
-    std::atomic_flag completed;
+    std::atomic_flag completed = ATOMIC_FLAG_INIT;
 };
 
 template <class T, class E>
@@ -44,7 +44,6 @@ TakeWhileObserver<T,E>::TakeWhileObserver(
     : downstream(downstream)
     , predicate(predicate)
     , inclusive(inclusive)
-    , completed(false)
 {}
 
 template <class T, class E>
