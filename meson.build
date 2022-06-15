@@ -6,8 +6,12 @@ project(
     license: 'BSL-1.0',
     meson_version: '>= 0.57.0'
 )
-
 cpp = meson.get_compiler('cpp')
+
+# Enable /bigobj on msvc
+if cpp.get_id() == 'msvc'
+	add_project_arguments('/bigobj', language: 'cpp')
+endif
 
 # Discover Number of CPU Threads
 num_cpu_threads = 1
