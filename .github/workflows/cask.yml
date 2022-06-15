@@ -131,7 +131,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-20.04
-    needs: [build-linux, build-mac, analyze]
+    needs: [build-linux, build-mac, build-windows, analyze]
     if: contains(github.ref, 'main') && github.actor != 'engineering-at-tangotango'
 
     steps:
