@@ -18,15 +18,15 @@ namespace cask::observable {
 template <class TI, class TO, class E>
 class MapObservable final : public Observable<TO,E> {
 public:
-    MapObservable(const std::shared_ptr<const Observable<TI,E>>& upstream, const std::function<TO(const TI&)>& predicate);
+    MapObservable(const ObservableConstRef<TI,E>& upstream, const std::function<TO(const TI&)>& predicate);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const override;
 private:
-    std::shared_ptr<const Observable<TI,E>> upstream;
+    ObservableConstRef<TI,E> upstream;
     std::function<TO(const TI&)> predicate;
 };
 
 template <class TI, class TO, class E>
-MapObservable<TI,TO,E>::MapObservable(const std::shared_ptr<const Observable<TI,E>>& upstream, const std::function<TO(const TI&)>& predicate)
+MapObservable<TI,TO,E>::MapObservable(const ObservableConstRef<TI,E>& upstream, const std::function<TO(const TI&)>& predicate)
     : upstream(upstream)
     , predicate(predicate)
 {}

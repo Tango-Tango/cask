@@ -20,6 +20,9 @@ class Observable;
 template <class T, class E = std::any>
 using ObservableRef = std::shared_ptr<Observable<T,E>>;
 
+template <class T, class E = std::any>
+using ObservableConstRef = std::shared_ptr<const Observable<T,E>>;
+
 /**
  * An Observable represents a stream of zero or more values and any possibl
  * asychronous computations associated with that stream. It is the streaming
@@ -299,6 +302,8 @@ public:
     template <class T2>
     ObservableRef<T2,E> flatMapOptional(const std::function<std::optional<T2>(const T&)>& predicate) const;
 
+    ObservableRef<T,E> merge(const ObservableRef<T,E>& other) const;
+
     /**
      * For each element in stream emit a possible infinite series of elements
      * downstream. Upstream events will not be be backpressured. When an upstream
@@ -453,6 +458,7 @@ public:
 #include "observable/MapErrorObservable.hpp"
 #include "observable/MapTaskObservable.hpp"
 #include "observable/MapBothTaskObservable.hpp"
+#include "observable/MergeObservable.hpp"
 #include "observable/RepeatTaskObservable.hpp"
 #include "observable/SwitchMapObservable.hpp"
 #include "observable/TakeObserver.hpp"
@@ -613,6 +619,15 @@ ObservableRef<T2,E> Observable<T,E>::flatMapOptional(const std::function<std::op
     });
 }
 
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::merge(const ObservableRef<T,E>& other) const {
+    std::vector<std::shared_ptr<const Observable<T,E>>> all_observables_vector {
+        this->shared_from_this(),
+        other
+    };
+    auto all_observables = Observable<std::shared_ptr<const Observable<T,E>>,E>::fromVector(all_observables_vector);
+    return std::make_shared<observable::MergeObservable<T,E>>(all_observables);
+}
 
 template <class T, class E>
 template <class T2>
