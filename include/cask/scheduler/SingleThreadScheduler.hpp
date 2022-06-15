@@ -61,11 +61,12 @@ private:
     std::queue<std::function<void()>> readyQueue;
     std::mutex timerMutex;
     std::map<int64_t,std::vector<TimerEntry>> timers;
-    int64_t ticks;
+    int64_t last_execution_ms;
     int64_t next_id;
 
     void run();
     void timer();
+    static int64_t current_time_ms();
 
     class CancelableTimer final : public Cancelable {
     public:

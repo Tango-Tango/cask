@@ -8,10 +8,6 @@
 
 namespace cask::scheduler {
 
-int64_t current_time_ms() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-}
-
 ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
     : should_run(true)
     , readyQueueMutex()
@@ -164,6 +160,10 @@ void ThreadPoolScheduler::timer() {
     }
 
     timerThreadStatus.store(false);
+}
+
+int64_t ThreadPoolScheduler::current_time_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 ThreadPoolScheduler::CancelableTimer::CancelableTimer(

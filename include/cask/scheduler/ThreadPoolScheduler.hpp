@@ -57,6 +57,7 @@ private:
 
     void run(unsigned int thread_index);
     void timer();
+    static int64_t current_time_ms();
 
     class CancelableTimer final : public Cancelable {
     public:
