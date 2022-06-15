@@ -103,9 +103,9 @@ jobs:
       run: python3 -m pip install meson==0.61.1 ninja
     - name: Generate the Build Environment
       run: meson setup builddir
-    - name: Build and Test
+    - name: Compile
       working-directory: builddir
-      run: meson test --verbose
+      run: meson compile
   
   analyze:
     name: Analyze
