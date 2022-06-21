@@ -302,6 +302,20 @@ public:
     template <class T2>
     ObservableRef<T2,E> flatMapOptional(const std::function<std::optional<T2>(const T&)>& predicate) const;
 
+    /**
+     * For each element in stream emit a possible infinite series of elements
+     * downstream. Upstream events will be backpressured until all events
+     * from the newly created stream have been processed.
+     *
+     * NOTE: This method implements the same behavior as `concatMap` from rx.
+     *
+     * @param predicate The function to apply to each element of the stream and
+     *                  which emits a new stream of events downstream.
+     * @return An observable which applies the given transform to each element of the stream.
+     */
+    template <class T2>
+    ObservableRef<T2,E> flatScan(const T2& seed, const std::function<ObservableRef<T2,E>(const T2&, const T&)>& predicate) const;
+
     ObservableRef<T,E> merge(const ObservableRef<T,E>& other) const;
 
     /**
@@ -450,6 +464,7 @@ public:
 #include "observable/EvalObservable.hpp"
 #include "observable/FilterObservable.hpp"
 #include "observable/FlatMapObservable.hpp"
+#include "observable/FlatScanObservable.hpp"
 #include "observable/ForeachObserver.hpp"
 #include "observable/ForeachTaskObserver.hpp"
 #include "observable/GuaranteeObservable.hpp"
@@ -618,6 +633,14 @@ ObservableRef<T2,E> Observable<T,E>::flatMapOptional(const std::function<std::op
         return *result_opt;
     });
 }
+
+template <class T, class E>
+template <class T2>
+ObservableRef<T2,E> Observable<T,E>::flatScan(const T2& seed, const std::function<ObservableRef<T2,E>(const T2&, const T&)>& predicate) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::FlatScanObservable<T,T2,E>>(self, seed, predicate);
+}
+
 
 template <class T, class E>
 ObservableRef<T,E> Observable<T,E>::merge(const ObservableRef<T,E>& other) const {
