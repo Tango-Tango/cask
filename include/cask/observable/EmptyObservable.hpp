@@ -28,7 +28,6 @@ FiberRef<None,None> EmptyObservable<T,E>::subscribe(
             return observer->onComplete();
         })
         .doOnCancel(Task<None,None>::defer([observer] {
-            std::cout << "[EmptyObservable] Canceled" << std::endl;
             return observer->onCancel();
         }))
         .run(sched);
