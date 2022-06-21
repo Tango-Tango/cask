@@ -318,6 +318,12 @@ public:
 
     ObservableRef<T,E> merge(const ObservableRef<T,E>& other) const;
 
+    template <class T2>
+    ObservableRef<T2,E> scan(const T2& seed, const std::function<T2(const T2&, const T&)>& predicate) const;
+
+    template <class T2>
+    ObservableRef<T2,E> scanTask(const T2& seed, const std::function<Task<T2,E>(const T2&, const T&)>& predicate) const;
+
     /**
      * For each element in stream emit a possible infinite series of elements
      * downstream. Upstream events will not be be backpressured. When an upstream
@@ -650,6 +656,22 @@ ObservableRef<T,E> Observable<T,E>::merge(const ObservableRef<T,E>& other) const
     };
     auto all_observables = Observable<std::shared_ptr<const Observable<T,E>>,E>::fromVector(all_observables_vector);
     return std::make_shared<observable::MergeObservable<T,E>>(all_observables);
+}
+
+template <class T, class E>
+template <class T2>
+ObservableRef<T2,E> Observable<T,E>::scan(const T2& seed, const std::function<T2(const T2&, const T&)>& predicate) const {
+    return flatScan<T2>(seed, [predicate](auto acc, auto value) {
+        return Observable<T2,E>::pure(predicate(acc, value));
+    });
+}
+
+template <class T, class E>
+template <class T2>
+ObservableRef<T2,E> Observable<T,E>::scanTask(const T2& seed, const std::function<Task<T2,E>(const T2&, const T&)>& predicate) const {
+    return flatScan<T2>(seed, [predicate](auto acc, auto value) {
+        return Observable<T2,E>::fromTask(predicate(acc, value));
+    });
 }
 
 template <class T, class E>
