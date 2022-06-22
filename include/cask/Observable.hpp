@@ -124,6 +124,8 @@ public:
      */
     static ObservableRef<T,E> fromVector(const std::vector<T>& vector);
 
+    static ObservableRef<T,E> mergeAll(std::initializer_list<ObservableConstRef<T,E>> observables);
+
     /**
      * Create an observable who never emits any elements and which
      * never completes.
@@ -535,6 +537,13 @@ ObservableRef<T,E> Observable<T,E>::fromTask(const Task<T,E>& task) {
 template <class T, class E>
 ObservableRef<T,E> Observable<T,E>::fromVector(const std::vector<T>& vector) {
     return std::make_shared<observable::VectorObservable<T,E>>(vector);
+}
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::mergeAll(std::initializer_list<ObservableConstRef<T,E>> observables) {
+    std::vector<ObservableConstRef<T,E>> all_observables_vector(observables);
+    auto all_observables = Observable<ObservableConstRef<T,E>,E>::fromVector(all_observables_vector);
+    return std::make_shared<observable::MergeObservable<T,E>>(all_observables);
 }
 
 template <class T, class E>

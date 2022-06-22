@@ -40,6 +40,7 @@ if not meson.is_subproject()
         'cask/observable/TestObservableMapError.cpp',
         'cask/observable/TestObservableMapTask.cpp',
         'cask/observable/TestObservableMerge.cpp',
+        'cask/observable/TestObservableMergeAll.cpp',
         'cask/observable/TestObservableNever.cpp',
         'cask/observable/TestObservableRepeatTask.cpp',
         'cask/observable/TestObservableScan.cpp',
