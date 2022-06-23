@@ -65,18 +65,39 @@ TEST(Pool, AllocatesLotsOfSmallObjects) {
 
 TEST(Pool, RepeatedlyAllocatesParallel) {
     Pool pool;
-    std::vector<std::thread> threads;
+    bool failed = false;
+    std::vector<bool> completed;
 
     for(std::size_t i = 0; i < 32; i++) {
-        threads.emplace_back([&pool] {
-            for(std::size_t i = 0; i < 10000; i++) {
-                int* thing = pool.allocate<int>();
-                pool.deallocate<int>(thing);
+        completed.emplace_back(false);
+
+        std::thread thread([&pool, &completed, &failed, i] {
+            try {
+                for(std::size_t i = 0; i < 10000; i++) {
+                    int* thing = pool.allocate<int>();
+                    pool.deallocate<int>(thing);
+                }
+
+                completed[i] = true;
+            } catch(...) {
+                completed[i] = true;
+                failed = true;
             }
         });
+
+        thread.detach();
     }
 
-    for(auto& thread : threads) {
-        thread.join();
+    bool waiting = true;
+    while(waiting) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+        waiting = false;
+
+        for(auto c : completed) {
+            if (!c) waiting = true;
+        }
     }
+
+    EXPECT_FALSE(failed);
 }
