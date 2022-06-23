@@ -483,6 +483,7 @@ public:
 #include "observable/MapBothTaskObservable.hpp"
 #include "observable/MergeObservable.hpp"
 #include "observable/RepeatTaskObservable.hpp"
+#include "observable/ScanTaskObservable.hpp"
 #include "observable/SwitchMapObservable.hpp"
 #include "observable/TakeObserver.hpp"
 #include "observable/TakeWhileObservable.hpp"
@@ -670,17 +671,16 @@ ObservableRef<T,E> Observable<T,E>::merge(const ObservableRef<T,E>& other) const
 template <class T, class E>
 template <class T2>
 ObservableRef<T2,E> Observable<T,E>::scan(const T2& seed, const std::function<T2(const T2&, const T&)>& predicate) const {
-    return flatScan<T2>(seed, [predicate](auto acc, auto value) {
-        return Observable<T2,E>::pure(predicate(acc, value));
+    return scanTask<T2>(seed, [predicate](auto acc, auto value) {
+        return Task<T2,E>::pure(predicate(acc, value));
     });
 }
 
 template <class T, class E>
 template <class T2>
 ObservableRef<T2,E> Observable<T,E>::scanTask(const T2& seed, const std::function<Task<T2,E>(const T2&, const T&)>& predicate) const {
-    return flatScan<T2>(seed, [predicate](auto acc, auto value) {
-        return Observable<T2,E>::fromTask(predicate(acc, value));
-    });
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::ScanTaskObservable<T,T2,E>>(self, seed, predicate);
 }
 
 template <class T, class E>
