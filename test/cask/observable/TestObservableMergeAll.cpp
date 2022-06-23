@@ -73,10 +73,40 @@ TEST_P(ObservableMergeAllTest,RightValue) {
     EXPECT_EQ(*result, 123);
 }
 
+TEST_P(ObservableMergeAllTest,Never) {
+    auto fiber = Observable<int,std::string>::mergeAll({
+            Observable<int,std::string>::never(),
+            Observable<int,std::string>::never(),
+            Observable<int,std::string>::never(),
+            Observable<int,std::string>::never(),
+            Observable<int,std::string>::never(),
+            Observable<int,std::string>::never(),
+            Observable<int,std::string>::never(),
+            Observable<int,std::string>::never(),
+            Observable<int,std::string>::never(),
+            Observable<int,std::string>::never(),
+            Observable<int,std::string>::never(),
+            Observable<int,std::string>::never(),
+            Observable<int,std::string>::never()
+        })
+        ->last()
+        .run(sched);
+
+    fiber->cancel();
+
+    try {
+        fiber->await();
+        FAIL() << "Expected fiber to cancel";
+    } catch(std::runtime_error&) {}
+}
+
 INSTANTIATE_TEST_SUITE_P(ObservableMergeAllSingleThread, ObservableMergeAllTest, ::testing::Values(
     std::make_shared<SingleThreadScheduler>()
 ));
 
 INSTANTIATE_TEST_SUITE_P(ObservableMergeAllThreaded, ObservableMergeAllTest, ::testing::Values(
-    std::make_shared<ThreadPoolScheduler>(4)
+    std::make_shared<ThreadPoolScheduler>(1),
+    std::make_shared<ThreadPoolScheduler>(2),
+    std::make_shared<ThreadPoolScheduler>(4),
+    std::make_shared<ThreadPoolScheduler>(8)
 ));
