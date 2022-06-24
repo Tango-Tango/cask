@@ -46,14 +46,13 @@ jobs:
       run: ./regenerate_env.sh ${{ matrix.target }}
     - name: Compile
       working-directory: build_${{ matrix.target }}
-      run: |
-        meson compile
-        cat meson-logs/meson-log.txt
+      run: meson compile
     - name: Test
       working-directory: build_${{ matrix.target }}
-      run: |
-        meson test
-        cat meson-logs/meson-log.txt
+      run:  meson test
+    - name: Dump Logs
+      working-directory: build_${{ matrix.target }}
+      run: cat meson-logs/meson-log.txt
   
   build-mac:
     name: Mac Build and Test
@@ -80,14 +79,13 @@ jobs:
       run: ./regenerate_env.sh ${{ matrix.target }}
     - name: Compile
       working-directory: build_${{ matrix.target }}
-      run: |
-        meson compile
-        cat meson-logs/meson-log.txt
+      run: meson compile
     - name: Test
       working-directory: build_${{ matrix.target }}
-      run: |
-        meson test
-        cat meson-logs/meson-log.txt
+      run:  meson test
+    - name: Dump Logs
+      working-directory: build_${{ matrix.target }}
+      run: cat meson-logs/meson-log.txt
 
   build-windows:
     name: Windows Build and Test
