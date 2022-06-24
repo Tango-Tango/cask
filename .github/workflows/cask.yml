@@ -51,6 +51,7 @@ jobs:
       working-directory: build_${{ matrix.target }}
       run:  meson test
     - name: Dump Logs
+      if: always()
       working-directory: build_${{ matrix.target }}
       run: cat meson-logs/meson-log.txt
   
@@ -84,6 +85,7 @@ jobs:
       working-directory: build_${{ matrix.target }}
       run:  meson test
     - name: Dump Logs
+      if: always()
       working-directory: build_${{ matrix.target }}
       run: cat meson-logs/meson-log.txt
 
