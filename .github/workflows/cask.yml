@@ -50,10 +50,14 @@ jobs:
     - name: Test
       working-directory: build_${{ matrix.target }}
       run:  meson test
-    - name: Dump Logs
+    - name: Dump Compile Logs
       if: always()
       working-directory: build_${{ matrix.target }}
       run: cat meson-logs/meson-log.txt
+    - name: Dump Test Logs
+      if: always()
+      working-directory: build_${{ matrix.target }}
+      run: cat meson-logs/testlog.txt
   
   build-mac:
     name: Mac Build and Test
@@ -84,10 +88,14 @@ jobs:
     - name: Test
       working-directory: build_${{ matrix.target }}
       run:  meson test
-    - name: Dump Logs
+    - name: Dump Compile Logs
       if: always()
       working-directory: build_${{ matrix.target }}
       run: cat meson-logs/meson-log.txt
+    - name: Dump Test Logs
+      if: always()
+      working-directory: build_${{ matrix.target }}
+      run: cat meson-logs/testlog.txt
 
   build-windows:
     name: Windows Build and Test
