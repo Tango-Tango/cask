@@ -44,9 +44,16 @@ jobs:
       run: sudo python3 -m pip install meson==0.61.1
     - name: Generate the Build Environment
       run: ./regenerate_env.sh ${{ matrix.target }}
-    - name: Build and Test
+    - name: Compile
       working-directory: build_${{ matrix.target }}
-      run: meson test --verbose
+      run: |
+        meson compile
+        cat meson-logs/meson-log.txt
+    - name: Test
+      working-directory: build_${{ matrix.target }}
+      run: |
+        meson test
+        cat meson-logs/meson-log.txt
   
   build-mac:
     name: Mac Build and Test
@@ -71,9 +78,16 @@ jobs:
       run: sudo python3 -m pip install meson==0.61.1
     - name: Generate the Build Environment
       run: ./regenerate_env.sh ${{ matrix.target }}
-    - name: Build and Test
+    - name: Compile
       working-directory: build_${{ matrix.target }}
-      run: meson test --verbose
+      run: |
+        meson compile
+        cat meson-logs/meson-log.txt
+    - name: Test
+      working-directory: build_${{ matrix.target }}
+      run: |
+        meson test
+        cat meson-logs/meson-log.txt
 
   build-windows:
     name: Windows Build and Test
