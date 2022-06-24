@@ -43,7 +43,6 @@ FiberRef<None,None> VectorObservable<T,E>::subscribe(
                 .template map<None>([](auto) { return None(); });
         })
         .doOnCancel(Task<None,None>::defer([observer] {
-            std::cout << "[VectorObservable] canceled" << std::endl;
             return observer->onCancel();
         }))
         .run(sched);

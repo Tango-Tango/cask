@@ -13,12 +13,17 @@ using cask::Observable;
 using cask::scheduler::ThreadPoolScheduler;
 using cask::scheduler::SingleThreadScheduler;
 
-class ObservableMergeTest : public ::testing::TestWithParam<std::shared_ptr<cask::Scheduler>> {
+class ObservableMergeTest : public ::testing::TestWithParam<int> {
 protected:
     std::shared_ptr<cask::Scheduler> sched;
     
     void SetUp() override {
-        sched = GetParam();
+        auto num_threads = GetParam();
+        if (num_threads <= 1) {
+            sched = std::make_shared<SingleThreadScheduler>();
+        } else {
+            sched = std::make_shared<ThreadPoolScheduler>(num_threads);
+        }
     }
 };
 
@@ -167,10 +172,7 @@ TEST_P(ObservableMergeTest,EmptyNeverValue) {
     EXPECT_EQ(result[0], 123);
 }
 
-INSTANTIATE_TEST_SUITE_P(ObservableMergeSingleThread, ObservableMergeTest, ::testing::Values(
-    std::make_shared<SingleThreadScheduler>()
+INSTANTIATE_TEST_SUITE_P(ObservableMerge, ObservableMergeTest, ::testing::Values(
+    1,2,3,8
 ));
 
-INSTANTIATE_TEST_SUITE_P(ObservableMergeThreaded, ObservableMergeTest, ::testing::Values(
-    std::make_shared<ThreadPoolScheduler>(4)
-));

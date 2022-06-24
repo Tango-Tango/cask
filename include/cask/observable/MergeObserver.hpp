@@ -124,7 +124,6 @@ template <class T, class E>
 Task<None,None> MergeObserver<T,E>::onComplete() {
     return synchronize()
         .template use<PromiseRef<None,None>>([](auto self) {
-            std::cout << "onComplete" << std::endl;
             self->upstream_completed = true;
 
             if (self->running_fibers.empty()) {
@@ -141,7 +140,6 @@ Task<None,None> MergeObserver<T,E>::onComplete() {
 template <class T, class E>
 Task<None,None> MergeObserver<T,E>::onComplete(uint64_t id) {
     return synchronize().template use<None>([id](auto self) {
-        std::cout << "onComplete(" << id << ")" << std::endl;
         self->running_fibers.erase(id);
 
         if (self->running_fibers.empty() && self->upstream_completed) {
@@ -215,10 +213,8 @@ Task<None,None> MergeObserver<T,E>::errorShutdown() {
 template <class T, class E>
 Task<PromiseRef<None,None>,None> MergeObserver<T,E>::completeDownstream() {
     if (stopped.exchange(true)) {
-        std::cout << "completeDownstream (skip)" << std::endl;
         return Task<PromiseRef<None,None>,None>::pure(completed_promise);
     } else {
-        std::cout << "completeDownstream (transmitting)" << std::endl;
         return downstream->onComplete()
             .template map<PromiseRef<None,None>>([p = completed_promise](auto){
                 p->success(None());
@@ -230,10 +226,8 @@ Task<PromiseRef<None,None>,None> MergeObserver<T,E>::completeDownstream() {
 template <class T, class E>
 Task<None,None> MergeObserver<T,E>::errorDownstream(const E& error) {
     if (stopped.exchange(true)) {
-        std::cout << "errorDownstream (skip)" << std::endl;
         return Task<None,None>::none();
     } else {
-        std::cout << "errorDownstream (transmitting)" << std::endl;
         return downstream->onError(error)
             .template map<None>([p = completed_promise](auto){
                 p->success(None());
@@ -245,10 +239,8 @@ Task<None,None> MergeObserver<T,E>::errorDownstream(const E& error) {
 template <class T, class E>
 Task<None,None> MergeObserver<T,E>::cancelDownstream() {
     if (stopped.exchange(true)) {
-        std::cout << "cancelDownstream (skip)" << std::endl;
         return Task<None,None>::none();
     } else {
-        std::cout << "cancelDownstream (transmitting)" << std::endl;
         return downstream->onCancel()
             .template map<None>([p = completed_promise](auto){
                 p->success(None());

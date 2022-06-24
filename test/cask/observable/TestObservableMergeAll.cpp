@@ -13,14 +13,20 @@ using cask::Observable;
 using cask::scheduler::ThreadPoolScheduler;
 using cask::scheduler::SingleThreadScheduler;
 
-class ObservableMergeAllTest : public ::testing::TestWithParam<std::shared_ptr<cask::Scheduler>> {
+class ObservableMergeAllTest : public ::testing::TestWithParam<int> {
 protected:
     std::shared_ptr<cask::Scheduler> sched;
     
     void SetUp() override {
-        sched = GetParam();
+        auto num_threads = GetParam();
+        if (num_threads <= 1) {
+            sched = std::make_shared<SingleThreadScheduler>();
+        } else {
+            sched = std::make_shared<ThreadPoolScheduler>(num_threads);
+        }
     }
 };
+
 
 TEST_P(ObservableMergeAllTest,Empty) {
     auto fiber = Observable<int,std::string>::mergeAll({
@@ -100,13 +106,7 @@ TEST_P(ObservableMergeAllTest,Never) {
     } catch(std::runtime_error&) {}
 }
 
-INSTANTIATE_TEST_SUITE_P(ObservableMergeAllSingleThread, ObservableMergeAllTest, ::testing::Values(
-    std::make_shared<SingleThreadScheduler>()
+INSTANTIATE_TEST_SUITE_P(ObservableMergeAll, ObservableMergeAllTest, ::testing::Values(
+    1,2,3,8
 ));
 
-INSTANTIATE_TEST_SUITE_P(ObservableMergeAllThreaded, ObservableMergeAllTest, ::testing::Values(
-    std::make_shared<ThreadPoolScheduler>(1),
-    std::make_shared<ThreadPoolScheduler>(2),
-    std::make_shared<ThreadPoolScheduler>(4),
-    std::make_shared<ThreadPoolScheduler>(8)
-));
