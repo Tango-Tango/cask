@@ -11,10 +11,6 @@
 
 namespace cask::observable {
 
-/**
- * Represents an observable that transforms each element from an upstream observable
- * using the given predicate function. Normally obtained by calling `Observable<T>::map`.
- */
 template <class TI, class TO, class E>
 class FlatScanObservable final : public Observable<TO,E> {
 public:

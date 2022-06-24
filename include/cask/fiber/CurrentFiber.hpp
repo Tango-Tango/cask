@@ -29,6 +29,6 @@ private:
     static thread_local std::optional<uint64_t> current_id;
 };
 
-}
+} // namespace cask::fiber
 
 #endif

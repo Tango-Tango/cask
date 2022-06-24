@@ -14,7 +14,7 @@ namespace cask::observable {
 template <class T, class E>
 class MergeObservable final : public Observable<T,E> {
 public:
-    MergeObservable(const ObservableConstRef<ObservableConstRef<T,E>,E>& upstream);
+    explicit MergeObservable(const ObservableConstRef<ObservableConstRef<T,E>,E>& upstream);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     ObservableConstRef<ObservableConstRef<T,E>,E> upstream;

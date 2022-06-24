@@ -21,4 +21,4 @@ void CurrentFiber::clear() {
     current_id.reset();
 }
 
-}
+} // namespace cask::fiber 

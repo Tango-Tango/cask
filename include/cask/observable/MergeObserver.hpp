@@ -271,6 +271,6 @@ Resource<std::shared_ptr<MergeObserver<T,E>>,None> MergeObserver<T,E>::synchroni
     );
 }
 
-}
+} // namespace cask::observable
 
 #endif

@@ -10,11 +10,6 @@
 
 namespace cask::observable {
 
-/**
- * Represents an observer that transforms each event received on a stream to a new value and emits the
- * transformed event to a downstream observer. Normally obtained by calling `Observable<T>::map` and
- * then subscribring to the resulting observable.
- */
 template <class TI, class TO, class E>
 class FlatScanObserver final : public Observer<TI,E>, public std::enable_shared_from_this<FlatScanObserver<TI,TO,E>> {
 public:

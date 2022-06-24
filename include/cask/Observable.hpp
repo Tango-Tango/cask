@@ -124,6 +124,18 @@ public:
      */
     static ObservableRef<T,E> fromVector(const std::vector<T>& vector);
 
+    /**
+     * Merge all of the given observables together to create a new observable. All of the
+     * given observables will be evaluated concurrently and their results provided downstream
+     * If downstream backpressures it will backpressure all upstream observables - causing them to
+     * wait until downstream is ready to provide another value. How the results of each
+     * upstream observable are merged is undefined, but the individual ordering of events
+     * from each upstream will be maintained.
+     * 
+     * @param observables The observables to merge together.
+     * @return An observable which emits merged events from all of the given upstream
+     *         observables.
+     */
     static ObservableRef<T,E> mergeAll(std::initializer_list<ObservableConstRef<T,E>> observables);
 
     /**
@@ -305,24 +317,59 @@ public:
     ObservableRef<T2,E> flatMapOptional(const std::function<std::optional<T2>(const T&)>& predicate) const;
 
     /**
-     * For each element in stream emit a possible infinite series of elements
-     * downstream. Upstream events will be backpressured until all events
-     * from the newly created stream have been processed.
+     * Apply a function to each element of the observable and the result of the previous
+     * invocation of the function (using as seed value for the first element) evaluating
+     * from left-to-right as a possibly infinite series. Observables emitted by the function
+     * will be concatenated to the output and the value of the last element of the inner
+     * observable provided to the next invocation of the method in the series.
      *
-     * NOTE: This method implements the same behavior as `concatMap` from rx.
-     *
-     * @param predicate The function to apply to each element of the stream and
-     *                  which emits a new stream of events downstream.
+     * @param predicate The function to apply to each element of the stream along with some
+     *                  accumulator or state. The method emits a new stream of events
+     *                  downstream.
      * @return An observable which applies the given transform to each element of the stream.
      */
     template <class T2>
     ObservableRef<T2,E> flatScan(const T2& seed, const std::function<ObservableRef<T2,E>(const T2&, const T&)>& predicate) const;
 
+    /**
+     * Merge the given observable with this observable. Both this observable and the other
+     * observable will be evaluated concurrently and their results provided downstream. If
+     * downstream backpressures it will backpressure both observables - causing them to
+     * wait until downstream is ready to provide another value. How the results of each
+     * upstream observable are merged is undefined, but the individual ordering of events
+     * from each upstream will be maintained.
+     * 
+     * @param other The other observable to merge with this one.
+     * @return An observable which emits merged events from both this observable and
+     *         the given observable.
+     */
     ObservableRef<T,E> merge(const ObservableRef<T,E>& other) const;
 
+    /**
+     * Apply a pure function to each element of the observable and the result of the previous
+     * invocation of the function (using as seed value for the first element) evaluating
+     * from left-to-right as a possibly infinite series. Values emitted by the function
+     * will be emitted downstream and provided back to the next invocation of the function
+     * once an upstream value is ready.
+     *
+     * @param predicate The function to apply to each element of the stream along with some
+     *                  accumulator or state.
+     * @return An observable which applies the given transform to each element of the stream.
+     */
     template <class T2>
     ObservableRef<T2,E> scan(const T2& seed, const std::function<T2(const T2&, const T&)>& predicate) const;
 
+    /**
+     * Apply a side effecting and possibly asyncrhonouse function to each element of the
+     * observable and the result of the previous invocation of the function (using as seed
+     * value for the first element) evaluating from left-to-right as a possibly infinite
+     * series. Values emitted by the function will be emitted downstream and provided back
+     * to the next invocation of the function once an upstream value is ready.
+     *
+     * @param predicate The function to apply to each element of the stream along with some
+     *                  accumulator or state.
+     * @return An observable which applies the given transform to each element of the stream.
+     */
     template <class T2>
     ObservableRef<T2,E> scanTask(const T2& seed, const std::function<Task<T2,E>(const T2&, const T&)>& predicate) const;
 
