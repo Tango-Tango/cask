@@ -44,6 +44,13 @@ template <class T, class E = std::any>
 class Observable : public std::enable_shared_from_this<Observable<T,E>> {
 public:
     /**
+     * Create an observable which immediately cancels any downstream
+     * observer.
+     * @return A new observable that cancels any downstream observers.
+     */
+    static ObservableRef<T,E> cancel();
+
+    /**
      * Create an Observable housing a single pure value. When subscribed this
      * one value will be emitted and the stream will complete.
      * @param value The value to emit when subscribed.
@@ -511,6 +518,7 @@ public:
 
 #include "observable/AppendAllObservable.hpp"
 #include "observable/BufferObservable.hpp"
+#include "observable/CancelObservable.hpp"
 #include "observable/CallbackObserver.hpp"
 #include "observable/DeferObservable.hpp"
 #include "observable/DeferTaskObservable.hpp"
@@ -537,6 +545,11 @@ public:
 #include "observable/VectorObservable.hpp"
 
 namespace cask {
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::cancel() {
+    return std::make_shared<observable::CancelObservable<T,E>>();
+}
 
 template <class T, class E>
 ObservableRef<T,E> Observable<T,E>::pure(const T& value) {

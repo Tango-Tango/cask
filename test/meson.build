@@ -22,6 +22,7 @@ if not meson.is_subproject()
         'cask/mvar/TestMVarState.cpp',
         'cask/observable/TestObservableAppendAll.cpp',
         'cask/observable/TestObservableBuffer.cpp',
+        'cask/observable/TestObservableCancel.cpp',
         'cask/observable/TestObservableConcat.cpp',
         'cask/observable/TestObservableDistinctUntilChanged.cpp',
         'cask/observable/TestObservableDistinctUntilChangedBy.cpp',
