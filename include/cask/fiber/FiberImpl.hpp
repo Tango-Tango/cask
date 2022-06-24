@@ -13,6 +13,7 @@
 #include "cask/Config.hpp"
 #include "cask/Deferred.hpp"
 #include "cask/Fiber.hpp"
+#include "cask/fiber/CurrentFiber.hpp"
 
 namespace cask::fiber {
 
@@ -25,7 +26,7 @@ public:
     ~FiberImpl();
 
     FiberState getState();
-    int getId() override;
+    uint64_t getId() override;
     const FiberValue& getRawValue() override;
     std::optional<T> getValue() override;
     std::optional<E> getError() override;
@@ -61,7 +62,7 @@ private:
     template <bool Async>
     bool resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned int batch_size);
 
-    int id;
+    uint64_t id;
     std::shared_ptr<const FiberOp> op;
     std::weak_ptr<Scheduler> last_used_scheduler;
     FiberValue value;
@@ -78,7 +79,7 @@ private:
 
 template <class T, class E>
 FiberImpl<T,E>::FiberImpl(const std::shared_ptr<const FiberOp>& op)
-    : id(rand())
+    : id(CurrentFiber::acquireId())
     , op(op)
     , last_used_scheduler()
     , value()
@@ -99,12 +100,18 @@ FiberImpl<T,E>::~FiberImpl()
 
 template <class T, class E>
 bool FiberImpl<T,E>::resumeSync() {
-    return resumeUnsafe<false>(nullptr, UINT_MAX);
+    CurrentFiber::setId(id);
+    auto result = resumeUnsafe<false>(nullptr, UINT_MAX);
+    CurrentFiber::clear();
+    return result;
 }
 
 template <class T, class E>
 bool FiberImpl<T,E>::resume(const std::shared_ptr<Scheduler>& sched) {
-    return resumeUnsafe<true>(sched, batch_size);
+    CurrentFiber::setId(id);
+    auto result = resumeUnsafe<true>(sched, batch_size);
+    CurrentFiber::clear();
+    return result;
 }
 
 template <class T, class E>
@@ -143,7 +150,7 @@ FiberState FiberImpl<T,E>::getState() {
 }
 
 template <class T, class E>
-int FiberImpl<T,E>::getId() {
+uint64_t FiberImpl<T,E>::getId() {
     return id;
 }
 

@@ -66,7 +66,7 @@ using ObserverRef = std::shared_ptr<Observer<T,E>>;
  * methods without using expensive locks or other synchronization mechanisms.
  */
 template <class T, class E>
-class Observer : public std::enable_shared_from_this<Observer<T,E>> {
+class Observer {
 public:
     /**
      * Handle the next event in the event stream.

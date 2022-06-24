@@ -17,7 +17,7 @@ public:
     AppendAllObserver(
         const std::shared_ptr<Scheduler>& sched,
         const std::shared_ptr<Observer<T,E>>& downstream,
-        const std::shared_ptr<const Observable<T,E>> next
+        const ObservableConstRef<T,E>& next
     );
 
     Task<Ack,None> onNext(const T& value) override;
@@ -27,7 +27,7 @@ public:
 private:
     std::shared_ptr<Scheduler> sched;
     std::shared_ptr<Observer<T,E>> downstream;
-    std::shared_ptr<const Observable<T,E>> next;
+    ObservableConstRef<T,E> next;
 };
 
 
@@ -35,7 +35,7 @@ template <class T, class E>
 AppendAllObserver<T,E>::AppendAllObserver(
     const std::shared_ptr<Scheduler>& sched,
     const std::shared_ptr<Observer<T,E>>& downstream,
-    const std::shared_ptr<const Observable<T,E>> next
+    const ObservableConstRef<T,E>& next
 )
     : sched(sched)
     , downstream(downstream)

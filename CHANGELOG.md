@@ -3,6 +3,15 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+# 15.0
+
+- Add the `merge`, `mergeAll`, `flatScan`, `scan` and `scanTask` operators to `Observable`.
+- `Fiber` ids are now guaranteed to be globally unique. The id of the current fiber can
+  be obtained via `Fiber::currentFibeId`.
+- `Observer` instances no longer automatically inherit from `std::enable_shared_from_this`.
+  Child classes may still opt-in to this behavior (by inheriting directly) on an as-needed
+  basis.
+
 # 14.0
 
 - Allow the pool cache line size to be directly configured rather than guessed via

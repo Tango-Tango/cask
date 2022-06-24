@@ -27,6 +27,9 @@ jobs:
       matrix:
         os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
         target: [debug, release, release_no_atomics, release_always_async, clang, mips, arm]
+        exclude:
+          - os: ubuntu-18.04 # qemu-mipsel on ubuntu 18.04 is slow and buggy
+            target: mips
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
@@ -44,9 +47,20 @@ jobs:
       run: sudo python3 -m pip install meson==0.61.1
     - name: Generate the Build Environment
       run: ./regenerate_env.sh ${{ matrix.target }}
-    - name: Build and Test
+    - name: Compile
       working-directory: build_${{ matrix.target }}
-      run: meson test --verbose
+      run: meson compile
+    - name: Test
+      working-directory: build_${{ matrix.target }}
+      run:  meson test
+    - name: Dump Compile Logs
+      if: always()
+      working-directory: build_${{ matrix.target }}
+      run: cat meson-logs/meson-log.txt
+    - name: Dump Test Logs
+      if: always()
+      working-directory: build_${{ matrix.target }}
+      run: cat meson-logs/testlog.txt
   
   build-mac:
     name: Mac Build and Test
@@ -71,9 +85,20 @@ jobs:
       run: sudo python3 -m pip install meson==0.61.1
     - name: Generate the Build Environment
       run: ./regenerate_env.sh ${{ matrix.target }}
-    - name: Build and Test
+    - name: Compile
       working-directory: build_${{ matrix.target }}
-      run: meson test --verbose
+      run: meson compile
+    - name: Test
+      working-directory: build_${{ matrix.target }}
+      run:  meson test
+    - name: Dump Compile Logs
+      if: always()
+      working-directory: build_${{ matrix.target }}
+      run: cat meson-logs/meson-log.txt
+    - name: Dump Test Logs
+      if: always()
+      working-directory: build_${{ matrix.target }}
+      run: cat meson-logs/testlog.txt
 
   build-windows:
     name: Windows Build and Test

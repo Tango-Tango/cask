@@ -38,9 +38,13 @@ FiberRef<None,None> VectorObservable<T,E>::subscribe(
     const std::shared_ptr<Scheduler>& sched,
     const std::shared_ptr<Observer<T,E>>& observer) const
 {
-    return pushEvent(0, source, sched, observer, Continue)
-        .doOnCancel(Task<None,None>::defer([observer] { return observer->onCancel(); }))
-        .template map<None>([](auto) { return None(); })
+    return Task<None,None>::defer([sched, observer, source = source] {
+            return pushEvent(0, source, sched, observer, Continue)
+                .template map<None>([](auto) { return None(); });
+        })
+        .doOnCancel(Task<None,None>::defer([observer] {
+            return observer->onCancel();
+        }))
         .run(sched);
 }
 

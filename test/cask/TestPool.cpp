@@ -62,21 +62,3 @@ TEST(Pool, AllocatesLotsOfSmallObjects) {
         }
     }
 }
-
-TEST(Pool, RepeatedlyAllocatesParallel) {
-    Pool pool;
-    std::vector<std::thread> threads;
-
-    for(std::size_t i = 0; i < 32; i++) {
-        threads.emplace_back([&pool] {
-            for(std::size_t i = 0; i < 10000; i++) {
-                int* thing = pool.allocate<int>();
-                pool.deallocate<int>(thing);
-            }
-        });
-    }
-
-    for(auto& thread : threads) {
-        thread.join();
-    }
-}

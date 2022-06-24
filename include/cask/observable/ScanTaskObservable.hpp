@@ -3,11 +3,11 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
 
-#ifndef _CASK_FLAT_MAP_OBSERVABLE_H_
-#define _CASK_FLAT_MAP_OBSERVABLE_H_
+#ifndef _CASK_SCAN_TASK_OBSERVABLE_H_
+#define _CASK_SCAN_TASK_OBSERVABLE_H_
 
 #include "../Observable.hpp"
-#include "FlatMapObserver.hpp"
+#include "ScanTaskObserver.hpp"
 
 namespace cask::observable {
 
@@ -16,29 +16,35 @@ namespace cask::observable {
  * using the given predicate function. Normally obtained by calling `Observable<T>::map`.
  */
 template <class TI, class TO, class E>
-class FlatMapObservable final : public Observable<TO,E> {
+class ScanTaskObservable final : public Observable<TO,E> {
 public:
-    FlatMapObservable(const ObservableConstRef<TI,E>& upstream, const std::function<ObservableRef<TO,E>(const TI&)>& predicate);
+    ScanTaskObservable(
+        const ObservableConstRef<TI,E>& upstream,
+        const TO& seed,
+        const std::function<Task<TO,E>(const TO&, const TI&)>& predicate);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const override;
 private:
     ObservableConstRef<TI,E> upstream;
-    std::function<ObservableRef<TO,E>(const TI&)> predicate;
+    TO seed;
+    std::function<Task<TO,E>(const TO&, const TI&)> predicate;
 };
 
 
 template <class TI, class TO, class E>
-FlatMapObservable<TI,TO,E>::FlatMapObservable(
+ScanTaskObservable<TI,TO,E>::ScanTaskObservable(
     const ObservableConstRef<TI,E>& upstream,
-    const std::function<ObservableRef<TO,E>(const TI&)>& predicate
+    const TO& seed,
+    const std::function<Task<TO,E>(const TO&, const TI&)>& predicate
 )
     : upstream(upstream)
+    , seed(seed)
     , predicate(predicate)
 {}
 
 template <class TI, class TO, class E>
-FiberRef<None,None> FlatMapObservable<TI,TO,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const {
-    auto flatMapObserver = std::make_shared<FlatMapObserver<TI,TO,E>>(predicate, observer);
-    return upstream->subscribe(sched, flatMapObserver);
+FiberRef<None,None> ScanTaskObservable<TI,TO,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const {
+    auto flatScanObserver = std::make_shared<ScanTaskObserver<TI,TO,E>>(seed, predicate, observer);
+    return upstream->subscribe(sched, flatScanObserver);
 }
 
 } // namespace cask::observable

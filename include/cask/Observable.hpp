@@ -20,6 +20,9 @@ class Observable;
 template <class T, class E = std::any>
 using ObservableRef = std::shared_ptr<Observable<T,E>>;
 
+template <class T, class E = std::any>
+using ObservableConstRef = std::shared_ptr<const Observable<T,E>>;
+
 /**
  * An Observable represents a stream of zero or more values and any possibl
  * asychronous computations associated with that stream. It is the streaming
@@ -120,6 +123,20 @@ public:
      *         vector on subscription
      */
     static ObservableRef<T,E> fromVector(const std::vector<T>& vector);
+
+    /**
+     * Merge all of the given observables together to create a new observable. All of the
+     * given observables will be evaluated concurrently and their results provided downstream
+     * If downstream backpressures it will backpressure all upstream observables - causing them to
+     * wait until downstream is ready to provide another value. How the results of each
+     * upstream observable are merged is undefined, but the individual ordering of events
+     * from each upstream will be maintained.
+     * 
+     * @param observables The observables to merge together.
+     * @return An observable which emits merged events from all of the given upstream
+     *         observables.
+     */
+    static ObservableRef<T,E> mergeAll(std::initializer_list<ObservableConstRef<T,E>> observables);
 
     /**
      * Create an observable who never emits any elements and which
@@ -300,6 +317,63 @@ public:
     ObservableRef<T2,E> flatMapOptional(const std::function<std::optional<T2>(const T&)>& predicate) const;
 
     /**
+     * Apply a function to each element of the observable and the result of the previous
+     * invocation of the function (using as seed value for the first element) evaluating
+     * from left-to-right as a possibly infinite series. Observables emitted by the function
+     * will be concatenated to the output and the value of the last element of the inner
+     * observable provided to the next invocation of the method in the series.
+     *
+     * @param predicate The function to apply to each element of the stream along with some
+     *                  accumulator or state. The method emits a new stream of events
+     *                  downstream.
+     * @return An observable which applies the given transform to each element of the stream.
+     */
+    template <class T2>
+    ObservableRef<T2,E> flatScan(const T2& seed, const std::function<ObservableRef<T2,E>(const T2&, const T&)>& predicate) const;
+
+    /**
+     * Merge the given observable with this observable. Both this observable and the other
+     * observable will be evaluated concurrently and their results provided downstream. If
+     * downstream backpressures it will backpressure both observables - causing them to
+     * wait until downstream is ready to provide another value. How the results of each
+     * upstream observable are merged is undefined, but the individual ordering of events
+     * from each upstream will be maintained.
+     * 
+     * @param other The other observable to merge with this one.
+     * @return An observable which emits merged events from both this observable and
+     *         the given observable.
+     */
+    ObservableRef<T,E> merge(const ObservableRef<T,E>& other) const;
+
+    /**
+     * Apply a pure function to each element of the observable and the result of the previous
+     * invocation of the function (using as seed value for the first element) evaluating
+     * from left-to-right as a possibly infinite series. Values emitted by the function
+     * will be emitted downstream and provided back to the next invocation of the function
+     * once an upstream value is ready.
+     *
+     * @param predicate The function to apply to each element of the stream along with some
+     *                  accumulator or state.
+     * @return An observable which applies the given transform to each element of the stream.
+     */
+    template <class T2>
+    ObservableRef<T2,E> scan(const T2& seed, const std::function<T2(const T2&, const T&)>& predicate) const;
+
+    /**
+     * Apply a side effecting and possibly asyncrhonouse function to each element of the
+     * observable and the result of the previous invocation of the function (using as seed
+     * value for the first element) evaluating from left-to-right as a possibly infinite
+     * series. Values emitted by the function will be emitted downstream and provided back
+     * to the next invocation of the function once an upstream value is ready.
+     *
+     * @param predicate The function to apply to each element of the stream along with some
+     *                  accumulator or state.
+     * @return An observable which applies the given transform to each element of the stream.
+     */
+    template <class T2>
+    ObservableRef<T2,E> scanTask(const T2& seed, const std::function<Task<T2,E>(const T2&, const T&)>& predicate) const;
+
+    /**
      * For each element in stream emit a possible infinite series of elements
      * downstream. Upstream events will not be be backpressured. When an upstream
      * event occurs the downstream subscription will be canceled, the predicate will
@@ -445,6 +519,7 @@ public:
 #include "observable/EvalObservable.hpp"
 #include "observable/FilterObservable.hpp"
 #include "observable/FlatMapObservable.hpp"
+#include "observable/FlatScanObservable.hpp"
 #include "observable/ForeachObserver.hpp"
 #include "observable/ForeachTaskObserver.hpp"
 #include "observable/GuaranteeObservable.hpp"
@@ -453,7 +528,9 @@ public:
 #include "observable/MapErrorObservable.hpp"
 #include "observable/MapTaskObservable.hpp"
 #include "observable/MapBothTaskObservable.hpp"
+#include "observable/MergeObservable.hpp"
 #include "observable/RepeatTaskObservable.hpp"
+#include "observable/ScanTaskObservable.hpp"
 #include "observable/SwitchMapObservable.hpp"
 #include "observable/TakeObserver.hpp"
 #include "observable/TakeWhileObservable.hpp"
@@ -508,6 +585,13 @@ ObservableRef<T,E> Observable<T,E>::fromTask(const Task<T,E>& task) {
 template <class T, class E>
 ObservableRef<T,E> Observable<T,E>::fromVector(const std::vector<T>& vector) {
     return std::make_shared<observable::VectorObservable<T,E>>(vector);
+}
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::mergeAll(std::initializer_list<ObservableConstRef<T,E>> observables) {
+    std::vector<ObservableConstRef<T,E>> all_observables_vector(observables);
+    auto all_observables = Observable<ObservableConstRef<T,E>,E>::fromVector(all_observables_vector);
+    return std::make_shared<observable::MergeObservable<T,E>>(all_observables);
 }
 
 template <class T, class E>
@@ -613,6 +697,38 @@ ObservableRef<T2,E> Observable<T,E>::flatMapOptional(const std::function<std::op
     });
 }
 
+template <class T, class E>
+template <class T2>
+ObservableRef<T2,E> Observable<T,E>::flatScan(const T2& seed, const std::function<ObservableRef<T2,E>(const T2&, const T&)>& predicate) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::FlatScanObservable<T,T2,E>>(self, seed, predicate);
+}
+
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::merge(const ObservableRef<T,E>& other) const {
+    std::vector<std::shared_ptr<const Observable<T,E>>> all_observables_vector {
+        this->shared_from_this(),
+        other
+    };
+    auto all_observables = Observable<std::shared_ptr<const Observable<T,E>>,E>::fromVector(all_observables_vector);
+    return std::make_shared<observable::MergeObservable<T,E>>(all_observables);
+}
+
+template <class T, class E>
+template <class T2>
+ObservableRef<T2,E> Observable<T,E>::scan(const T2& seed, const std::function<T2(const T2&, const T&)>& predicate) const {
+    return scanTask<T2>(seed, [predicate](auto acc, auto value) {
+        return Task<T2,E>::pure(predicate(acc, value));
+    });
+}
+
+template <class T, class E>
+template <class T2>
+ObservableRef<T2,E> Observable<T,E>::scanTask(const T2& seed, const std::function<Task<T2,E>(const T2&, const T&)>& predicate) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::ScanTaskObservable<T,T2,E>>(self, seed, predicate);
+}
 
 template <class T, class E>
 template <class T2>

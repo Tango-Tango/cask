@@ -71,11 +71,16 @@ public:
     static std::optional<Either<T,E>> runSync(const std::shared_ptr<const fiber::FiberOp>& op);
 
     /**
+     * Return the ID of the currently running fiber (if any).
+     */
+    static std::optional<uint64_t> currentFiberId();
+
+    /**
      * Get the ID of this Fiber.
      * 
      * @return The unique identifier of this fiber.
      */
-    virtual int getId() = 0;
+    virtual uint64_t getId() = 0;
 
     /**
      * Return the `FiberValue` associated with this fiber.
@@ -175,6 +180,11 @@ std::optional<Either<T,E>> Fiber<T,E>::runSync(const std::shared_ptr<const fiber
     } else {
         return {};
     }
+}
+
+template <class T, class E>
+std::optional<uint64_t> Fiber<T,E>::currentFiberId() {
+    return fiber::CurrentFiber::id();
 }
 
 template <class T, class E>

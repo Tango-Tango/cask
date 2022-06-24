@@ -28,6 +28,7 @@ if not meson.is_subproject()
         'cask/observable/TestObservableFilter.cpp',
         'cask/observable/TestObservableFlatMap.cpp',
         'cask/observable/TestObservableFlatMapOptional.cpp',
+        'cask/observable/TestObservableFlatScan.cpp',
         'cask/observable/TestObservableFlatten.cpp',
         'cask/observable/TestObservableForeach.cpp',
         'cask/observable/TestObservableForeachTask.cpp',
@@ -38,8 +39,12 @@ if not meson.is_subproject()
         'cask/observable/TestObservableMapBothTask.cpp',
         'cask/observable/TestObservableMapError.cpp',
         'cask/observable/TestObservableMapTask.cpp',
+        'cask/observable/TestObservableMerge.cpp',
+        'cask/observable/TestObservableMergeAll.cpp',
         'cask/observable/TestObservableNever.cpp',
         'cask/observable/TestObservableRepeatTask.cpp',
+        'cask/observable/TestObservableScan.cpp',
+        'cask/observable/TestObservableScanTask.cpp',
         'cask/observable/TestObservableSwitchMap.cpp',
         'cask/observable/TestObservableTake.cpp',
         'cask/observable/TestObservableTakeWhile.cpp',
@@ -75,5 +80,5 @@ if not meson.is_subproject()
         dependencies: dependencies + test_dependencies
     )
 
-    test('cask unit tests', testexe, timeout: 600, env: ['ASAN_OPTIONS=detect_leaks=1'])
+    test('cask unit tests', testexe, timeout: 1200, env: ['ASAN_OPTIONS=detect_leaks=1'])
 endif
