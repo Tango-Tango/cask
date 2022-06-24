@@ -3,6 +3,11 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+# 15.1
+
+- Add `Observable::cancel` which allows a user to create an observable which will always
+  cancel downstream when evaluating.
+
 # 15.0
 
 - Add the `merge`, `mergeAll`, `flatScan`, `scan` and `scanTask` operators to `Observable`.
