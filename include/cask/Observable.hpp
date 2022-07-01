@@ -352,6 +352,8 @@ public:
      */
     ObservableRef<T,E> merge(const ObservableRef<T,E>& other) const;
 
+    ObservableRef<T,E> queue(uint32_t queue_size) const;
+
     /**
      * Apply a pure function to each element of the observable and the result of the previous
      * invocation of the function (using as seed value for the first element) evaluating
@@ -537,6 +539,7 @@ public:
 #include "observable/MapTaskObservable.hpp"
 #include "observable/MapBothTaskObservable.hpp"
 #include "observable/MergeObservable.hpp"
+#include "observable/QueueObservable.hpp"
 #include "observable/RepeatTaskObservable.hpp"
 #include "observable/ScanTaskObservable.hpp"
 #include "observable/SwitchMapObservable.hpp"
@@ -726,6 +729,12 @@ ObservableRef<T,E> Observable<T,E>::merge(const ObservableRef<T,E>& other) const
     };
     auto all_observables = Observable<std::shared_ptr<const Observable<T,E>>,E>::fromVector(all_observables_vector);
     return std::make_shared<observable::MergeObservable<T,E>>(all_observables);
+}
+
+template <class T, class E>
+ObservableRef<T,E> Observable<T,E>::queue(uint32_t queue_size) const {
+    auto self = this->shared_from_this();
+    return std::make_shared<observable::QueueObservable<T,E>>(self, queue_size);
 }
 
 template <class T, class E>
