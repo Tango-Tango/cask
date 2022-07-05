@@ -352,6 +352,14 @@ public:
      */
     ObservableRef<T,E> merge(const ObservableRef<T,E>& other) const;
 
+    /**
+     * Creates a new observable where upstream and downstream are run concurrently and
+     * communicate via a queue of the given maximum size. When the queue reaches the
+     * maximum size the upstream will be backpressured.
+     * 
+     * @param queue_size The maximum size of the queue.
+     * @return An observable with a queue between upstream and downstream
+     */
     ObservableRef<T,E> queue(uint32_t queue_size) const;
 
     /**

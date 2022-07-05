@@ -11,11 +11,6 @@
 
 namespace cask::observable {
 
-/**
- * Represents an observer that transforms each event received on a stream to a new value and emits the
- * transformed event to a downstream observer. Normally obtained by calling `Observable<T>::map` and
- * then subscribring to the resulting observable.
- */
 template <class T, class E>
 class QueueObserver final : public Observer<T,E>, public std::enable_shared_from_this<QueueObserver<T,E>> {
 public:
@@ -80,20 +75,15 @@ Task<Ack,None> QueueObserver<T,E>::onNext(const T& value) {
 
     if (downstream_fiber == nullptr) {
         downstream_fiber = Observable<std::shared_ptr<QueueEvent>,None>::repeatTask(queue->take())
-            ->template mapTask<None>([self_weak](auto event){
-                if (auto self = self_weak.lock()) {
-                    return self->onEvent(event);
-                } else {
-                    return Task<None,None>::none();
-                }
+            ->template mapTask<None>([self](auto event){
+                return self->onEvent(event);
             })
             ->completed()
             .run(sched);
 
-        downstream_fiber->onFiberShutdown([self_weak](auto) {
-            if (auto self = self_weak.lock()) {
-                self->downstream_shutdown_complete->success(None());
-            }
+        downstream_fiber->onFiberShutdown([self](auto) {
+            self->downstream_shutdown_complete->success(None());
+            self->downstream_fiber = nullptr;
         });
     }
 
@@ -136,6 +126,7 @@ Task<None,None> QueueObserver<T,E>::onComplete() {
 
 template <class T, class E>
 Task<None,None> QueueObserver<T,E>::onCancel() {
+
     if (downstream_fiber == nullptr) {
         return downstream->onCancel();
     } else {
