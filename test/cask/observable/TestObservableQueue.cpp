@@ -188,16 +188,10 @@ TEST(ObservableQueue, UpstreamRunsWhileDownstreamBackpressure) {
 }
 
 TEST(ObservableQueue, DownstreamStopBigQueue) {
-    int upstream_counter = 0;
-
     auto sched = std::make_shared<BenchScheduler>();
     auto downstream_queue = cask::Queue<int,cask::None>::empty(sched, 1);
     auto fiber = Observable<int, cask::None>::fromVector({
             0, 1, 2, 3, 4, 5
-        })
-        ->template map<int>([&upstream_counter](auto value) {
-            upstream_counter++;
-            return value;
         })
         ->queue(10)
         ->take(2)
@@ -206,7 +200,6 @@ TEST(ObservableQueue, DownstreamStopBigQueue) {
     sched->run_ready_tasks();
     auto result = fiber->await();
 
-    EXPECT_EQ(upstream_counter, 6);
     ASSERT_EQ(result.size(), 2);
     EXPECT_EQ(result[0], 0);
     EXPECT_EQ(result[1], 1);
@@ -229,6 +222,9 @@ TEST(ObservableQueue, DownstreamStopSmallQueue) {
         .run(sched);
 
     sched->run_ready_tasks();
+
+    ASSERT_TRUE(fiber->getValue().has_value());
+
     auto result = fiber->await();
 
     EXPECT_EQ(upstream_counter, 2);
