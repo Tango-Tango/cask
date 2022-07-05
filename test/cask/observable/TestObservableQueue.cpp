@@ -6,11 +6,13 @@
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
+#include "cask/scheduler/SingleThreadScheduler.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::Observable;
 using cask::Scheduler;
 using cask::scheduler::BenchScheduler;
+using cask::scheduler::SingleThreadScheduler;
 
 TEST(ObservableQueue, Empty) {
     auto sched = std::make_shared<BenchScheduler>();
@@ -188,17 +190,15 @@ TEST(ObservableQueue, UpstreamRunsWhileDownstreamBackpressure) {
 }
 
 TEST(ObservableQueue, DownstreamStopBigQueue) {
-    auto sched = std::make_shared<BenchScheduler>();
+    auto sched = std::make_shared<SingleThreadScheduler>();
     auto downstream_queue = cask::Queue<int,cask::None>::empty(sched, 1);
-    auto fiber = Observable<int, cask::None>::fromVector({
+    auto result = Observable<int, cask::None>::fromVector({
             0, 1, 2, 3, 4, 5
         })
         ->queue(10)
         ->take(2)
-        .run(sched);
-
-    sched->run_ready_tasks();
-    auto result = fiber->await();
+        .run(sched)
+        ->await();
 
     ASSERT_EQ(result.size(), 2);
     EXPECT_EQ(result[0], 0);
@@ -208,9 +208,9 @@ TEST(ObservableQueue, DownstreamStopBigQueue) {
 TEST(ObservableQueue, DownstreamStopSmallQueue) {
     int upstream_counter = 0;
 
-    auto sched = std::make_shared<BenchScheduler>();
+    auto sched = std::make_shared<SingleThreadScheduler>();
     auto downstream_queue = cask::Queue<int,cask::None>::empty(sched, 1);
-    auto fiber = Observable<int, cask::None>::fromVector({
+    auto result = Observable<int, cask::None>::fromVector({
             0, 1, 2, 3, 4, 5
         })
         ->template map<int>([&upstream_counter](auto value) {
@@ -219,13 +219,8 @@ TEST(ObservableQueue, DownstreamStopSmallQueue) {
         })
         ->queue(1)
         ->take(2)
-        .run(sched);
-
-    sched->run_ready_tasks();
-
-    ASSERT_TRUE(fiber->getValue().has_value());
-
-    auto result = fiber->await();
+        .run(sched)
+        ->await();
 
     EXPECT_EQ(upstream_counter, 2);
     ASSERT_EQ(result.size(), 2);
