@@ -360,7 +360,7 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
         op = nullptr;
     }
     break;
-    case CEDE:
+    case CEDE:// NOLINT(bugprone-branch-clone): When not async the linter picks this and ASYNC up as duplicate branches
     {
         if constexpr(Async) {
             auto promise = Promise<Erased,Erased>::create(sched);
