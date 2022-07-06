@@ -3,10 +3,21 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
-# 15.2
+# 16.1
 
 - Add `Observable::queue` which creates and observable where upstream and downstream
   run concurrently and are seperated by a queue of a given maximum size.
+
+# 16.0
+
+- Make `Fiber::run` and `Task::run` execute as much of the given task synchronously
+  on the current thread for as long as possible. This both increases efficiency (by
+  avoiding touch the scheduler as much as possible) and resolves issues with cancelations
+  where they wouldn't be properly processed because the fiber run loop was not properly
+  "primed"
+- Adjust `Task::asyncBoundary` to be a guaranteed cede to the scheduler. Previously this
+  boundary could be optimized away by the fiber run loop.
+- Add the `CEDE` instruction to `FiberOp` to support guaranteed ceding to the scheduler.
 
 # 15.1
 

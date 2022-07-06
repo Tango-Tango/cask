@@ -29,7 +29,7 @@ using DeferredRef = std::shared_ptr<Deferred<T,E>>;
 
 namespace cask::fiber {
 
-enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE, CANCEL };
+enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE, CANCEL, CEDE };
 
 /**
  * A `FiberOp` represents a trampolined and possibly asynchronous program
@@ -80,6 +80,7 @@ public:
     static std::shared_ptr<const FiberOp> race(const std::vector<std::shared_ptr<const FiberOp>>& race) noexcept;
     static std::shared_ptr<const FiberOp> race(std::vector<std::shared_ptr<const FiberOp>>&& race) noexcept;
     static std::shared_ptr<const FiberOp> cancel() noexcept;
+    static std::shared_ptr<const FiberOp> cede() noexcept;
 
     /**
      * Create a new operation which represents the flat map of this operation
@@ -110,7 +111,7 @@ public:
     explicit FiberOp(FlatMapData* flatMap, const std::shared_ptr<Pool>& pool) noexcept;
     explicit FiberOp(DelayData* delay, const std::shared_ptr<Pool>& pool) noexcept;
     explicit FiberOp(RaceData* race, const std::shared_ptr<Pool>& pool) noexcept;
-    explicit FiberOp(bool cancel_flag) noexcept;    
+    explicit FiberOp(FiberOpType valueless_op) noexcept;    
 
     ~FiberOp();
     
