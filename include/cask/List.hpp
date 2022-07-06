@@ -95,6 +95,13 @@ public:
      */ 
     virtual ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) const = 0;
 
+    /**
+     * Execute the given predicate function for each element in the list.
+     * 
+     * @param predicate The function to evaluate for each element of the list.
+     */
+    virtual void foreach(const std::function<void(const T&)>& predicate) const = 0;
+
     virtual ~List() = default;
 };
 

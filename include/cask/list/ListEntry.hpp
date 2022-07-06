@@ -26,6 +26,7 @@ public:
     std::optional<T> head() const override;
     ListRef<T> tail() const override;
     ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) const override;
+    void foreach(const std::function<void(const T&)>& predicate) const override;
 
 private:
     T headValue;
@@ -111,6 +112,21 @@ ListRef<T> ListEntry<T>::dropWhile(const std::function<bool(const T&)>& predicat
     }
 
     return entry;
+}
+
+template <class T>
+void ListEntry<T>::foreach(const std::function<void(const T&)>& predicate) const {
+    ListRef<T> entry = this->shared_from_this();
+
+    while(true) {
+        auto valueOpt = entry->head();
+        if(valueOpt.has_value()) {
+            predicate(*valueOpt);
+            entry = entry->tail();
+        } else {
+            break;
+        }
+    }
 }
 
 } // namespace cask::list

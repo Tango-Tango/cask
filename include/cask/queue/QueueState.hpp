@@ -32,6 +32,7 @@ public:
     std::tuple<QueueState<T,E>,Task<None,E>> put(const T& value) const;
     std::tuple<QueueState<T,E>,std::optional<T>,std::function<void()>> tryTake() const;
     std::tuple<QueueState<T,E>,Task<T,E>> take() const;
+    std::tuple<QueueState<T,E>,std::function<void()>> reset() const;
     
     QueueState(const std::shared_ptr<Scheduler>& sched, uint32_t max_size);
     QueueState(const std::shared_ptr<Scheduler>& sched, uint32_t max_size, const ListRef<T>& values, const ListRef<PendingPut>& pendingPuts, const ListRef<PromiseRef<T,E>>& pendingTakes);
@@ -168,6 +169,23 @@ std::tuple<QueueState<T,E>,Task<T,E>> QueueState<T,E>::take() const {
             Task<T,E>::forPromise(promise)
         );
     }
+}
+
+template <class T, class E>
+std::tuple<QueueState<T,E>,std::function<void()>> QueueState<T,E>::reset() const {
+    return std::make_tuple(
+        QueueState(sched, max_size, List<T>::empty(), List<PendingPut>::empty(), List<PromiseRef<T,E>>::empty()),
+        [pendingPuts = pendingPuts, pendingTakes = pendingTakes] {
+            pendingPuts->foreach([](auto put) {
+                auto promise = std::get<0>(put);
+                promise->cancel();
+            });
+
+            pendingTakes->foreach([](auto take) {
+                take->cancel();
+            });
+        }
+    );
 }
 
 } // namespace cask::queue
