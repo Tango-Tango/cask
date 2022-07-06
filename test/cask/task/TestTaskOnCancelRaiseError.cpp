@@ -17,6 +17,7 @@ TEST(TaskOnCancelRaiseError,ConvertsToError) {
         .failed()
         .run(sched);
 
+    sched->run_ready_tasks();
     fiber->cancel();
     sched->run_ready_tasks();
 
@@ -29,6 +30,7 @@ TEST(TaskOnCancelRaiseError,IgnoresValue) {
         .onCancelRaiseError("cancel happened")
         .run(sched);
 
+     sched->run_ready_tasks();
     fiber->cancel();
     sched->run_ready_tasks();
 
@@ -42,6 +44,7 @@ TEST(TaskOnCancelRaiseError,IgnoresError) {
         .failed()
         .run(sched);
 
+    sched->run_ready_tasks();
     fiber->cancel();
     sched->run_ready_tasks();
 
