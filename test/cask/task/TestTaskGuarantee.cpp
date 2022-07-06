@@ -64,7 +64,7 @@ TEST(TaskGuarantee, RunsOnCancelAfterWaiting) {
     EXPECT_EQ(counter, 1);
 }
 
-TEST(TaskGuarantee, DoesntRunIfTaskNeverReallyStarted) {
+TEST(TaskGuarantee, AlwaysRuns) {
     auto sched = std::make_shared<BenchScheduler>();
     auto counter = 0;
     auto deferred = Task<int>::never()
@@ -82,5 +82,5 @@ TEST(TaskGuarantee, DoesntRunIfTaskNeverReallyStarted) {
         FAIL() << "Expected method to throw";
     } catch(std::runtime_error&) {}
     
-    EXPECT_EQ(counter, 0);
+    EXPECT_EQ(counter, 1);
 }

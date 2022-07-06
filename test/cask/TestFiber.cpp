@@ -18,9 +18,22 @@ using cask::fiber::FiberOp;
 using cask::scheduler::BenchScheduler;
 using cask::scheduler::SingleThreadScheduler;
 
-TEST(TestFiber, Constructs) {
+TEST(TestFiber, ConstructsSync) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
+    auto fiber = Fiber<int,std::string>::run(op, sched);
+
+    EXPECT_TRUE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
+    EXPECT_FALSE(fiber->isCanceled());
+}
+
+TEST(TestFiber, ConstructsAsync) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto op = FiberOp::async([](auto sched) {
+        auto promise = Promise<Erased,Erased>::create(sched);
+        return Deferred<Erased,Erased>::forPromise(promise);
+    });
     auto fiber = Fiber<int,std::string>::run(op, sched);
 
     EXPECT_FALSE(fiber->getValue().has_value());
@@ -45,7 +58,6 @@ TEST(TestFiber, DoesntCancelWhenCompletedAndDestructed) {
 
     EXPECT_TRUE(finished);
 }
-
 
 TEST(TestFiber, EvaluatesPureValue) {
     auto sched = std::make_shared<BenchScheduler>();
@@ -377,3 +389,51 @@ TEST(TestFiber, CurrentId){
     auto current_id = Fiber<int,std::string>::currentFiberId();
     EXPECT_FALSE(current_id.has_value());
 }
+
+TEST(TestFiber, SkipsCancelSync) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto op = FiberOp::value(123)->flatMap([](auto fiber_value) {
+        if (fiber_value.isValue()) {
+            return FiberOp::value(fiber_value.underlying());
+        } else if (fiber_value.isError()) {
+            return FiberOp::error(fiber_value.underlying());
+        } else {
+            return FiberOp::value(456);
+        }
+    });
+
+    auto fiber = Fiber<int,std::string>::run(op, sched);
+
+    fiber->cancel();
+    sched->run_ready_tasks();
+
+    ASSERT_TRUE(fiber->getValue().has_value());
+    EXPECT_EQ(*(fiber->getValue()), 123);
+}
+
+TEST(TestFiber, RecoversCancel) {
+    auto sched = std::make_shared<BenchScheduler>();
+    
+    auto op = FiberOp::async([](auto sched) {
+            auto promise = Promise<Erased,Erased>::create(sched);
+            return Deferred<Erased,Erased>::forPromise(promise);
+        })
+        ->flatMap([](auto fiber_value) {
+            if (fiber_value.isValue()) {
+                return FiberOp::value(fiber_value.underlying());
+            } else if (fiber_value.isError()) {
+                return FiberOp::error(fiber_value.underlying());
+            } else {
+                return FiberOp::value(456);
+            }
+        });
+
+    auto fiber = Fiber<int,std::string>::run(op, sched);
+
+    fiber->cancel();
+    sched->run_ready_tasks();
+
+    ASSERT_TRUE(fiber->getValue().has_value());
+    EXPECT_EQ(fiber->getValue(), 456);
+}
+

@@ -486,11 +486,7 @@ std::optional<Either<T,E>> Task<T,E>::runSync() const {
 template <class T, class E>
 Task<T,E> Task<T,E>::asyncBoundary() const noexcept {
     return Task<T,E>(
-        fiber::FiberOp::async([](auto sched) {
-            auto promise = Promise<Erased,Erased>::create(sched);
-            promise->success(Erased());
-            return Deferred<Erased,Erased>::forPromise(promise);
-        })->flatMap([op = op](auto fiber_value) {
+        fiber::FiberOp::cede()->flatMap([op = op](auto fiber_value) {
             if(fiber_value.isCanceled()) {
                 return fiber::FiberOp::cancel();
             } else {
