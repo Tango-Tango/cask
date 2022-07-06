@@ -238,6 +238,13 @@ public:
     Task<T,E> doOnCancel(const Task<None,None>& handler) const noexcept;
 
     /**
+     * Convert a received cancel signal into the given error.
+     * 
+     * @return A new `Task` which converts cancels to the given error.
+     */
+    Task<T,E> onCancelRaiseError(const E& error) const noexcept;
+
+    /**
      * Materialize both values and errors into the success type so that they
      * may be operated on simulataneously.
      *
@@ -680,6 +687,21 @@ Task<T,E> Task<T,E>::doOnCancel(const Task<None,None>& handler) const noexcept {
                 return handler_op->flatMap([](auto) {
                     return fiber::FiberOp::cancel();
                 });
+            }
+        })
+    );
+}
+
+template <class T, class E>
+Task<T,E> Task<T,E>::onCancelRaiseError(const E& error) const noexcept {
+    return Task<T,E>(
+        op->flatMap([error](auto fiber_input) {
+            if(fiber_input.isValue()) {
+                return fiber::FiberOp::value(fiber_input.underlying());
+            } else if(fiber_input.isError()) {
+                return fiber::FiberOp::error(fiber_input.underlying());
+            } else {
+                return fiber::FiberOp::error(error);
             }
         })
     );

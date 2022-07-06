@@ -84,16 +84,24 @@ Task<Ack,None> QueueObserver<T,E>::onNext(const T& value) {
         downstream_fiber->onFiberShutdown([self](auto) {
             self->downstream_shutdown_complete->success(None());
             self->downstream_fiber = nullptr;
+            self->queue->reset();
         });
     }
 
-    return queue->put(event).template map<Ack>([self](auto) {
-        if (self->stopped.load()) {
-            return Stop;
-        } else {
-            return Continue;
-        }
-    });
+    return queue->put(event)
+        .onCancelRaiseError(None())
+        .template flatMapBoth<Ack,None>(
+            [self](auto) {
+                if (self->stopped.load()) {
+                    return Task<Ack,None>::pure(Stop);
+                } else {
+                    return Task<Ack,None>::pure(Continue);
+                }
+            },
+            [](auto) {
+                return Task<Ack,None>::pure(Stop);
+            }
+        );
 }
 
 template <class T, class E>
@@ -104,9 +112,16 @@ Task<None,None> QueueObserver<T,E>::onError(const E& error) {
         auto self = this->shared_from_this();
         auto event = std::make_shared<ErrorEvent>(error);
 
-        return queue->put(event).template flatMap<None>([self](auto) {
-            return Task<None,None>::forPromise(self->downstream_shutdown_complete);
-        });
+        return queue->put(event)
+            .onCancelRaiseError(None())
+            .template flatMapBoth<None,None>(
+                [self](auto) {
+                    return Task<None,None>::forPromise(self->downstream_shutdown_complete);
+                },
+                [](auto) {
+                    return Task<None,None>::none();
+                }
+            );
     }
 }
 
@@ -118,9 +133,16 @@ Task<None,None> QueueObserver<T,E>::onComplete() {
         auto self = this->shared_from_this();
         auto event = std::make_shared<CompleteEvent>();
 
-        return queue->put(event).template flatMap<None>([self](auto) {
-            return Task<None,None>::forPromise(self->downstream_shutdown_complete);
-        });
+        return queue->put(event)
+            .onCancelRaiseError(None())
+            .template flatMapBoth<None,None>(
+                [self](auto) {
+                    return Task<None,None>::forPromise(self->downstream_shutdown_complete);
+                },
+                [](auto) {
+                    return Task<None,None>::none();
+                }
+            );
     }
 }
 
@@ -133,9 +155,16 @@ Task<None,None> QueueObserver<T,E>::onCancel() {
         auto self = this->shared_from_this();
         auto event = std::make_shared<CancelEvent>();
 
-        return queue->put(event).template flatMap<None>([self](auto) {
-            return Task<None,None>::forPromise(self->downstream_shutdown_complete);
-        });
+        return queue->put(event)
+            .onCancelRaiseError(None())
+            .template flatMapBoth<None,None>(
+                [self](auto) {
+                    return Task<None,None>::forPromise(self->downstream_shutdown_complete);
+                },
+                [](auto) {
+                    return Task<None,None>::none();
+                }
+            );
     }
 }
 

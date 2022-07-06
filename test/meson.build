@@ -66,6 +66,7 @@ if not meson.is_subproject()
         'cask/task/TestTaskGuarantee.cpp',
         'cask/task/TestTaskNever.cpp',
         'cask/task/TestTaskNone.cpp',
+        'cask/task/TestTaskOnCancelRaiseError.cpp',
         'cask/task/TestTaskPure.cpp',
         'cask/task/TestTaskRace.cpp',
         'cask/task/TestTaskRaiseError.cpp',

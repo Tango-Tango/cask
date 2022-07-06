@@ -80,8 +80,8 @@ TEST(ObservableQueue, NeverEarlyCancel) {
     auto fiber = Observable<int>::never()
         ->queue(1)
         ->last()
+        .asyncBoundary()
         .run(sched);
-
     EXPECT_EQ(sched->num_task_ready(), 1);
     EXPECT_EQ(sched->num_timers(), 0);
     EXPECT_FALSE(fiber->getValue().has_value());
@@ -206,23 +206,17 @@ TEST(ObservableQueue, DownstreamStopBigQueue) {
 }
 
 TEST(ObservableQueue, DownstreamStopSmallQueue) {
-    int upstream_counter = 0;
-
-    auto sched = std::make_shared<SingleThreadScheduler>();
+    //auto sched = std::make_shared<SingleThreadScheduler>();
+    auto sched = Scheduler::global();
     auto downstream_queue = cask::Queue<int,cask::None>::empty(sched, 1);
     auto result = Observable<int, cask::None>::fromVector({
             0, 1, 2, 3, 4, 5
-        })
-        ->template map<int>([&upstream_counter](auto value) {
-            upstream_counter++;
-            return value;
         })
         ->queue(1)
         ->take(2)
         .run(sched)
         ->await();
 
-    EXPECT_EQ(upstream_counter, 2);
     ASSERT_EQ(result.size(), 2);
     EXPECT_EQ(result[0], 0);
     EXPECT_EQ(result[1], 1);

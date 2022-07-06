@@ -97,3 +97,24 @@ TEST(List, DropWhileMatchesEverything) {
     EXPECT_TRUE(list->is_empty());
     EXPECT_EQ(list->size(), 0);
 }
+
+TEST(List, Foreach) {
+    int sum = 0;
+
+    List<int>::empty()
+        ->append(1)
+        ->append(2)
+        ->append(3)
+        ->foreach([&sum](auto value) { sum += value; });
+    
+    EXPECT_EQ(sum, 6);
+}
+
+TEST(List, ForeachEmpty) {
+    int sum = 0;
+
+    List<int>::empty()
+        ->foreach([&sum](auto value) { sum += value; });
+    
+    EXPECT_EQ(sum, 0);
+}

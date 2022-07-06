@@ -71,6 +71,13 @@ public:
      * @return A value or nothing.
      */
     std::optional<T> tryTake();
+
+    /**
+     * Reset this queue to its initial, empty, state. If any values
+     * are in the queue they are dropped. If there are any pending
+     * puts or takes then they are canceled.
+     */
+    void reset();
 private:
     Queue(const std::shared_ptr<Scheduler>& sched, uint32_t max_size);
     explicit Queue(const std::shared_ptr<Scheduler>& sched, const T& initialValue);
@@ -163,6 +170,23 @@ std::optional<T> Queue<T,E>::tryTake() {
     } else {
         return std::optional<T>();
     }
+}
+
+template <class T, class E>
+void Queue<T,E>::reset() {
+    using IntermediateResult = std::function<void()>;
+
+    stateRef->template modify<IntermediateResult>([](auto state) {
+        auto result = state.reset();
+        auto nextState = std::get<0>(result);
+        auto thunk = std::get<1>(result);
+        return std::make_tuple(nextState, thunk);
+    })
+    .template map<None>([](auto thunk) {
+        thunk();
+        return None();
+    })
+    .runSync();
 }
 
 } // namespace cask
