@@ -164,7 +164,7 @@ namespace cask {
 template <class T, class E>
 FiberRef<T,E> Fiber<T,E>::run(const std::shared_ptr<const fiber::FiberOp>& op, const std::shared_ptr<Scheduler>& sched) {
     auto fiber = std::make_shared<fiber::FiberImpl<T,E>>(op);
-    fiber->reschedule(sched);
+    fiber->resume(sched);
     return fiber;
 }
 

@@ -51,11 +51,12 @@ TEST(TaskDoOnCancel, IgnoredForCompletedError) {
     EXPECT_EQ(cancel_counter, 0);
 }
 
-TEST(TaskDoOnCancel, IgnoredForEarlyCancelFire) {
+TEST(TaskDoOnCancel, RunsForEarlyCancel) {
     int cancel_counter = 0;
     auto sched = std::make_shared<BenchScheduler>();
 
     auto fiber = Task<int,std::string>::pure(123)
+        .asyncBoundary()
         .doOnCancel(Task<None,None>::eval([&cancel_counter] {
             cancel_counter++;
             return None();
@@ -65,8 +66,8 @@ TEST(TaskDoOnCancel, IgnoredForEarlyCancelFire) {
     fiber->cancel();
     sched->run_ready_tasks();
 
-    ASSERT_TRUE(fiber->isCanceled());
-    EXPECT_EQ(cancel_counter, 0);
+    EXPECT_TRUE(fiber->isCanceled());
+    EXPECT_EQ(cancel_counter, 1);
 }
 
 

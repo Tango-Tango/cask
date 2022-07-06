@@ -75,8 +75,8 @@ FiberOp::FiberOp(RaceData* race, const std::shared_ptr<Pool>& pool) noexcept
     data.raceData = race;
 }
 
-FiberOp::FiberOp(bool) noexcept
-    : opType(CANCEL)
+FiberOp::FiberOp(FiberOpType valueless_op) noexcept
+    : opType(valueless_op)
     , pool()
 {}
 
@@ -103,6 +103,7 @@ FiberOp::~FiberOp() {
             pool->deallocate<RaceData>(data.raceData);
         break;
         case CANCEL:
+        case CEDE:
         break;
     }
 }
@@ -135,6 +136,7 @@ std::shared_ptr<const FiberOp> FiberOp::async(const  std::function<DeferredRef<E
     return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
 }
 
+
 std::shared_ptr<const FiberOp> FiberOp::thunk(const std::function<Erased()>& thunk) noexcept {
     auto pool = global_pool();
     auto thunk_data = pool->allocate<ThunkData>(thunk);
@@ -165,9 +167,16 @@ std::shared_ptr<const FiberOp> FiberOp::race(std::vector<std::shared_ptr<const F
 
 std::shared_ptr<const FiberOp> FiberOp::cancel() noexcept {
     auto pool = global_pool();
-    auto op = pool->allocate<FiberOp>(true); 
+    auto op = pool->allocate<FiberOp>(CANCEL); 
     return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
 }
+
+std::shared_ptr<const FiberOp> FiberOp::cede() noexcept {
+    auto pool = global_pool();
+    auto op = pool->allocate<FiberOp>(CEDE); 
+    return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+}
+
 
 std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicate) const noexcept {
     switch(opType) {
@@ -178,6 +187,7 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
         case DELAY:
         case RACE:
         case CANCEL:
+        case CEDE:
         {
             auto pool = global_pool();
             auto data = pool->allocate<FlatMapData>(this->shared_from_this(), predicate);
