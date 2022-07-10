@@ -371,8 +371,10 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
             state.store(WAITING, std::memory_order_release);
             setDeferredCallbacks(deferred, sched);
 
-            sched->submit([promise] {
-                promise->success(None());
+            sched->submit([promise_weak = std::weak_ptr<Promise<Erased,Erased>>(promise)] {
+                if (auto promise = promise_weak.lock()) {
+                    promise->success(None());
+                }
             });
             
         } else {
