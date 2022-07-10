@@ -51,11 +51,11 @@ Task<Ack, None> ForeachTaskObserver<T,E>::onNext(const T& value) {
             },
             [self_weak = this->weak_from_this()](auto error) {
                 if(auto self = self_weak.lock()) {
-                    return self->onError(error).template map<Ack>([](auto) {
-                        return cask::Stop;
+                    return self->onError(error).template flatMap<Ack>([](auto) {
+                        return Task<Ack,None>::raiseError(None());
                     });
                 } else {
-                    return Task<Ack,None>::pure(Stop);
+                    return Task<Ack,None>::raiseError(None());
                 }
             }
         );

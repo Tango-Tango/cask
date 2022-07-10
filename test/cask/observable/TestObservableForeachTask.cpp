@@ -72,6 +72,23 @@ TEST(ObservableForeachTask, RaiseError) {
     EXPECT_EQ(result, "broke");
 }
 
+TEST(ObservableForeachTask, RaiseErrorConcat) {
+    int counter = 0;
+
+    auto result = Observable<int,std::string>::pure(1)
+        ->concat(Observable<int,std::string>::pure(2))
+        ->foreachTask([&counter](auto) {
+            counter++;
+            return Task<None,std::string>::raiseError("broke");
+        })
+        .failed()
+        .run(Scheduler::global())
+        ->await();
+
+    EXPECT_EQ(counter, 1);
+    EXPECT_EQ(result, "broke");
+}
+
 TEST(ObservableForeachTask, UpstreamError) {
     int counter = 0;
 
