@@ -63,7 +63,8 @@ Task<Ack,None> VectorObservable<T,E>::pushEvent(
                     return Stop;
                 });
         } else if(lastAck == Continue) {
-            return observer->onNext(source[i])
+            T next = source[i];
+            return observer->onNext(std::forward<T>(next))
                 .template flatMap<Ack>([i, source, sched, observer](auto ack) {
                     return pushEvent(i + 1, source, sched, observer, ack);
                 });

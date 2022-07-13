@@ -75,7 +75,7 @@ public:
      * @return A signal to the upstream observable that processing
      *         can continue or needs to stop.
      */
-    virtual Task<Ack,None> onNext(const T& value) = 0;
+    virtual Task<Ack,None> onNext(T&& value) = 0;
 
     /**
      * Provide an error which should terminate processing.

@@ -18,16 +18,16 @@ namespace cask::observable {
 template <class TI, class TO, class E>
 class FlatMapObserver final : public Observer<TI,E>, public std::enable_shared_from_this<FlatMapObserver<TI,TO,E>> {
 public:
-    FlatMapObserver(const std::function<ObservableRef<TO,E>(const TI&)>& predicate,
+    FlatMapObserver(const std::function<ObservableRef<TO,E>(TI&&)>& predicate,
                     const std::shared_ptr<Observer<TO,E>>& downstream);
     
 
-    Task<Ack,None> onNext(const TI& value) override;
+    Task<Ack,None> onNext(TI&& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 
-    Task<Ack,None> onNextInternal(const TO& value);
+    Task<Ack,None> onNextInternal(TO&& value);
     Task<None,None> onErrorInternal(const E& error);
     Task<None,None> onCompleteInternal();
     Task<None,None> onCancelInternal();
@@ -40,7 +40,7 @@ private:
 
 template <class TI, class TO, class E>
 FlatMapObserver<TI,TO,E>::FlatMapObserver(
-    const std::function<ObservableRef<TO,E>(const TI&)>& predicate,
+    const std::function<ObservableRef<TO,E>(TI&&)>& predicate,
     const std::shared_ptr<Observer<TO,E>>& downstream)
     : predicate(predicate)
     , downstream(downstream)
@@ -48,14 +48,14 @@ FlatMapObserver<TI,TO,E>::FlatMapObserver(
 {}
 
 template <class TI, class TO, class E>
-Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(const TI& value) {
+Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(TI&& value) {
     auto self = this->shared_from_this();
     auto next_observable = self->predicate(value);
 
     return Task<None,None>::deferFiber([self, next_observable](auto sched) {
             return next_observable->subscribeHandlers(
                 sched,
-                [self] (auto value) { return self->onNextInternal(value); },
+                [self] (auto value) { return self->onNextInternal(std::move(value)); },
                 [self] (auto error) { return self->onErrorInternal(error); },
                 [self] { return self->onCompleteInternal(); },
                 [self] { return self->onCancelInternal(); }
@@ -86,9 +86,9 @@ Task<None,None> FlatMapObserver<TI,TO,E>::onCancel() {
 }
 
 template <class TI, class TO, class E>
-Task<Ack,None> FlatMapObserver<TI,TO,E>::onNextInternal(const TO& value) {
+Task<Ack,None> FlatMapObserver<TI,TO,E>::onNextInternal(TO&& value) {
     auto self = this->shared_from_this();
-    return downstream->onNext(value)
+    return downstream->onNext(std::move(value))
         .template map<Ack>([self](auto ack) {
             if (ack == Stop) {
                 self->stopped = true;

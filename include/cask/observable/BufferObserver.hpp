@@ -20,7 +20,7 @@ template <class T, class E>
 class BufferObserver final : public Observer<T,E> {
 public:
     BufferObserver(const std::shared_ptr<Observer<BufferRef<T>,E>>& downstream, uint32_t buffer_size);
-    Task<Ack,None> onNext(const T& value) override;
+    Task<Ack,None> onNext(T&& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
@@ -41,10 +41,10 @@ BufferObserver<T,E>::BufferObserver(const std::shared_ptr<Observer<BufferRef<T>,
 }
 
 template <class T, class E>
-Task<Ack,None> BufferObserver<T,E>::onNext(const T& value) {
+Task<Ack,None> BufferObserver<T,E>::onNext(T&& value) {
     buffer->emplace_back(value);
     if(buffer->size() == buffer_size) {
-        auto downstreamTask = downstream->onNext(buffer);
+        auto downstreamTask = downstream->onNext(std::move(buffer));
         buffer = std::make_shared<std::vector<T>>();
         buffer->reserve(buffer_size);
         return downstreamTask;
@@ -61,7 +61,7 @@ Task<None,None> BufferObserver<T,E>::onError(const E& error) {
 template <class T, class E>
 Task<None,None> BufferObserver<T,E>::onComplete() {
     if(buffer->size() != 0) {
-        return downstream->onNext(buffer)
+        return downstream->onNext(std::move(buffer))
             .template flatMap<None>([downstream = downstream](auto) {
                 return downstream->onComplete();
             });

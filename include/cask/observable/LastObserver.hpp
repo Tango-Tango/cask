@@ -22,7 +22,7 @@ class LastObserver final : public Observer<T,E> {
 public:
     explicit LastObserver(const std::weak_ptr<Promise<std::optional<T>,E>>& promise);
 
-    Task<Ack,None> onNext(const T& value) override;
+    Task<Ack,None> onNext(T&& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
@@ -39,7 +39,7 @@ LastObserver<T,E>::LastObserver(const std::weak_ptr<Promise<std::optional<T>,E>>
 {}
 
 template <class T, class E>
-Task<Ack, None> LastObserver<T,E>::onNext(const T& value) {
+Task<Ack, None> LastObserver<T,E>::onNext(T&& value) {
     lastValue = value;
     return Task<Ack,None>::pure(Continue);
 }

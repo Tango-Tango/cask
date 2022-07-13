@@ -34,7 +34,7 @@ FiberRef<None,None> DeferTaskObservable<T,E>::subscribe(
         try {
             return predicate().template flatMapBoth<None,None>(
                 [observer](auto result) {
-                    return observer->onNext(result)
+                    return observer->onNext(std::move(result))
                     .template flatMap<None>([observer](auto) {
                         return observer->onComplete();
                     });

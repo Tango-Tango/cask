@@ -19,7 +19,7 @@ public:
         uint32_t queue_size,
         const std::shared_ptr<Scheduler>& sched
     );
-    Task<Ack,None> onNext(const T& value) override;
+    Task<Ack,None> onNext(T&& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
@@ -31,8 +31,8 @@ private:
 
     class NextEvent : public QueueEvent {
     public:
-        const T value;
-        explicit NextEvent(const T& value) : value(value) {}
+        T value;
+        explicit NextEvent(T&& value) : value(value) {}
     };
 
     class ErrorEvent : public QueueEvent {
@@ -68,10 +68,10 @@ QueueObserver<T,E>::QueueObserver(
 {}
 
 template <class T, class E>
-Task<Ack,None> QueueObserver<T,E>::onNext(const T& value) {
+Task<Ack,None> QueueObserver<T,E>::onNext(T&& value) {
     auto self = this->shared_from_this();
     auto self_weak = this->weak_from_this();
-    auto event = std::make_shared<NextEvent>(value);
+    auto event = std::make_shared<NextEvent>(std::forward<T>(value));
 
     if (downstream_fiber == nullptr) {
         downstream_fiber = Observable<std::shared_ptr<QueueEvent>,None>::repeatTask(queue->take())
@@ -173,7 +173,7 @@ Task<None,None> QueueObserver<T,E>::onEvent(const std::shared_ptr<QueueEvent>& e
     auto self = this->shared_from_this();
 
     if (auto next = std::dynamic_pointer_cast<NextEvent>(event)) {
-        return downstream->onNext(next->value)
+        return downstream->onNext(std::move(next->value))
             .template map<None>([self](auto ack) {
                 if (ack == Stop) {
                     self->stopped = true;

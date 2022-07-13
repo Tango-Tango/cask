@@ -22,29 +22,29 @@ class ForeachTaskObserver final : public Observer<T,E>, public std::enable_share
 public:
     explicit ForeachTaskObserver(
         const std::weak_ptr<Promise<None,E>>& promise,
-        const std::function<Task<None,E>(const T& value)>& predicate);
+        const std::function<Task<None,E>(T&& value)>& predicate);
 
-    Task<Ack,None> onNext(const T& value) override;
+    Task<Ack,None> onNext(T&& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
     std::weak_ptr<Promise<None,E>> promise;
-    std::function<Task<None,E>(const T& value)> predicate;
+    std::function<Task<None,E>(T&& value)> predicate;
 };
 
 template <class T, class E>
 ForeachTaskObserver<T,E>::ForeachTaskObserver(
     const std::weak_ptr<Promise<None,E>>& promise,
-    const std::function<Task<None,E>(const T& value)>& predicate
+    const std::function<Task<None,E>(T&& value)>& predicate
 )
     : promise(promise)
     , predicate(predicate)
 {}
 
 template <class T, class E>
-Task<Ack, None> ForeachTaskObserver<T,E>::onNext(const T& value) {
-    return predicate(value)
+Task<Ack, None> ForeachTaskObserver<T,E>::onNext(T&& value) {
+    return predicate(std::forward<T>(value))
         .template flatMapBoth<Ack, None>(
             [](auto) {
                 return Task<Ack,None>::pure(cask::Continue);

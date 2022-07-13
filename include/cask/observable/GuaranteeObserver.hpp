@@ -20,7 +20,7 @@ template <class T, class E>
 class GuaranteeObserver final : public Observer<T,E> {
 public:
     GuaranteeObserver(const std::shared_ptr<Observer<T,E>>& downstream, const Task<None,None>& task);
-    Task<Ack,None> onNext(const T& value) override;
+    Task<Ack,None> onNext(T&& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
@@ -42,8 +42,8 @@ GuaranteeObserver<T,E>::GuaranteeObserver(const std::shared_ptr<Observer<T,E>>& 
 }
 
 template <class T, class E>
-Task<Ack,None> GuaranteeObserver<T,E>::onNext(const T& value) {
-    return downstream->onNext(value).template flatMap<Ack>([task = task, completed = completed](auto ack) {
+Task<Ack,None> GuaranteeObserver<T,E>::onNext(T&& value) {
+    return downstream->onNext(std::forward<T>(value)).template flatMap<Ack>([task = task, completed = completed](auto ack) {
         if(ack == cask::Stop && !completed->test_and_set()) {
             return task.template map<Ack>([](auto) {
                 return cask::Stop;

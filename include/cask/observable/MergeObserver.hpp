@@ -19,8 +19,8 @@ class MergeObserver final
 {
 public:
     MergeObserver(const std::shared_ptr<Observer<T,E>>& downstream, const std::shared_ptr<Scheduler>& sched);
-    Task<Ack,None> onNext(const ObservableConstRef<T,E>& upstream) override;
-    Task<Ack,None> onNext(const T& value, uint64_t id);
+    Task<Ack,None> onNext(ObservableConstRef<T,E>&& upstream) override;
+    Task<Ack,None> onNext(T&& value, uint64_t id);
     Task<None,None> onError(const E& error) override;
     Task<None,None> onError(const E& error, uint64_t id);
     Task<None,None> onComplete() override;
@@ -63,7 +63,7 @@ MergeObserver<T,E>::MergeObserver(const std::shared_ptr<Observer<T,E>>& downstre
 {}
 
 template <class T, class E>
-Task<Ack,None> MergeObserver<T,E>::onNext(const ObservableConstRef<T,E>& upstream) {
+Task<Ack,None> MergeObserver<T,E>::onNext(ObservableConstRef<T,E>&& upstream) {
     return synchronize().template use<Ack>([upstream](auto self) {
         if (self->awaiting_cancel || self->stopped) {
             return Task<Ack,None>::pure(Stop);
@@ -72,7 +72,7 @@ Task<Ack,None> MergeObserver<T,E>::onNext(const ObservableConstRef<T,E>& upstrea
 
             auto fiber = upstream->subscribeHandlers(
                 self->sched,
-                [id, self](auto value) { return self->onNext(value, id); },
+                [id, self](T&& value) { return self->onNext(std::forward<T>(value), id); },
                 [id, self](auto error) { return self->onError(error, id); },
                 [id, self]() { return self->onComplete(id); },
                 [id, self]() { return self->onCancel(id); }
@@ -87,12 +87,12 @@ Task<Ack,None> MergeObserver<T,E>::onNext(const ObservableConstRef<T,E>& upstrea
 }
 
 template <class T, class E>
-Task<Ack,None> MergeObserver<T,E>::onNext(const T& value, uint64_t) {
-    return synchronize().template use<Ack>([value](auto self) {
+Task<Ack,None> MergeObserver<T,E>::onNext(T&& value, uint64_t) {
+    return synchronize().template use<Ack>([value](auto self) mutable {
         if (self->awaiting_cancel || self->stopped) {
                 return Task<Ack,None>::pure(Stop);
         } else {
-            return self->downstream->onNext(value)
+            return self->downstream->onNext(std::forward<T>(value))
                 .template map<Ack>([self](auto ack) {
                     if (ack == Stop && !self->stopped.exchange(true)) {
                         self->completed_promise->success(None());

@@ -18,7 +18,7 @@ public:
                      const std::shared_ptr<Observer<TO,E>>& downstream);
     
 
-    Task<Ack,None> onNext(const TI& value) override;
+    Task<Ack,None> onNext(TI&& value) override;
     Task<None,None> onError(const E& value) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
@@ -41,15 +41,15 @@ FlatScanObserver<TI,TO,E>::FlatScanObserver(
 {}
 
 template <class TI, class TO, class E>
-Task<Ack,None> FlatScanObserver<TI,TO,E>::onNext(const TI& value) {
+Task<Ack,None> FlatScanObserver<TI,TO,E>::onNext(TI&& value) {
     auto self_weak = this->weak_from_this();
 
     return predicate(state, value)
         ->template mapBothTask<Ack,None>(
-            [self_weak](auto updated_state) {
+            [self_weak](TO&& updated_state) {
                 if (auto self = self_weak.lock()) {
                     self->state = updated_state;
-                    return self->downstream->onNext(self->state);
+                    return self->downstream->onNext(std::forward<TO>(updated_state));
                 } else {
                     return Task<Ack,None>::pure(Stop);
                 }

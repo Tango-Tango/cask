@@ -22,29 +22,29 @@ class ForeachObserver final : public Observer<T,E> {
 public:
     explicit ForeachObserver(
         const std::weak_ptr<Promise<None,E>>& promise,
-        const std::function<void(const T& value)>& predicate);
+        const std::function<void(T&& value)>& predicate);
 
-    Task<Ack,None> onNext(const T& value) override;
+    Task<Ack,None> onNext(T&& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
     std::weak_ptr<Promise<None,E>> promise;
-    std::function<void(const T& value)> predicate;
+    std::function<void(T&& value)> predicate;
 };
 
 template <class T, class E>
 ForeachObserver<T,E>::ForeachObserver(
     const std::weak_ptr<Promise<None,E>>& promise,
-    const std::function<void(const T& value)>& predicate
+    const std::function<void(T&& value)>& predicate
 )
     : promise(promise)
     , predicate(predicate)
 {}
 
 template <class T, class E>
-Task<Ack, None> ForeachObserver<T,E>::onNext(const T& value) {
-    predicate(value);
+Task<Ack, None> ForeachObserver<T,E>::onNext(T&& value) {
+    predicate(std::forward<T>(value));
     return Task<Ack,None>::pure(cask::Continue);
 }
 

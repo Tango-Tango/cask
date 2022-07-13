@@ -20,7 +20,7 @@ template <class T, class E>
 class TakeObserver final : public Observer<T,E> {
 public:
     TakeObserver(uint32_t amount, const std::weak_ptr<Promise<std::vector<T>,E>>& promise);
-    Task<Ack,None> onNext(const T& value) override;
+    Task<Ack,None> onNext(T&& value) override;
     Task<None,None> onError(const E& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
@@ -38,7 +38,7 @@ TakeObserver<T,E>::TakeObserver(uint32_t amount, const std::weak_ptr<Promise<std
 {}
 
 template <class T, class E>
-Task<Ack,None> TakeObserver<T,E>::onNext(const T& value) {
+Task<Ack,None> TakeObserver<T,E>::onNext(T&& value) {
     entries.push_back(value);
     remaining -= 1;
 

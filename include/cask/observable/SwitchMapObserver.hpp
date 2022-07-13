@@ -24,11 +24,11 @@ using StatefulResult = std::tuple<switchmap::SwitchMapState,U>;
 template <class TI, class TO, class E>
 class SwitchMapObserver final : public Observer<TI,E>, public std::enable_shared_from_this<SwitchMapObserver<TI,TO,E>> {
 public:
-    SwitchMapObserver(const std::function<ObservableRef<TO,E>(const TI&)>& predicate,
+    SwitchMapObserver(const std::function<ObservableRef<TO,E>(TI&&)>& predicate,
                       const std::shared_ptr<Observer<TO,E>>& downstream,
                       const std::shared_ptr<Scheduler>& sched);
 
-    Task<Ack,None> onNext(const TI& value) override;
+    Task<Ack,None> onNext(TI&& value) override;
     Task<None,None> onError(const E& value) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
@@ -38,7 +38,7 @@ private:
     std::shared_ptr<Scheduler> sched;
     std::shared_ptr<MVar<switchmap::SwitchMapState,None>> stateVar;
 
-    Task<StatefulResult<Ack>,None> onNextUnsafe(const TI& value, const switchmap::SwitchMapState& state);
+    Task<StatefulResult<Ack>,None> onNextUnsafe(TI&& value, const switchmap::SwitchMapState& state);
     Task<StatefulResult<None>,None> onErrorUnsafe(const E& value, const switchmap::SwitchMapState& state);
     Task<StatefulResult<FiberRef<None,None>>,None> onCompleteUnsafe(const switchmap::SwitchMapState& state);
     Task<StatefulResult<None>,None> onCancelUnsafe(const switchmap::SwitchMapState& state);
@@ -52,7 +52,7 @@ namespace cask::observable {
 
 template <class TI, class TO, class E>
 SwitchMapObserver<TI,TO,E>::SwitchMapObserver(
-    const std::function<ObservableRef<TO,E>(const TI&)>& predicate,
+    const std::function<ObservableRef<TO,E>(TI&&)>& predicate,
     const std::shared_ptr<Observer<TO,E>>& downstream,
     const std::shared_ptr<Scheduler>& sched)
     : predicate(predicate)
@@ -62,9 +62,9 @@ SwitchMapObserver<TI,TO,E>::SwitchMapObserver(
 {}
 
 template <class TI, class TO, class E>
-Task<Ack,None> SwitchMapObserver<TI,TO,E>::onNext(const TI& value) {
-    return stateVar->template modify<Ack>([self = this->shared_from_this(), value](auto state) {
-        return self->onNextUnsafe(value, state);
+Task<Ack,None> SwitchMapObserver<TI,TO,E>::onNext(TI&& value) {
+    return stateVar->template modify<Ack>([self = this->shared_from_this(), value](auto state) mutable {
+        return self->onNextUnsafe(std::move(value), state);
     });
 }
 
@@ -100,7 +100,7 @@ Task<None,None> SwitchMapObserver<TI,TO,E>::onCancel() {
 }
 
 template <class TI, class TO, class E>
-Task<StatefulResult<Ack>,None> SwitchMapObserver<TI,TO,E>::onNextUnsafe(const TI& value, const switchmap::SwitchMapState& state) {
+Task<StatefulResult<Ack>,None> SwitchMapObserver<TI,TO,E>::onNextUnsafe(TI&& value, const switchmap::SwitchMapState& state) {
     if(state.subscription && state.downstream_ack == Continue) {
         auto promise = Promise<None,None>::create(sched);
 
@@ -110,10 +110,10 @@ Task<StatefulResult<Ack>,None> SwitchMapObserver<TI,TO,E>::onNextUnsafe(const TI
         });
 
         return Task<None,None>::forPromise(promise)
-            .template flatMap<StatefulResult<Ack>>([value, state, self = this->shared_from_this()](auto) {
+            .template flatMap<StatefulResult<Ack>>([value, state, self = this->shared_from_this()](auto) mutable {
                 switchmap::SwitchMapState updated_state = state;
                 updated_state.subscription = nullptr;
-                return self->onNextUnsafe(value, updated_state);
+                return self->onNextUnsafe(std::move(value), updated_state);
             });
     } else if(state.downstream_ack == Continue) {
         auto observer = std::make_shared<switchmap::SwitchMapInternalObserver<TO,E>>(downstream, stateVar);
