@@ -60,7 +60,7 @@ public:
     using AsyncData = std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>;
     using ThunkData = std::function<Erased()>;
     using FlatMapInput = std::shared_ptr<const FiberOp>;
-    using FlatMapPredicate = std::function<std::shared_ptr<const FiberOp>(const FiberValue&)>;
+    using FlatMapPredicate = std::function<std::shared_ptr<const FiberOp>(FiberValue&&)>;
     using FlatMapData = std::pair<FlatMapInput,FlatMapPredicate>;
     using DelayData = int64_t;
     using RaceData = std::vector<std::shared_ptr<const FiberOp>>;
@@ -90,7 +90,7 @@ public:
      * @param predicate The method which maps the input value to a new operation.
      * @return A new operation which transforms the intput to the given output operation.
      */
-    std::shared_ptr<const FiberOp> flatMap(const FlatMapPredicate& predicate) const noexcept;
+    std::shared_ptr<const FiberOp> flatMap(FlatMapPredicate&& predicate) const noexcept;
 
     union {
         AsyncData* asyncData;
@@ -119,9 +119,9 @@ private:
     std::shared_ptr<Pool> pool;
 
     static std::shared_ptr<const FiberOp> fixed_predicate(
-        const FlatMapPredicate& input_predicate,
-        const FlatMapPredicate& output_predicate,
-        const FiberValue& value
+        FlatMapPredicate&& input_predicate,
+        FlatMapPredicate&& output_predicate,
+        FiberValue&& value
     );
 };
 

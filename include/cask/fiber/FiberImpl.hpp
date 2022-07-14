@@ -486,7 +486,7 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
 template <class T, class E>
 bool FiberImpl<T,E>::finishIteration() {
     if(nextOp) {
-        op = nextOp(value);
+        op = nextOp(std::move(value));
         nextOp = nullptr;
         return false;
     } else {

@@ -178,7 +178,7 @@ std::shared_ptr<const FiberOp> FiberOp::cede() noexcept {
 }
 
 
-std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicate) const noexcept {
+std::shared_ptr<const FiberOp> FiberOp::flatMap(FlatMapPredicate&& predicate) const noexcept {
     switch(opType) {
         case VALUE:
         case ERROR:
@@ -198,7 +198,9 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
         case FLATMAP:
         {
             FiberOp::FlatMapData* data = this->data.flatMapData;
-            auto fixed = std::bind(FiberOp::fixed_predicate, data->second, predicate, std::placeholders::_1);
+            auto fixed = [input_predicate = data->second, output_predicate = predicate](FiberValue&& value) mutable {
+                return FiberOp::fixed_predicate(std::move(input_predicate), std::move(output_predicate), std::forward<FiberValue>(value));
+            };
             auto pool = global_pool();
             auto flatMapData = pool->allocate<FlatMapData>(data->first, fixed);
             auto op = pool->allocate<FiberOp>(flatMapData, pool); 
@@ -212,11 +214,11 @@ std::shared_ptr<const FiberOp> FiberOp::flatMap(const FlatMapPredicate& predicat
 }
 
 std::shared_ptr<const FiberOp> FiberOp::fixed_predicate(
-    const FlatMapPredicate& input_predicate,
-    const FlatMapPredicate& output_predicate,
-    const FiberValue& value
+    FlatMapPredicate&& input_predicate,
+    FlatMapPredicate&& output_predicate,
+    FiberValue&& value
 ) {
-    return input_predicate(value)->flatMap(output_predicate);
+    return input_predicate(std::forward<FiberValue>(value))->flatMap(std::forward<FlatMapPredicate>(output_predicate));
 }
 
 } // namespace cask::fiber
