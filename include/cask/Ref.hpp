@@ -104,7 +104,7 @@ Task<None,E> Ref<T,E>::update(std::function<T(T&)> predicate) {
             while(true) {
                 auto initial = std::atomic_load_explicit(&(self->data), std::memory_order_acquire);
                 auto updated = std::make_shared<T>(predicate(*initial));
-                if(std::atomic_compare_exchange_weak_explicit(&(self->data), &initial, updated, std::memory_order_release, std::memory_order_release)) {
+                if(std::atomic_compare_exchange_weak_explicit(&(self->data), &initial, updated, std::memory_order_release, std::memory_order_relaxed)) {
                     return None();
                 }
             }
@@ -124,13 +124,12 @@ Task<U,E> Ref<T,E>::modify(std::function<std::tuple<T,U>(T&)> predicate) {
     auto self = this->shared_from_this();
 
     if constexpr (ref_uses_atomics) {
-        
         return Task<U,E>::eval([self, predicate]() {
             while(true) {
                 auto initial = std::atomic_load_explicit(&(self->data), std::memory_order_acquire);
                 const auto& [updated, result] = predicate(*initial);
                 auto updatedRef = std::make_shared<T>(updated);
-                if(std::atomic_compare_exchange_weak_explicit(&(self->data), &initial, updatedRef, std::memory_order_release, std::memory_order_release)) {
+                if(std::atomic_compare_exchange_weak_explicit(&(self->data), &initial, updatedRef, std::memory_order_release, std::memory_order_relaxed)) {
                     return result;
                 }
             }
