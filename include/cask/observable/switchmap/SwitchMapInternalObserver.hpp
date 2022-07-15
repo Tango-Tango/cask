@@ -72,7 +72,7 @@ Task<None,None> SwitchMapInternalObserver<T,E>::onComplete() {
                 return StatefulResult<None>({updated_state, None()});
             });
         } else {
-            return Task<StatefulResult<None>,None>::pure({updated_state, None()});
+            return Task<StatefulResult<None>,None>::pure(updated_state, None());
         }
     });
 }

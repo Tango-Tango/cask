@@ -102,7 +102,7 @@ public:
      *         the return value provided by the predicate function.
      */
     template <class U>
-    Task<U,E> modify(const std::function<Task<std::tuple<T,U>,E>(const T&)>& predicate);
+    Task<U,E> modify(const std::function<Task<std::tuple<T,U>,E>(T&&)>& predicate);
 private:
     explicit MVar(const std::shared_ptr<Scheduler>& sched);
     explicit MVar(const std::shared_ptr<Scheduler>& sched, const T& initialValue);
@@ -190,7 +190,7 @@ Task<T,E> MVar<T,E>::read() {
 
 template <class T, class E>
 template <class U>
-Task<U,E> MVar<T,E>::modify(const std::function<Task<std::tuple<T,U>,E>(const T&)>& predicate) {
+Task<U,E> MVar<T,E>::modify(const std::function<Task<std::tuple<T,U>,E>(T&&)>& predicate) {
     return take()
         .template flatMap<std::tuple<T,U>>(predicate)
         .template flatMap<U>([self = this->shared_from_this()](auto result) {

@@ -32,7 +32,7 @@ public:
      * @param release The task which releases this resource when the user has completed their work.
      * @return A resource wrapping these acquire and release methods.
      */
-    constexpr static Resource<T,E> make(const Task<T,E>& acquire, ReleaseFunction release) noexcept;
+    constexpr static Resource<T,E> make(const Task<T,E>& acquire, const ReleaseFunction& release) noexcept;
 
     /**
      * Create a resource wrapping the given allocation task.
@@ -48,7 +48,7 @@ public:
      * @return A Task which represents the acquisition, usage, and release of this resource.
      */ 
     template <class T2>
-    constexpr Task<T2,E> use(std::function<Task<T2,E>(T)> userTask) const noexcept;
+    constexpr Task<T2,E> use(const std::function<Task<T2,E>(const T&)>& userTask) const noexcept;
 
     /**
      * Create a new resource which transforms the resource to some new value after
@@ -59,7 +59,7 @@ public:
      * @return A resource which performs the given transform after acquisition.
      */
     template <class T2>
-    constexpr Resource<T2,E> map(std::function<T2(T)> predicate) const noexcept;
+    constexpr Resource<T2,E> map(const std::function<T2(const T&)>& predicate) const noexcept;
 
     /**
      * Create a new resource which transforms any errors to some new error type.
@@ -68,7 +68,7 @@ public:
      * @return A resource which transforms errors.
      */
     template <class E2>
-    constexpr Resource<T,E2> mapError(std::function<E2(E)> predicate) const noexcept;
+    constexpr Resource<T,E2> mapError(const std::function<E2(E&&)>& predicate) const noexcept;
 
     /**
      * Construct a new inner resource from this one. The result is a new resource
@@ -82,13 +82,13 @@ public:
      * @return A resource which acquries and releases all resources properly.
      */
     template <class T2>
-    constexpr Resource<T2,E> flatMap(std::function<Resource<T2,E>(T)> predicate) const noexcept;
+    constexpr Resource<T2,E> flatMap(std::function<Resource<T2,E>(T&&)>&& predicate) const noexcept;
 
     AllocatedResourceTask allocated;
 };
 
 template <class T, class E>
-constexpr Resource<T,E> Resource<T,E>::make(const Task<T,E> &acquire, ReleaseFunction release) noexcept {
+constexpr Resource<T,E> Resource<T,E>::make(const Task<T,E> &acquire, const ReleaseFunction& release) noexcept {
     return Resource<T,E>(
         acquire.template map<AllocatedResource>([release](T thing) {
             auto deferredRelease = ReleaseTask::defer([thing, release] {
@@ -107,7 +107,7 @@ constexpr Resource<T,E>::Resource(const AllocatedResourceTask& allocated) noexce
 
 template <class T, class E>
 template <class T2>
-constexpr Task<T2,E> Resource<T,E>::use(std::function<Task<T2,E>(T)> userTask) const noexcept {
+constexpr Task<T2,E> Resource<T,E>::use(const std::function<Task<T2,E>(const T&)>& userTask) const noexcept {
     return allocated.template flatMap<T2>([userTask](auto result) {
         const auto& value = std::get<0>(result);
         const auto& release = std::get<1>(result);
@@ -117,7 +117,7 @@ constexpr Task<T2,E> Resource<T,E>::use(std::function<Task<T2,E>(T)> userTask) c
 
 template <class T, class E>
 template <class T2>
-constexpr Resource<T2,E> Resource<T,E>::map(std::function<T2(T)> predicate) const noexcept {
+constexpr Resource<T2,E> Resource<T,E>::map(const std::function<T2(const T&)>& predicate) const noexcept {
     return Resource<T2,E>(
         allocated.template map<typename Resource<T2,E>::AllocatedResource>([predicate](auto result) {
             const auto& value = std::get<0>(result);
@@ -130,14 +130,12 @@ constexpr Resource<T2,E> Resource<T,E>::map(std::function<T2(T)> predicate) cons
 
 template <class T, class E>
 template <class E2>
-constexpr Resource<T,E2> Resource<T,E>::mapError(std::function<E2(E)> predicate) const noexcept {
+constexpr Resource<T,E2> Resource<T,E>::mapError(const std::function<E2(E&&)>& predicate) const noexcept {
     return Resource<T,E2>(
         allocated.template map<typename Resource<T,E2>::AllocatedResource>([predicate](auto result) {
-            const auto& value = std::get<0>(result);
-            const auto& release = std::get<1>(result);
             return std::make_tuple(
-                value,
-                release.template mapError<E2>(predicate)
+                std::move(std::get<0>(result)),
+                std::get<1>(result).template mapError<E2>(predicate)
             );
         })
         .template mapError<E2>(predicate)
@@ -146,16 +144,15 @@ constexpr Resource<T,E2> Resource<T,E>::mapError(std::function<E2(E)> predicate)
 
 template <class T, class E>
 template <class T2>
-constexpr Resource<T2,E> Resource<T,E>::flatMap(std::function<Resource<T2,E>(T)> predicate) const noexcept {
+constexpr Resource<T2,E> Resource<T,E>::flatMap(std::function<Resource<T2,E>(T&&)>&& predicate) const noexcept {
     using SourceResource = typename Resource<T,E>::AllocatedResource;
     using TargetResource = typename Resource<T2,E>::AllocatedResource;
     using TargetResourceTask = Task<TargetResource,E>;
 
     std::function<TargetResourceTask(SourceResource)> composeResources =
-        [predicate](SourceResource result) {
-            T outerValue = std::get<0>(result);
-            ReleaseTask outerRelease = std::get<1>(result);
-            Resource<T2,E> innerResource = predicate(outerValue);
+        [predicate = std::move(predicate)](SourceResource result) {
+            auto innerResource = predicate(std::move(std::get<0>(result)));
+            auto outerRelease = std::get<1>(result);
 
             std::function<TargetResource(TargetResource)> innerCompose =
                 [outerRelease](auto innerAllocated) {

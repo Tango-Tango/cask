@@ -268,7 +268,7 @@ TEST(Task, RecurseWithoutExploding) {
         });
     };
 
-    auto task = Task<int>::pure(1000).flatMap(recurse);
+    auto task = Task<int>::pure(1000).flatMap<int>(recurse);
     auto result = task.run(sched)->await();
     EXPECT_EQ(result, 0);
 }
