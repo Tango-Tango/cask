@@ -42,21 +42,56 @@ public:
      * @param initialValue The initial value of the ref.
      * @return A new ref storing this value.
      */
-    static std::shared_ptr<Ref<T,E>> create(const T& initialValue);
+    template <class... Args>
+    static std::shared_ptr<Ref<T,E>> create(Args&&... args)  {
+        auto value = T(std::forward<Args>(args)...);
+        return std::make_shared<Ref<T,E>>(std::move(value));
+    }
 
     /**
      * Retrieve the currently stored value.
      * 
      * @return A task which, when run, will provide the value.
      */
-    Task<T,E> get();
+    Task<T,E> get()  {
+        auto self = this->shared_from_this();
+        return Task<T,E>::eval([self = std::move(self)]() {
+            return *(self->data);
+        });
+    }
 
     /**
      * Update the stored value using the given mutator function.
      * 
      * @return A task which, when run, will update the stored value.
      */
-    Task<None,E> update(std::function<T(T&)> predicate);
+    template <typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<T(const T&)>
+        >::value
+    >>
+    Task<None,E> update(Predicate&& predicate)  {
+        auto self = this->shared_from_this();
+
+        if constexpr (ref_uses_atomics) {
+            return Task<None,E>::eval([self = std::move(self), predicate = std::forward<Predicate>(predicate)]() {
+                while(true) {
+                    auto initial = std::atomic_load_explicit(&(self->data), std::memory_order_acquire);
+                    auto updated = std::make_shared<T>(predicate(*initial));
+                    if(std::atomic_compare_exchange_weak_explicit(&(self->data), &initial, updated, std::memory_order_release, std::memory_order_relaxed)) {
+                        return None();
+                    }
+                }
+            });
+        } else {
+            return Task<None,E>::eval([self = std::move(self), predicate = std::forward<Predicate>(predicate)]() {
+                std::lock_guard guard(self->mutex);
+                self->data = std::make_shared<T>(predicate(*(self->data)));
+                return None();
+            });
+        }
+    }
 
     /**
      * Modify the stored value using the given mutator function which
@@ -68,81 +103,46 @@ public:
      * @return A task which will update the stored value and then provide
      *         the return value provided by the predicate function.
      */
-    template <typename U>
-    Task<U,E> modify(std::function<std::tuple<T,U>(T&)> predicate);
+    template <typename U, typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<std::tuple<T,U>(const T&)>
+        >::value
+    >>
+    Task<U,E> modify(Predicate&& predicate)  {
+        auto self = this->shared_from_this();
+
+        if constexpr (ref_uses_atomics) {
+            return Task<U,E>::eval([self = std::move(self), predicate = std::forward<Predicate>(predicate)]() {
+                while(true) {
+                    auto initial = std::atomic_load_explicit(&(self->data), std::memory_order_acquire);
+                    auto&& [updated, result] = predicate(*initial);
+                    auto updatedRef = std::make_shared<T>(std::move(updated));
+                    if(std::atomic_compare_exchange_weak_explicit(&(self->data), &initial, updatedRef, std::memory_order_release, std::memory_order_relaxed)) {
+                        return std::move(result);
+                    }
+                }
+            });
+        } else {
+            return Task<U,E>::eval([self = std::move(self), predicate = std::forward<Predicate>(predicate)]() {
+                std::lock_guard guard(self->mutex);
+                auto&& [updated, result] = predicate(*(self->data));
+                self->data = std::make_shared<T>(std::move(updated));
+                return std::move(result);
+            });
+        }
+    }
+
+    template <class... Args>
+    explicit Ref(Args&&... args)
+        : data(std::make_shared<T>(std::forward<Args>(args)...))
+        , mutex()
+    {}
+
 private:
-    explicit Ref(const T& initialValue);
     std::shared_ptr<T> data;
     std::mutex mutex;
 };
-
-template <class T, class E>
-std::shared_ptr<Ref<T,E>> Ref<T,E>::create(const T& initialValue) {
-    return std::shared_ptr<Ref<T,E>>(new Ref<T,E>(initialValue));
-}
-
-template <class T, class E>
-Ref<T,E>::Ref(const T& initialValue)
-    : data(std::make_shared<T>(initialValue))
-    , mutex()
-{}
-
-template <class T, class E>
-Task<T,E> Ref<T,E>::get() {
-    auto self = this->shared_from_this();
-    return Task<T,E>::eval([self]() {
-        return *(self->data);
-    });
-}
-
-template <class T, class E>
-Task<None,E> Ref<T,E>::update(std::function<T(T&)> predicate) {
-    auto self = this->shared_from_this();
-
-    if constexpr (ref_uses_atomics) {
-        return Task<None,E>::eval([self, predicate]() {
-            while(true) {
-                auto initial = std::atomic_load_explicit(&(self->data), std::memory_order_acquire);
-                auto updated = std::make_shared<T>(predicate(*initial));
-                if(std::atomic_compare_exchange_weak_explicit(&(self->data), &initial, updated, std::memory_order_release, std::memory_order_relaxed)) {
-                    return None();
-                }
-            }
-        });
-    } else {
-        return Task<None,E>::eval([self, predicate]() {
-            std::lock_guard guard(self->mutex);
-            self->data = std::make_shared<T>(predicate(*(self->data)));
-            return None();
-        });
-    }
-}
-
-template <class T, class E>
-template <typename U>
-Task<U,E> Ref<T,E>::modify(std::function<std::tuple<T,U>(T&)> predicate) {
-    auto self = this->shared_from_this();
-
-    if constexpr (ref_uses_atomics) {
-        return Task<U,E>::eval([self, predicate]() {
-            while(true) {
-                auto initial = std::atomic_load_explicit(&(self->data), std::memory_order_acquire);
-                const auto& [updated, result] = predicate(*initial);
-                auto updatedRef = std::make_shared<T>(updated);
-                if(std::atomic_compare_exchange_weak_explicit(&(self->data), &initial, updatedRef, std::memory_order_release, std::memory_order_relaxed)) {
-                    return result;
-                }
-            }
-        });
-    } else {
-        return Task<U,E>::eval([self, predicate]() {
-            std::lock_guard guard(self->mutex);
-            const auto& [updated, result] = predicate(*(self->data));
-            self->data = std::make_shared<T>(updated);
-            return result;
-        });
-    }
-}
 
 } // namespace cask
 
