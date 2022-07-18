@@ -63,8 +63,8 @@ SwitchMapObserver<TI,TO,E>::SwitchMapObserver(
 
 template <class TI, class TO, class E>
 Task<Ack,None> SwitchMapObserver<TI,TO,E>::onNext(TI&& value) {
-    return stateVar->template modify<Ack>([self = this->shared_from_this(), value = std::forward<TI>(value)](auto state) mutable {
-        return self->onNextUnsafe(std::forward<TI>(value), state);
+    return stateVar->template modify<Ack>([self = this->shared_from_this(), value = std::forward<TI>(value)](auto state) {
+        return self->onNextUnsafe(value, state);
     });
 }
 

@@ -129,7 +129,7 @@ std::shared_ptr<const FiberOp> FiberOp::error(const Erased& e) noexcept {
     return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
 }
 
-std::shared_ptr<const FiberOp> FiberOp::async(const  std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept {
+std::shared_ptr<const FiberOp> FiberOp::async(const std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept {
     auto pool = global_pool();
     auto async_data = pool->allocate<AsyncData>(predicate);
     auto op = pool->allocate<FiberOp>(async_data, pool); 

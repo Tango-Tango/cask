@@ -178,7 +178,7 @@ TEST(ObservableSwitchMap, CompletionWaitsForSubscriptionComplete) {
 
     sched->advance_time(1);
     sched->run_ready_tasks();
-    EXPECT_TRUE(fiber->getValue().has_value());
+    ASSERT_TRUE(fiber->getValue().has_value());
 
     auto result = fiber->await();
 
