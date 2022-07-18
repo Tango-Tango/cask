@@ -111,7 +111,7 @@ constexpr Task<T2,E> Resource<T,E>::use(const std::function<Task<T2,E>(const T&)
     return allocated.template flatMap<T2>([userTask](auto result) {
         const auto& value = std::get<0>(result);
         const auto& release = std::get<1>(result);
-        return userTask(value).template guarantee<None>(release);
+        return userTask(value).guarantee(release);
     });
 }
 
