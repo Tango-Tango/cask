@@ -14,15 +14,15 @@ namespace cask::observable {
 template <class T, class E>
 class DeferObservable final : public Observable<T,E> {
 public:
-    explicit DeferObservable(const std::function<ObservableRef<T,E>()>& predicate);
+    explicit DeferObservable(std::function<ObservableRef<T,E>()>&& predicate);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     std::function<ObservableRef<T,E>()> predicate;
 };
 
 template <class T, class E>
-DeferObservable<T,E>::DeferObservable(const std::function<ObservableRef<T,E>()>& predicate)
-    : predicate(predicate)
+DeferObservable<T,E>::DeferObservable(std::function<ObservableRef<T,E>()>&& predicate)
+    : predicate(std::move(predicate))
 {}
 
 template <class T, class E>

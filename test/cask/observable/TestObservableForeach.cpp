@@ -43,7 +43,7 @@ TEST(ObservableForeach, SingleValue) {
 TEST(ObservableForeach, MultipleValues) {
     int counter = 0;
 
-    Observable<int,std::string>::fromVector({5, 6, 7 ,3, 1, 4})
+    Observable<int,std::string>::sequence(5, 6, 7 ,3, 1, 4)
         ->foreach([&counter](auto) {
             counter++;
         })
@@ -93,7 +93,7 @@ TEST(ObservableForeach, CompletesGuaranteedEffects) {
     int counter = 0;
     bool completed = false;
     std::vector<int> values = {1,2,3,4,5};
-    Observable<int>::fromVector(values)
+    Observable<int>::sequence(values)
         ->guarantee(
             Task<None,None>::eval([&completed] {
                 completed = true;

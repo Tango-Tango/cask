@@ -116,9 +116,7 @@ TEST(ObservableQueue, ValueThenNever) {
 
 TEST(ObservableQueue, ValuesLargerThanQueue) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto fiber = Observable<int>::fromVector({
-            0, 1, 2, 3, 4, 5
-        })
+    auto fiber = Observable<int>::sequence(0, 1, 2, 3, 4, 5)
         ->queue(1)
         ->take(10)
         .run(sched);
@@ -155,9 +153,7 @@ TEST(ObservableQueue, UpstreamRunsWhileDownstreamBackpressure) {
 
     auto sched = std::make_shared<BenchScheduler>();
     auto downstream_queue = cask::Queue<int,cask::None>::empty(sched, 1);
-    auto fiber = Observable<int, cask::None>::fromVector({
-            0, 1, 2, 3, 4, 5
-        })
+    auto fiber = Observable<int, cask::None>::sequence(0, 1, 2, 3, 4, 5)
         ->template map<int>([&upstream_counter](auto value) {
             upstream_counter++;
             return value;
@@ -192,9 +188,7 @@ TEST(ObservableQueue, UpstreamRunsWhileDownstreamBackpressure) {
 TEST(ObservableQueue, DownstreamStopBigQueue) {
     auto sched = std::make_shared<SingleThreadScheduler>();
     auto downstream_queue = cask::Queue<int,cask::None>::empty(sched, 1);
-    auto result = Observable<int, cask::None>::fromVector({
-            0, 1, 2, 3, 4, 5
-        })
+    auto result = Observable<int, cask::None>::sequence(0, 1, 2, 3, 4, 5)
         ->queue(10)
         ->take(2)
         .run(sched)
@@ -206,12 +200,9 @@ TEST(ObservableQueue, DownstreamStopBigQueue) {
 }
 
 TEST(ObservableQueue, DownstreamStopSmallQueue) {
-    //auto sched = std::make_shared<SingleThreadScheduler>();
     auto sched = Scheduler::global();
     auto downstream_queue = cask::Queue<int,cask::None>::empty(sched, 1);
-    auto result = Observable<int, cask::None>::fromVector({
-            0, 1, 2, 3, 4, 5
-        })
+    auto result = Observable<int, cask::None>::sequence(0, 1, 2, 3, 4, 5)
         ->queue(1)
         ->take(2)
         .run(sched)

@@ -29,9 +29,7 @@ TEST(ObservableScan, Pure) {
 
 TEST(ObservableScan, Vector) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto fiber = Observable<int>::fromVector({
-            1,2,3,4,5
-        })
+    auto fiber = Observable<int>::sequence(1,2,3,4,5)
         ->scan<int>(0, [](auto acc, auto value) {
             return acc + value;
         })
@@ -68,9 +66,7 @@ TEST(ObservableScan, Empty) {
 
 TEST(ObservableScan, Stop) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto fiber = Observable<int>::fromVector({
-            1,2,3,4,5
-        })
+    auto fiber = Observable<int>::sequence(1,2,3,4,5)
         ->scan<int>(0, [](auto acc, auto value) {
             return acc + value;
         })

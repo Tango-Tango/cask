@@ -50,9 +50,9 @@ TEST(ObservableDistinctUntilChangedBy, Cancel) {
 }
 
 TEST(ObservableDistinctUntilChangedBy, SequentialNumbers) {
-    auto result = Observable<SomeData>::fromVector({
+    auto result = Observable<SomeData>::sequence(
             SomeData("0", 0), SomeData("1", 0), SomeData("2", 0)
-        })
+        )
         ->distinctUntilChangedBy([](auto left, auto right) { return std::get<0>(left) == std::get<0>(right); })
         ->take(10)
         .run(Scheduler::global())
@@ -65,9 +65,9 @@ TEST(ObservableDistinctUntilChangedBy, SequentialNumbers) {
 }
 
 TEST(ObservableDistinctUntilChangedBy, SupressDuplicates) {
-    auto result = Observable<SomeData>::fromVector({
+    auto result = Observable<SomeData>::sequence(
             SomeData("0", 1), SomeData("0", 2), SomeData("0", 3)
-        })
+        )
         ->distinctUntilChangedBy([](auto left, auto right) { return std::get<0>(left) == std::get<0>(right); })
         ->take(10)
         .run(Scheduler::global())

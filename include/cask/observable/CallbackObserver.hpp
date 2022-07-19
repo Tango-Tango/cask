@@ -14,10 +14,10 @@ template <class T, class E>
 class CallbackObserver final : public Observer<T,E> {
 public:
     CallbackObserver(
-        const std::function<Task<Ack,None>(T&&)>& onNextHdl,
-        const std::function<Task<None,None>(E&&)>& onErrorHdl,
-        const std::function<Task<None,None>()>& onCompleteHdl,
-        const std::function<Task<None,None>()>& onCancelHdl
+        std::function<Task<Ack,None>(T&&)>&& onNextHdl,
+        std::function<Task<None,None>(E&&)>&& onErrorHdl,
+        std::function<Task<None,None>()>&& onCompleteHdl,
+        std::function<Task<None,None>()>&& onCancelHdl
     );
 
     Task<Ack,None> onNext(T&& value) override;
@@ -34,14 +34,14 @@ private:
 
 template <class T, class E>
 CallbackObserver<T,E>::CallbackObserver(
-    const std::function<Task<Ack,None>(T&&)>& onNextHdl,
-    const std::function<Task<None,None>(E&&)>& onErrorHdl,
-    const std::function<Task<None,None>()>& onCompleteHdl,
-        const std::function<Task<None,None>()>& onCancelHdl
-)   : onNextHdl(onNextHdl)
-    , onErrorHdl(onErrorHdl)
-    , onCompleteHdl(onCompleteHdl)
-    , onCancelHdl(onCancelHdl)
+    std::function<Task<Ack,None>(T&&)>&& onNextHdl,
+    std::function<Task<None,None>(E&&)>&& onErrorHdl,
+    std::function<Task<None,None>()>&& onCompleteHdl,
+    std::function<Task<None,None>()>&& onCancelHdl
+)   : onNextHdl(std::move(onNextHdl))
+    , onErrorHdl(std::move(onErrorHdl))
+    , onCompleteHdl(std::move(onCompleteHdl))
+    , onCancelHdl(std::move(onCancelHdl))
 {}
 
 template <class T, class E>

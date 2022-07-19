@@ -27,12 +27,11 @@ protected:
     }
 };
 
-
 TEST_P(ObservableMergeAllTest,Empty) {
-    auto fiber = Observable<int,std::string>::mergeAll({
+    auto fiber = Observable<int,std::string>::mergeAll(
             Observable<int,std::string>::empty(),
             Observable<int,std::string>::empty()
-        })
+        )
         ->last()
         .run(sched);
 
@@ -41,11 +40,11 @@ TEST_P(ObservableMergeAllTest,Empty) {
 }
 
 TEST_P(ObservableMergeAllTest,StackedEmpties) {
-    auto fiber = Observable<int,std::string>::mergeAll({
+    auto fiber = Observable<int,std::string>::mergeAll(
             Observable<int,std::string>::empty(),
             Observable<int,std::string>::empty(),
             Observable<int,std::string>::empty()
-        })
+        )
         ->last()
         .run(sched);
 
@@ -54,10 +53,10 @@ TEST_P(ObservableMergeAllTest,StackedEmpties) {
 }
 
 TEST_P(ObservableMergeAllTest,LeftValue) {
-    auto fiber = Observable<int,std::string>::mergeAll({
+    auto fiber = Observable<int,std::string>::mergeAll(
             Observable<int,std::string>::pure(123),
             Observable<int,std::string>::empty()
-        })
+        )
         ->last()
         .run(sched);
 
@@ -67,10 +66,10 @@ TEST_P(ObservableMergeAllTest,LeftValue) {
 }
 
 TEST_P(ObservableMergeAllTest,RightValue) {
-    auto fiber = Observable<int,std::string>::mergeAll({
+    auto fiber = Observable<int,std::string>::mergeAll(
             Observable<int,std::string>::empty(),
             Observable<int,std::string>::pure(123)
-        })
+        )
         ->last()
         .run(sched);
 
@@ -80,7 +79,7 @@ TEST_P(ObservableMergeAllTest,RightValue) {
 }
 
 TEST_P(ObservableMergeAllTest,Never) {
-    auto fiber = Observable<int,std::string>::mergeAll({
+    auto fiber = Observable<int,std::string>::mergeAll(
             Observable<int,std::string>::never(),
             Observable<int,std::string>::never(),
             Observable<int,std::string>::never(),
@@ -94,7 +93,7 @@ TEST_P(ObservableMergeAllTest,Never) {
             Observable<int,std::string>::never(),
             Observable<int,std::string>::never(),
             Observable<int,std::string>::never()
-        })
+        )
         ->last()
         .run(sched);
 

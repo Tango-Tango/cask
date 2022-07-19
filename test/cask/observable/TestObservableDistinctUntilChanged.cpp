@@ -48,7 +48,7 @@ TEST(ObservableDistinctUntilChanged, Cancel) {
 }
 
 TEST(ObservableDistinctUntilChanged, SequentialNumbers) {
-    auto result = Observable<int>::fromVector({0, 1, 2, 3, 4})
+    auto result = Observable<int>::sequence(0, 1, 2, 3, 4)
         ->distinctUntilChanged()
         ->take(10)
         .run(Scheduler::global())
@@ -63,7 +63,7 @@ TEST(ObservableDistinctUntilChanged, SequentialNumbers) {
 }
 
 TEST(ObservableDistinctUntilChanged, SuppressesAllDuplicates) {
-    auto result = Observable<int>::fromVector({1, 1, 1, 1, 1})
+    auto result = Observable<int>::sequence(1, 1, 1, 1, 1)
         ->distinctUntilChanged()
         ->take(10)
         .run(Scheduler::global())
@@ -74,7 +74,7 @@ TEST(ObservableDistinctUntilChanged, SuppressesAllDuplicates) {
 }
 
 TEST(ObservableDistinctUntilChanged, SuppressesRepeatedDuplicates) {
-    auto result = Observable<int>::fromVector({0, 0, 1, 1, 2, 2, 3, 3, 4, 4})
+    auto result = Observable<int>::sequence(0, 0, 1, 1, 2, 2, 3, 3, 4, 4)
         ->distinctUntilChanged()
         ->take(10)
         .run(Scheduler::global())
@@ -89,7 +89,7 @@ TEST(ObservableDistinctUntilChanged, SuppressesRepeatedDuplicates) {
 }
 
 TEST(ObservableDistinctUntilChanged, DoesntSuppressToggling) {
-    auto result = Observable<int>::fromVector({0, 1, 0, 1, 1})
+    auto result = Observable<int>::sequence(0, 1, 0, 1, 1)
         ->distinctUntilChanged()
         ->take(10)
         .run(Scheduler::global())
@@ -104,7 +104,7 @@ TEST(ObservableDistinctUntilChanged, DoesntSuppressToggling) {
 
 
 TEST(ObservableDistinctUntilChanged, DoesntSuppressTogglingRepeats) {
-    auto result = Observable<int>::fromVector({0, 0, 1, 1, 0, 0, 1, 1})
+    auto result = Observable<int>::sequence(0, 0, 1, 1, 0, 0, 1, 1)
         ->distinctUntilChanged()
         ->take(10)
         .run(Scheduler::global())

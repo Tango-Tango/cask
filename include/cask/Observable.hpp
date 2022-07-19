@@ -56,7 +56,8 @@ public:
      * @param value The value to emit when subscribed.
      * @return A new observable wrapping the given value.
      */
-    static ObservableRef<T,E> pure(const T& value);
+    template <class... Args>
+    static ObservableRef<T,E> pure(Args&&... args);
 
     /**
      * Create an Observable that, upon subscription, immediately returns an error.
@@ -64,7 +65,8 @@ public:
      * @param error The error to emit when subscribed.
      * @return A new observable wrapping the given error.
      */
-    static ObservableRef<T,E> raiseError(const E& error);
+    template <class... Args>
+    static ObservableRef<T,E> raiseError(Args&&... args);
 
     /**
      * Create an empty observable that, upon subscription, immediately
@@ -82,7 +84,13 @@ public:
      * @param predicate The function to evaluate.
      * @return An observable wrapping the given function.
      */
-    static ObservableRef<T,E> eval(const std::function<T()>& predicate);
+    template <typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<T()>
+        >::value
+    >>
+    static ObservableRef<T,E> eval(Predicate&& predicate);
 
     /**
      * Create an observable which, upon subscription, defers that
@@ -92,7 +100,13 @@ public:
      * @param predicate The method to use for creating an observable.
      * @return An observable wrapping the given deferral function.
      */
-    static ObservableRef<T,E> defer(const std::function<ObservableRef<T,E>()>& predicate);
+    template <typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<ObservableRef<T,E>()>
+        >::value
+    >>
+    static ObservableRef<T,E> defer(Predicate&& predicate);
 
     /**
      * Create an observable which, upon subscription, evaluates the
@@ -102,7 +116,13 @@ public:
      * @param predicate The method to use for creating a task.
      * @return An observable wrapping the given deferral function.
      */
-    static ObservableRef<T,E> deferTask(const std::function<Task<T,E>()>& predicate);
+    template <typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<Task<T,E>()>
+        >::value
+    >>
+    static ObservableRef<T,E> deferTask(Predicate&& predicate);
 
     /**
      * Create and observable which repeatedly evaluates the given task and
@@ -111,7 +131,13 @@ public:
      * @return A new observable which will infinitely execute the given task
      *         until canceled or the observer stops the execution.
      */
-    static ObservableRef<T,E> repeatTask(const Task<T,E>& task);
+    template <typename Arg, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Arg>,
+            Task<T,E>
+        >::value
+    >>
+    static ObservableRef<T,E> repeatTask(Arg&& task);
 
     /**
      * Create an observable which evalutes the given task a single time and
@@ -119,7 +145,13 @@ public:
      * @param task The task to execute.
      * @return A new observable which will execute the give task a single time.
      */
-    static ObservableRef<T,E> fromTask(const Task<T,E>& task);
+    template <typename Arg, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Arg>,
+            Task<T,E>
+        >::value
+    >>
+    static ObservableRef<T,E> fromTask(Arg&& task);
 
     /**
      * Create an observable who emits each element of the given vector
@@ -129,7 +161,24 @@ public:
      * @return A new observable which will emit the values of the given
      *         vector on subscription
      */
-    static ObservableRef<T,E> fromVector(const std::vector<T>& vector);
+    template <typename Arg, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Arg>,
+            std::vector<T>
+        >::value
+    >>
+    static ObservableRef<T,E> fromVector(Arg&& vector);
+
+    /**
+     * Create an observable who emits each element of the given vector
+     * to downstream observers.
+     * @param vector The vector to iterator through and whose values to
+     *               emit downstream.
+     * @return A new observable which will emit the values of the given
+     *         vector on subscription
+     */
+    template <class... Args>
+    static ObservableRef<T,E> sequence(Args&&... args);
 
     /**
      * Merge all of the given observables together to create a new observable. All of the
@@ -143,7 +192,8 @@ public:
      * @return An observable which emits merged events from all of the given upstream
      *         observables.
      */
-    static ObservableRef<T,E> mergeAll(std::initializer_list<ObservableConstRef<T,E>> observables);
+    template <class... Args>
+    static ObservableRef<T,E> mergeAll(Args&&... observables);
 
     /**
      * Create an observable who never emits any elements and which
@@ -179,12 +229,36 @@ public:
      * @param onCancel Provide an error for upstream cancelations. By default does nothing.
      * @return The handle which may be used to cancel computation on the stream.
      */
+    template <
+        typename NextPredicate,
+        typename ErrorPredicate,
+        typename CompletePredicate,
+        typename CancelPredicate,
+        typename = std::enable_if_t<
+            std::is_convertible<
+                std::remove_reference_t<NextPredicate>,
+                std::function<Task<Ack,None>(T&&)>
+            >::value &&
+            std::is_convertible<
+                std::remove_reference_t<ErrorPredicate>,
+                std::function<Task<None,None>(E&&)>
+            >::value &&
+            std::is_convertible<
+                std::remove_reference_t<CompletePredicate>,
+                std::function<Task<None,None>()>
+            >::value &&
+            std::is_convertible<
+                std::remove_reference_t<CancelPredicate>,
+                std::function<Task<None,None>()>
+            >::value 
+        >
+    >
     FiberRef<None,None> subscribeHandlers(
         const std::shared_ptr<Scheduler>& sched,
-        const std::function<Task<Ack,None>(T&&)>& onNext,
-        const std::function<Task<None,None>(E&&)>& onError = [](auto&&) { return Task<None,None>::none(); },
-        const std::function<Task<None,None>()>& onComplete = [] { return Task<None,None>::none(); },
-        const std::function<Task<None,None>()>& onCancel = [] { return Task<None,None>::none(); }
+        NextPredicate&& onNext,
+        ErrorPredicate&& onError = [](E&&) { return Task<None,None>::none(); },
+        CompletePredicate&& onComplete = [] { return Task<None,None>::none(); },
+        CancelPredicate&& onCancel = [] { return Task<None,None>::none(); }
     ) const;
 
     /**
@@ -563,16 +637,20 @@ ObservableRef<T,E> Observable<T,E>::cancel() {
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::pure(const T& value) {
-    return deferTask([value]() {
-        return Task<T,E>::pure(value);
+template <class... Args>
+ObservableRef<T,E> Observable<T,E>::pure(Args&&... args) {
+    auto task = Task<T,E>::pure(std::forward<Args>(args)...);
+    return deferTask([task = std::move(task)] {
+        return task;
     });
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::raiseError(const E& error) {
-    return deferTask([error]() {
-        return Task<T,E>::raiseError(error);
+template <class... Args>
+ObservableRef<T,E> Observable<T,E>::raiseError(Args&&... args) {
+    auto task = Task<T,E>::raiseError(std::forward<Args>(args)...);
+    return deferTask([task = std::move(task)] {
+        return task;
     });
 }
 
@@ -582,39 +660,53 @@ ObservableRef<T,E> Observable<T,E>::empty() {
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::eval(const std::function<T()>& predicate) {
-    return std::make_shared<observable::EvalObservable<T,E>>(predicate);
+template <typename Predicate, typename>
+ObservableRef<T,E> Observable<T,E>::eval(Predicate&& predicate) {
+    return std::make_shared<observable::EvalObservable<T,E>>(std::forward<Predicate>(predicate));
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::defer(const std::function<ObservableRef<T,E>()>& predicate) {
-    return std::make_shared<observable::DeferObservable<T,E>>(predicate);
+template <typename Predicate, typename>
+ObservableRef<T,E> Observable<T,E>::defer(Predicate&& predicate) {
+    return std::make_shared<observable::DeferObservable<T,E>>(std::forward<Predicate>(predicate));
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::deferTask(const std::function<Task<T,E>()>& predicate) {
-    return std::make_shared<observable::DeferTaskObservable<T,E>>(predicate);
+template <typename Predicate, typename>
+ObservableRef<T,E> Observable<T,E>::deferTask(Predicate&& predicate) {
+    return std::make_shared<observable::DeferTaskObservable<T,E>>(std::forward<Predicate>(predicate));
 }
 
 template <class T, class E>
-std::shared_ptr<Observable<T,E>> Observable<T,E>::repeatTask(const Task<T,E>& task) {
-    return std::make_shared<observable::RepeatTaskObservable<T,E>>(task);
+template <typename Arg, typename>
+std::shared_ptr<Observable<T,E>> Observable<T,E>::repeatTask(Arg&& task) {
+    return std::make_shared<observable::RepeatTaskObservable<T,E>>(std::forward<Task<T,E>>(task));
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::fromTask(const Task<T,E>& task) {
-    return deferTask([task](){ return task; });
+template <typename Arg, typename>
+ObservableRef<T,E> Observable<T,E>::fromTask(Arg&& task) {
+    return deferTask([task = std::forward<Task<T,E>>(task)](){ return task; });
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::fromVector(const std::vector<T>& vector) {
-    return std::make_shared<observable::VectorObservable<T,E>>(vector);
+template <typename Arg, typename>
+ObservableRef<T,E> Observable<T,E>::fromVector(Arg&& vector) {
+    return std::make_shared<observable::VectorObservable<T,E>>(std::forward<std::vector<T>>(vector));
 }
 
 template <class T, class E>
-ObservableRef<T,E> Observable<T,E>::mergeAll(std::initializer_list<ObservableConstRef<T,E>> observables) {
-    std::vector<ObservableConstRef<T,E>> all_observables_vector(observables);
-    auto all_observables = Observable<ObservableConstRef<T,E>,E>::fromVector(all_observables_vector);
+template <typename... Args>
+ObservableRef<T,E> Observable<T,E>::sequence(Args&&... args) {
+    std::vector<T> v({std::forward<Args>(args)...});
+    return std::make_shared<observable::VectorObservable<T,E>>(std::move(v));
+}
+
+template <class T, class E>
+template <typename... Args>
+ObservableRef<T,E> Observable<T,E>::mergeAll(Args&&... observables) {
+    std::vector<ObservableConstRef<T,E>> v({std::forward<Args>(observables)...});
+    auto all_observables = Observable<ObservableConstRef<T,E>,E>::fromVector(std::move(v));
     return std::make_shared<observable::MergeObservable<T,E>>(all_observables);
 }
 
@@ -626,15 +718,25 @@ ObservableRef<T,E> Observable<T,E>::never() {
 }
 
 template <class T, class E>
+template <
+    typename NextPredicate,
+    typename ErrorPredicate,
+    typename CompletePredicate,
+    typename CancelPredicate,
+    typename
+>
 FiberRef<None,None> Observable<T,E>::subscribeHandlers(
     const std::shared_ptr<Scheduler>& sched,
-    const std::function<Task<Ack,None>(T&&)>& onNext,
-    const std::function<Task<None,None>(E&&)>& onError,
-    const std::function<Task<None,None>()>& onComplete,
-    const std::function<Task<None,None>()>& onCancel
+    NextPredicate&& onNext,
+    ErrorPredicate&& onError,
+    CompletePredicate&& onComplete,
+    CancelPredicate&& onCancel
 ) const {
     auto observer = std::make_shared<observable::CallbackObserver<T,E>>(
-        onNext, onError, onComplete, onCancel
+        std::forward<NextPredicate>(onNext),
+        std::forward<ErrorPredicate>(onError),
+        std::forward<CompletePredicate>(onComplete),
+        std::forward<CancelPredicate>(onCancel)
     );
 
     return subscribe(sched, observer);

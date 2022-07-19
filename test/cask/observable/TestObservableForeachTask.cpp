@@ -45,7 +45,7 @@ TEST(ObservableForeachTask, SingleValue) {
 TEST(ObservableForeachTask, MultipleValues) {
     int counter = 0;
 
-    Observable<int,std::string>::fromVector({5, 6, 7 ,3, 1, 4})
+    Observable<int,std::string>::sequence(5, 6, 7 ,3, 1, 4)
         ->foreachTask([&counter](auto) {
             counter++;
             return Task<None,std::string>::none();
@@ -59,7 +59,7 @@ TEST(ObservableForeachTask, MultipleValues) {
 TEST(ObservableForeachTask, RaiseError) {
     int counter = 0;
 
-    auto result = Observable<int,std::string>::fromVector({5, 6, 7 ,3, 1, 4})
+    auto result = Observable<int,std::string>::sequence(5, 6, 7 ,3, 1, 4)
         ->foreachTask([&counter](auto) {
             counter++;
             return Task<None,std::string>::raiseError("broke");

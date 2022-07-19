@@ -129,8 +129,8 @@ TEST_P(ObservableMergeTest,DownstreamRightStop) {
 }
 
 TEST_P(ObservableMergeTest,DownstreamBothStop) {
-    auto fiber = Observable<int,std::string>::fromVector({1,2,3})
-        ->merge(Observable<int,std::string>::fromVector({4,5,6}))
+    auto fiber = Observable<int,std::string>::sequence(1,2,3)
+        ->merge(Observable<int,std::string>::sequence(4,5,6))
         ->take(4)
         .run(sched);
     
@@ -139,9 +139,9 @@ TEST_P(ObservableMergeTest,DownstreamBothStop) {
 }
 
 TEST_P(ObservableMergeTest,DownstreamManyStop) {
-    auto fiber = Observable<int,std::string>::fromVector({1,2,3})
-        ->merge(Observable<int,std::string>::fromVector({4,5,6}))
-        ->merge(Observable<int,std::string>::fromVector({7,8,9}))
+    auto fiber = Observable<int,std::string>::sequence(1,2,3)
+        ->merge(Observable<int,std::string>::sequence(4,5,6))
+        ->merge(Observable<int,std::string>::sequence(7,8,9))
         ->take(7)
         .run(sched);
     
@@ -150,9 +150,9 @@ TEST_P(ObservableMergeTest,DownstreamManyStop) {
 }
 
 TEST_P(ObservableMergeTest,DownstreamManyTakeAll) {
-    auto fiber = Observable<int,std::string>::fromVector({1,2,3})
-        ->merge(Observable<int,std::string>::fromVector({4,5,6}))
-        ->merge(Observable<int,std::string>::fromVector({7,8,9}))
+    auto fiber = Observable<int,std::string>::sequence(1,2,3)
+        ->merge(Observable<int,std::string>::sequence(4,5,6))
+        ->merge(Observable<int,std::string>::sequence(7,8,9))
         ->take(10)
         .run(sched);
     
