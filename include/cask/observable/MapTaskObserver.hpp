@@ -21,7 +21,7 @@ public:
     MapTaskObserver(const std::function<Task<TO,E>(TI&&)>& predicate, const std::shared_ptr<Observer<TO,E>>& downstream);
 
     Task<Ack,None> onNext(TI&& value) override;
-    Task<None,None> onError(const E& error) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -40,10 +40,10 @@ MapTaskObserver<TI,TO,E>::MapTaskObserver(const std::function<Task<TO,E>(TI&&)>&
 template <class TI, class TO, class E>
 Task<Ack,None> MapTaskObserver<TI,TO,E>::onNext(TI&& value) {
     return predicate(std::forward<TI>(value)).template flatMapBoth<Ack,None>(
-        [downstream = downstream](auto downstreamValue) { return downstream->onNext(std::forward<TO>(downstreamValue)); },
-        [self_weak = this->weak_from_this()](auto error) {
+        [downstream = downstream](auto&& downstreamValue) { return downstream->onNext(std::forward<TO>(downstreamValue)); },
+        [self_weak = this->weak_from_this()](auto&& error) {
             if(auto self = self_weak.lock()) {
-                return self->onError(error).template map<Ack>([](auto) {
+                return self->onError(std::forward<E>(error)).template map<Ack>([](auto) {
                     return Stop;
                 });
             } else {
@@ -54,9 +54,9 @@ Task<Ack,None> MapTaskObserver<TI,TO,E>::onNext(TI&& value) {
 }
 
 template <class TI, class TO, class E>
-Task<None,None> MapTaskObserver<TI,TO,E>::onError(const E& error) {
+Task<None,None> MapTaskObserver<TI,TO,E>::onError(E&& error) {
     if(!completed.test_and_set()) {
-        return downstream->onError(error);
+        return downstream->onError(std::forward<E>(error));
     } else {
         return Task<None,None>::none();
     }

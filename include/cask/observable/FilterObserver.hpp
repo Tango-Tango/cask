@@ -20,7 +20,7 @@ class FilterObserver final : public Observer<T,E> {
 public:
     FilterObserver(const std::function<bool(const T&)>& predicate, const std::shared_ptr<Observer<T,E>>& downstream);
     Task<Ack,None> onNext(T&& value) override;
-    Task<None,None> onError(const E& error) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -45,8 +45,8 @@ Task<Ack,None> FilterObserver<T,E>::onNext(T&& value) {
 }
 
 template <class T, class E>
-Task<None,None> FilterObserver<T,E>::onError(const E& error) {
-    return downstream->onError(error);
+Task<None,None> FilterObserver<T,E>::onError(E&& error) {
+    return downstream->onError(std::forward<E>(error));
 }
 
 template <class T, class E>

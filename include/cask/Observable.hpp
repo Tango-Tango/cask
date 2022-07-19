@@ -182,7 +182,7 @@ public:
     FiberRef<None,None> subscribeHandlers(
         const std::shared_ptr<Scheduler>& sched,
         const std::function<Task<Ack,None>(T&&)>& onNext,
-        const std::function<Task<None,None>(const E&)>& onError = [](auto) { return Task<None,None>::none(); },
+        const std::function<Task<None,None>(E&&)>& onError = [](auto&&) { return Task<None,None>::none(); },
         const std::function<Task<None,None>()>& onComplete = [] { return Task<None,None>::none(); },
         const std::function<Task<None,None>()>& onCancel = [] { return Task<None,None>::none(); }
     ) const;
@@ -285,7 +285,7 @@ public:
     template <class T2, class E2>
     std::shared_ptr<Observable<T2,E2>> mapBothTask(
         const std::function<Task<T2,E2>(T&&)>& successPredicate,
-        const std::function<Task<T2,E2>(const E&)>& errorPredicate
+        const std::function<Task<T2,E2>(E&&)>& errorPredicate
     ) const;
 
     /**
@@ -629,7 +629,7 @@ template <class T, class E>
 FiberRef<None,None> Observable<T,E>::subscribeHandlers(
     const std::shared_ptr<Scheduler>& sched,
     const std::function<Task<Ack,None>(T&&)>& onNext,
-    const std::function<Task<None,None>(const E&)>& onError,
+    const std::function<Task<None,None>(E&&)>& onError,
     const std::function<Task<None,None>()>& onComplete,
     const std::function<Task<None,None>()>& onCancel
 ) const {
@@ -687,7 +687,7 @@ template <class T, class E>
 template <class T2, class E2>
 std::shared_ptr<Observable<T2,E2>> Observable<T,E>::mapBothTask(
     const std::function<Task<T2,E2>(T&&)>& successPredicate,
-    const std::function<Task<T2,E2>(const E&)>& errorPredicate
+    const std::function<Task<T2,E2>(E&&)>& errorPredicate
 ) const {
     auto self = this->shared_from_this();
     return std::make_shared<observable::MapBothTaskObservable<T,T2,E,E2>>(self, successPredicate, errorPredicate);

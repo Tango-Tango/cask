@@ -37,7 +37,7 @@ FiberRef<None,None> EvalObservable<T,E>::subscribe(
                         return observer->onComplete();
                     });
             } catch(E& error) {
-                return observer->onError(error);
+                return observer->onError(std::forward<E>(error));
             }
         })
         .doOnCancel(Task<None,None>::defer([observer] { return observer->onCancel(); }))

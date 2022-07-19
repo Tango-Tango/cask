@@ -21,7 +21,7 @@ public:
     explicit DistinctUntilChangedObserver(const std::shared_ptr<Observer<T,E>>& downstream, const std::function<bool(const T&, const T&)>& comparator);
 
     Task<Ack,None> onNext(T&& value) override;
-    Task<None,None> onError(const E& error) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -48,8 +48,8 @@ Task<Ack, None> DistinctUntilChangedObserver<T,E>::onNext(T&& value) {
 }
 
 template <class T, class E>
-Task<None,None> DistinctUntilChangedObserver<T,E>::onError(const E& error) {
-    return downstream->onError(error);
+Task<None,None> DistinctUntilChangedObserver<T,E>::onError(E&& error) {
+    return downstream->onError(std::forward<E>(error));
 }
 
 template <class T, class E>

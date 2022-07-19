@@ -23,12 +23,12 @@ public:
     
 
     Task<Ack,None> onNext(TI&& value) override;
-    Task<None,None> onError(const E& error) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 
     Task<Ack,None> onNextInternal(TO&& value);
-    Task<None,None> onErrorInternal(const E& error);
+    Task<None,None> onErrorInternal(E&& error);
     Task<None,None> onCompleteInternal();
     Task<None,None> onCancelInternal();
 private:
@@ -50,13 +50,13 @@ FlatMapObserver<TI,TO,E>::FlatMapObserver(
 template <class TI, class TO, class E>
 Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(TI&& value) {
     auto self = this->shared_from_this();
-    auto next_observable = self->predicate(value);
+    auto next_observable = self->predicate(std::forward<TI>(value));
 
     return Task<None,None>::deferFiber([self, next_observable](auto sched) {
             return next_observable->subscribeHandlers(
                 sched,
-                [self] (auto value) { return self->onNextInternal(std::move(value)); },
-                [self] (auto error) { return self->onErrorInternal(error); },
+                [self] (auto&& value) { return self->onNextInternal(std::forward<TO>(value)); },
+                [self] (auto&& error) { return self->onErrorInternal(std::forward<E>(error)); },
                 [self] { return self->onCompleteInternal(); },
                 [self] { return self->onCancelInternal(); }
             );
@@ -71,8 +71,8 @@ Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(TI&& value) {
 }
 
 template <class TI, class TO, class E>
-Task<None,None> FlatMapObserver<TI,TO,E>::onError(const E& error) {
-    return downstream->onError(error);
+Task<None,None> FlatMapObserver<TI,TO,E>::onError(E&& error) {
+    return downstream->onError(std::forward<E>(error));
 }
 
 template <class TI, class TO, class E>
@@ -99,9 +99,9 @@ Task<Ack,None> FlatMapObserver<TI,TO,E>::onNextInternal(TO&& value) {
 }
 
 template <class TI, class TO, class E>
-Task<None,None> FlatMapObserver<TI,TO,E>::onErrorInternal(const E& error) {
+Task<None,None> FlatMapObserver<TI,TO,E>::onErrorInternal(E&& error) {
     stopped = true;
-    return downstream->onError(error);
+    return downstream->onError(std::forward<E>(error));
 }
 
 template <class TI, class TO, class E>

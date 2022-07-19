@@ -20,7 +20,7 @@ public:
         const std::shared_ptr<Scheduler>& sched
     );
     Task<Ack,None> onNext(T&& value) override;
-    Task<None,None> onError(const E& error) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -32,13 +32,13 @@ private:
     class NextEvent : public QueueEvent {
     public:
         T value;
-        explicit NextEvent(T&& value) : value(value) {}
+        explicit NextEvent(T&& value) : value(std::forward<T>(value)) {}
     };
 
     class ErrorEvent : public QueueEvent {
     public:
-        const E error;
-        explicit ErrorEvent(const E& error) : error(error) {}
+        E error;
+        explicit ErrorEvent(E&& error) : error(std::forward<E>(error)) {}
     };
 
     class CompleteEvent : public QueueEvent {};
@@ -105,12 +105,12 @@ Task<Ack,None> QueueObserver<T,E>::onNext(T&& value) {
 }
 
 template <class T, class E>
-Task<None,None> QueueObserver<T,E>::onError(const E& error) {
+Task<None,None> QueueObserver<T,E>::onError(E&& error) {
     if (downstream_fiber == nullptr) {
-        return downstream->onError(error);
+        return downstream->onError(std::forward<E>(error));
     } else {
         auto self = this->shared_from_this();
-        auto event = std::make_shared<ErrorEvent>(error);
+        auto event = std::make_shared<ErrorEvent>(std::forward<E>(error));
 
         return queue->put(event)
             .onCancelRaiseError(None())
@@ -173,7 +173,7 @@ Task<None,None> QueueObserver<T,E>::onEvent(const std::shared_ptr<QueueEvent>& e
     auto self = this->shared_from_this();
 
     if (auto next = std::dynamic_pointer_cast<NextEvent>(event)) {
-        return downstream->onNext(std::move(next->value))
+        return downstream->onNext(std::forward<T>(next->value))
             .template map<None>([self](auto ack) {
                 if (ack == Stop) {
                     self->stopped = true;
@@ -183,7 +183,7 @@ Task<None,None> QueueObserver<T,E>::onEvent(const std::shared_ptr<QueueEvent>& e
                 return None();
             });
     } else if (auto error = std::dynamic_pointer_cast<ErrorEvent>(event)) {
-        return downstream->onError(error->error)
+        return downstream->onError(std::forward<E>(error->error))
             .template map<None>([self](auto) {
                 self->downstream_fiber->cancel();
                 return None();

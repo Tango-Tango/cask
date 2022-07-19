@@ -21,7 +21,7 @@ class TakeObserver final : public Observer<T,E> {
 public:
     TakeObserver(uint32_t amount, const std::weak_ptr<Promise<std::vector<T>,E>>& promise);
     Task<Ack,None> onNext(T&& value) override;
-    Task<None,None> onError(const E& error) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -53,9 +53,9 @@ Task<Ack,None> TakeObserver<T,E>::onNext(T&& value) {
 }
 
 template <class T, class E>
-Task<None,None> TakeObserver<T,E>::onError(const E& error) {
+Task<None,None> TakeObserver<T,E>::onError(E&& error) {
     if(auto promiseLock = promise.lock()) {
-        promiseLock->error(error);
+        promiseLock->error(std::forward<E>(error));
     }
 
     return Task<None,None>::none();

@@ -33,18 +33,18 @@ FiberRef<None,None> DeferTaskObservable<T,E>::subscribe(
     auto downstreamTask = Task<None,None>::defer([predicate = predicate, observer] {
         try {
             return predicate().template flatMapBoth<None,None>(
-                [observer](auto result) {
-                    return observer->onNext(std::move(result))
+                [observer](auto&& result) {
+                    return observer->onNext(std::forward<T>(result))
                     .template flatMap<None>([observer](auto) {
                         return observer->onComplete();
                     });
                 },
-                [observer](auto error) {
-                    return observer->onError(error);
+                [observer](auto&& error) {
+                    return observer->onError(std::forward<E>(error));
                 }
             );
         } catch(E& error) {
-            return observer->onError(error);
+            return observer->onError(std::forward<E>(error));
         }
     });
 

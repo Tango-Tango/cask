@@ -29,7 +29,7 @@ public:
                       const std::shared_ptr<Scheduler>& sched);
 
     Task<Ack,None> onNext(TI&& value) override;
-    Task<None,None> onError(const E& value) override;
+    Task<None,None> onError(E&& value) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -39,7 +39,7 @@ private:
     std::shared_ptr<MVar<switchmap::SwitchMapState,None>> stateVar;
 
     Task<StatefulResult<Ack>,None> onNextUnsafe(const TI& value, const switchmap::SwitchMapState& state);
-    Task<StatefulResult<None>,None> onErrorUnsafe(const E& value, const switchmap::SwitchMapState& state);
+    Task<StatefulResult<None>,None> onErrorUnsafe(E value, const switchmap::SwitchMapState& state);
     Task<StatefulResult<FiberRef<None,None>>,None> onCompleteUnsafe(const switchmap::SwitchMapState& state);
     Task<StatefulResult<None>,None> onCancelUnsafe(const switchmap::SwitchMapState& state);
 };
@@ -69,8 +69,8 @@ Task<Ack,None> SwitchMapObserver<TI,TO,E>::onNext(TI&& value) {
 }
 
 template <class TI, class TO, class E>
-Task<None,None> SwitchMapObserver<TI,TO,E>::onError(const E& error) {
-    return stateVar->template modify<None>([self = this->shared_from_this(), error](auto state) {
+Task<None,None> SwitchMapObserver<TI,TO,E>::onError(E&& error) {
+    return stateVar->template modify<None>([self = this->shared_from_this(), error = std::forward<E>(error)](auto state) {
         return self->onErrorUnsafe(error, state);
     });
 }
@@ -129,7 +129,7 @@ Task<StatefulResult<Ack>,None> SwitchMapObserver<TI,TO,E>::onNextUnsafe(const TI
 }
 
 template <class TI, class TO, class E>
-Task<StatefulResult<None>,None> SwitchMapObserver<TI,TO,E>::onErrorUnsafe(const E& error, const switchmap::SwitchMapState& state) {
+Task<StatefulResult<None>,None> SwitchMapObserver<TI,TO,E>::onErrorUnsafe(E error, const switchmap::SwitchMapState& state) {
     if(state.subscription) {
         auto promise = Promise<None,None>::create(sched);
 
@@ -145,7 +145,7 @@ Task<StatefulResult<None>,None> SwitchMapObserver<TI,TO,E>::onErrorUnsafe(const 
                 return self->onErrorUnsafe(error, updated_state);
             });
     } else {
-        return downstream->onError(error).template map<StatefulResult<None>>([state](auto) {
+        return downstream->onError(std::forward<E>(error)).template map<StatefulResult<None>>([state](auto) {
             return StatefulResult<None>({state, None()});
         });
     }

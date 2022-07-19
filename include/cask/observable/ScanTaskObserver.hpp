@@ -19,7 +19,7 @@ public:
     
 
     Task<Ack,None> onNext(TI&& value) override;
-    Task<None,None> onError(const E& value) override;
+    Task<None,None> onError(E&& value) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -46,17 +46,17 @@ Task<Ack,None> ScanTaskObserver<TI,TO,E>::onNext(TI&& value) {
 
     return predicate(state, std::forward<TI>(value))
         .template flatMapBoth<Ack,None>(
-            [self_weak](auto updated_state) {
+            [self_weak](auto&& updated_state) {
                 if (auto self = self_weak.lock()) {
                     self->state = updated_state;
-                    return self->downstream->onNext(std::move(updated_state));
+                    return self->downstream->onNext(std::forward<TO>(updated_state));
                 } else {
                     return Task<Ack,None>::pure(Stop);
                 }
             },
-            [self_weak](auto error) {
+            [self_weak](auto&& error) {
                 if(auto self = self_weak.lock()) {
-                    return self->onError(error).template map<Ack>([](auto) {
+                    return self->onError(std::forward<E>(error)).template map<Ack>([](auto) {
                         return Stop;
                     });
                 } else {
@@ -67,9 +67,9 @@ Task<Ack,None> ScanTaskObserver<TI,TO,E>::onNext(TI&& value) {
 }
 
 template <class TI, class TO, class E>
-Task<None,None> ScanTaskObserver<TI,TO,E>::onError(const E& error) {
+Task<None,None> ScanTaskObserver<TI,TO,E>::onError(E&& error) {
     if(!completed.test_and_set()) {
-        return downstream->onError(error);
+        return downstream->onError(std::forward<E>(error));
     } else {
         return Task<None,None>::none();
     }

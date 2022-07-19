@@ -21,7 +21,7 @@ class BufferObserver final : public Observer<T,E> {
 public:
     BufferObserver(const std::shared_ptr<Observer<BufferRef<T>,E>>& downstream, uint32_t buffer_size);
     Task<Ack,None> onNext(T&& value) override;
-    Task<None,None> onError(const E& error) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -54,8 +54,8 @@ Task<Ack,None> BufferObserver<T,E>::onNext(T&& value) {
 }
 
 template <class T, class E>
-Task<None,None> BufferObserver<T,E>::onError(const E& error) {
-    return downstream->onError(error);
+Task<None,None> BufferObserver<T,E>::onError(E&& error) {
+    return downstream->onError(std::forward<E>(error));
 }
 
 template <class T, class E>

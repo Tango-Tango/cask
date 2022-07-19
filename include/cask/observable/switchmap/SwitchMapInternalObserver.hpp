@@ -23,7 +23,7 @@ public:
                               const std::shared_ptr<MVar<switchmap::SwitchMapState,None>>& stateVar);
 
     Task<Ack,None> onNext(T&& value) override;
-    Task<None,None> onError(const E& value) override;
+    Task<None,None> onError(E&& value) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -51,11 +51,11 @@ Task<Ack,None> SwitchMapInternalObserver<T,E>::onNext(T&& value) {
 }
 
 template <class T, class E>
-Task<None,None> SwitchMapInternalObserver<T,E>::onError(const E& error) {
-    return stateVar->template modify<None>([downstream = downstream, error](auto state) {
+Task<None,None> SwitchMapInternalObserver<T,E>::onError(E&& error) {
+    return stateVar->template modify<None>([downstream = downstream, error = std::forward<E>(error)](auto state) mutable {
         switchmap::SwitchMapState updated_state = state;
         updated_state.downstream_ack = Stop;
-        return downstream->onError(error).template map<StatefulResult<None>>([updated_state](auto) {
+        return downstream->onError(std::forward<E>(error)).template map<StatefulResult<None>>([updated_state](auto) {
             return StatefulResult<None>({updated_state, None()});
         });
     });

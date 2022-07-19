@@ -21,7 +21,7 @@ public:
     );
 
     Task<Ack,None> onNext(T&& value) override;
-    Task<None,None> onError(const E& error) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -48,8 +48,8 @@ Task<Ack,None> AppendAllObserver<T,E>::onNext(T&& value) {
 }
 
 template <class T, class E>
-Task<None,None> AppendAllObserver<T,E>::onError(const E& error) {
-    return downstream->onError(error);
+Task<None,None> AppendAllObserver<T,E>::onError(E&& error) {
+    return downstream->onError(std::forward<E>(error));
 }
 
 template <class T, class E>
@@ -59,20 +59,20 @@ Task<None,None> AppendAllObserver<T,E>::onComplete() {
             [downstream = downstream](T&& value) {
                 return downstream->onNext(std::forward<T>(value));
             },
-            [downstream = downstream](const E& error) {
+            [downstream = downstream](E&& error) {
                 return downstream
-                    ->onError(error)
-                    .template flatMap<Ack>([](auto) {
+                    ->onError(std::forward<E>(error))
+                    .template flatMap<Ack>([](auto&&) {
                         return Task<Ack,None>::raiseError(None());
                     });
             }
         )
-        ->takeWhileInclusive([](auto ack){
+        ->takeWhileInclusive([](auto&& ack){
             return ack == Continue;
         })
         ->completed()
         .materialize()
-        .template flatMap<None>([downstream = downstream](auto result) {
+        .template flatMap<None>([downstream = downstream](auto&& result) {
             if(result.is_left()) {
                 return downstream->onComplete();
             } else {

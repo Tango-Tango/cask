@@ -33,7 +33,7 @@ FiberRef<None,None> DeferObservable<T,E>::subscribe(
     try {
         return predicate()->subscribe(sched, observer);
     } catch (E& error) {
-        return observer->onError(error).run(sched);
+        return observer->onError(std::forward<E>(error)).run(sched);
     }
 }
 

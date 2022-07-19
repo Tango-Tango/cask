@@ -80,7 +80,7 @@ public:
     /**
      * Provide an error which should terminate processing.
      */
-    virtual Task<None,None> onError(const E& error) = 0;
+    virtual Task<None,None> onError(E&& error) = 0;
 
     /**
      * Handle stream close because all events have been processed.

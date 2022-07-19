@@ -25,7 +25,7 @@ public:
         bool inclusive
     );
     Task<Ack,None> onNext(T&& value) override;
-    Task<None,None> onError(const E& error) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -72,9 +72,9 @@ Task<Ack,None> TakeWhileObserver<T,E>::onNext(T&& value) {
 }
 
 template <class T, class E>
-Task<None,None> TakeWhileObserver<T,E>::onError(const E& error) {
+Task<None,None> TakeWhileObserver<T,E>::onError(E&& error) {
     if(!completed.test_and_set()) {
-        return downstream->onError(error);
+        return downstream->onError(std::forward<E>(error));
     } else {
         return Task<None,None>::none();
     }

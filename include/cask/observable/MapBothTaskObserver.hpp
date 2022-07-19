@@ -20,17 +20,17 @@ class MapBothTaskObserver final : public Observer<TI,EI> {
 public:
     MapBothTaskObserver(
         const std::function<Task<TO,EO>(TI&&)>& successPredicate,
-        const std::function<Task<TO,EO>(const EI&)>& errorPredicate,
+        const std::function<Task<TO,EO>(EI&&)>& errorPredicate,
         const std::shared_ptr<Observer<TO,EO>>& downstream
     );
 
     Task<Ack,None> onNext(TI&& value) override;
-    Task<None,None> onError(const EI& error) override;
+    Task<None,None> onError(EI&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
     std::function<Task<TO,EO>(TI&&)> successPredicate;
-    std::function<Task<TO,EO>(const EI&)> errorPredicate;
+    std::function<Task<TO,EO>(EI&&)> errorPredicate;
     std::shared_ptr<Observer<TO,EO>> downstream;
     std::shared_ptr<std::atomic_flag> completed;
 };
@@ -39,7 +39,7 @@ private:
 template <class TI, class TO, class EI, class EO>
 MapBothTaskObserver<TI,TO,EI,EO>::MapBothTaskObserver(
     const std::function<Task<TO,EO>(TI&&)>& successPredicate,
-    const std::function<Task<TO,EO>(const EI&)>& errorPredicate,
+    const std::function<Task<TO,EO>(EI&&)>& errorPredicate,
     const ObserverRef<TO,EO>& downstream
 )
     : successPredicate(successPredicate)
@@ -53,12 +53,12 @@ MapBothTaskObserver<TI,TO,EI,EO>::MapBothTaskObserver(
 template <class TI, class TO, class EI, class EO>
 Task<Ack,None> MapBothTaskObserver<TI,TO,EI,EO>::onNext(TI&& value) {
     return successPredicate(std::forward<TI>(value)).template flatMapBoth<Ack,None>(
-        [downstream = downstream](TO downstreamValue) -> Task<Ack,None> {
-            return downstream->onNext(std::move(downstreamValue));
+        [downstream = downstream](TO&& downstreamValue) -> Task<Ack,None> {
+            return downstream->onNext(std::forward<TO>(downstreamValue));
         },
-        [downstream = downstream, completed = completed](EO downstreamError) -> Task<Ack,None> {
+        [downstream = downstream, completed = completed](EO&& downstreamError) -> Task<Ack,None> {
             if(!completed->test_and_set()) {
-                return downstream->onError(downstreamError).template map<Ack>(
+                return downstream->onError(std::forward<EO>(downstreamError)).template map<Ack>(
                     [](auto) { return Stop; }
                 );
             } else {
@@ -69,18 +69,18 @@ Task<Ack,None> MapBothTaskObserver<TI,TO,EI,EO>::onNext(TI&& value) {
 }
 
 template <class TI, class TO, class EI, class EO>
-Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onError(const EI& error) {
+Task<None,None> MapBothTaskObserver<TI,TO,EI,EO>::onError(EI&& error) {
     if(!completed->test_and_set()) {
-        return errorPredicate(error).template flatMapBoth<None,None>(
-            [downstream = downstream](TO downstreamValue) -> Task<None,None> {
-                return downstream->onNext(std::move(downstreamValue)).template flatMap<None>(
+        return errorPredicate(std::forward<EI>(error)).template flatMapBoth<None,None>(
+            [downstream = downstream](TO&& downstreamValue) -> Task<None,None> {
+                return downstream->onNext(std::forward<TO>(downstreamValue)).template flatMap<None>(
                     [downstream](auto) {
                         return downstream->onComplete();
                     }
                 );
             },
-            [downstream = downstream](EO downstreamError) -> Task<None,None> {
-                return downstream->onError(downstreamError);
+            [downstream = downstream](EO&& downstreamError) -> Task<None,None> {
+                return downstream->onError(std::forward<EO>(downstreamError));
             }
         );
     } else {

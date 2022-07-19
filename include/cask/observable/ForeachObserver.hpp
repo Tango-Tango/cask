@@ -25,7 +25,7 @@ public:
         const std::function<void(T&& value)>& predicate);
 
     Task<Ack,None> onNext(T&& value) override;
-    Task<None,None> onError(const E& error) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -49,9 +49,9 @@ Task<Ack, None> ForeachObserver<T,E>::onNext(T&& value) {
 }
 
 template <class T, class E>
-Task<None,None> ForeachObserver<T,E>::onError(const E& error) {
+Task<None,None> ForeachObserver<T,E>::onError(E&& error) {
     if(auto promiseLock = promise.lock()) {
-        promiseLock->error(error);
+        promiseLock->error(std::forward<E>(error));
     }
 
     return Task<None,None>::none();

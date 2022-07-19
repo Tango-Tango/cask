@@ -20,7 +20,7 @@ class MapObserver final : public Observer<TI,E> {
 public:
     MapObserver(const std::function<TO(TI&&)>& predicate, const std::shared_ptr<Observer<TO,E>>& downstream);
     Task<Ack,None> onNext(TI&& value) override;
-    Task<None,None> onError(const E& error) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -37,12 +37,12 @@ MapObserver<TI,TO,E>::MapObserver(const std::function<TO(TI&&)>& predicate, cons
 
 template <class TI, class TO, class E>
 Task<Ack,None> MapObserver<TI,TO,E>::onNext(TI&& value) {
-    return downstream->onNext(predicate(std::move(value)));
+    return downstream->onNext(predicate(std::forward<TI>(value)));
 }
 
 template <class TI, class TO, class E>
-Task<None,None> MapObserver<TI,TO,E>::onError(const E& error) {
-    return downstream->onError(error);
+Task<None,None> MapObserver<TI,TO,E>::onError(E&& error) {
+    return downstream->onError(std::forward<E>(error));
 }
 
 template <class TI, class TO, class E>

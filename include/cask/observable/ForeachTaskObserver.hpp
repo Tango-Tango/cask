@@ -25,7 +25,7 @@ public:
         const std::function<Task<None,E>(T&& value)>& predicate);
 
     Task<Ack,None> onNext(T&& value) override;
-    Task<None,None> onError(const E& error) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -46,12 +46,12 @@ template <class T, class E>
 Task<Ack, None> ForeachTaskObserver<T,E>::onNext(T&& value) {
     return predicate(std::forward<T>(value))
         .template flatMapBoth<Ack, None>(
-            [](auto) {
+            [](auto&&) {
                 return Task<Ack,None>::pure(cask::Continue);
             },
-            [self_weak = this->weak_from_this()](auto error) {
+            [self_weak = this->weak_from_this()](auto&& error) {
                 if(auto self = self_weak.lock()) {
-                    return self->onError(error).template flatMap<Ack>([](auto) {
+                    return self->onError(std::forward<E>(error)).template flatMap<Ack>([](auto&&) {
                         return Task<Ack,None>::raiseError(None());
                     });
                 } else {
@@ -62,9 +62,9 @@ Task<Ack, None> ForeachTaskObserver<T,E>::onNext(T&& value) {
 }
 
 template <class T, class E>
-Task<None,None> ForeachTaskObserver<T,E>::onError(const E& error) {
+Task<None,None> ForeachTaskObserver<T,E>::onError(E&& error) {
     if(auto promiseLock = promise.lock()) {
-        promiseLock->error(error);
+        promiseLock->error(std::forward<E>(error));
     }
 
     return Task<None,None>::none();
