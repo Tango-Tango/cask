@@ -14,7 +14,7 @@ template <class TI, class TO, class E>
 class FlatScanObserver final : public Observer<TI,E>, public std::enable_shared_from_this<FlatScanObserver<TI,TO,E>> {
 public:
     FlatScanObserver(const TO& seed,
-                     const std::function<ObservableRef<TO,E>(const TO&, const TI&)>& predicate,
+                     const std::function<ObservableRef<TO,E>(TO&&, TI&&)>& predicate,
                      const std::shared_ptr<Observer<TO,E>>& downstream);
     
 
@@ -24,7 +24,7 @@ public:
     Task<None,None> onCancel() override;
 private:
     TO state;
-    std::function<ObservableRef<TO,E>(const TO&, const TI&)> predicate;
+    std::function<ObservableRef<TO,E>(TO&&, TI&&)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
     std::atomic_flag completed = ATOMIC_FLAG_INIT;
 };
@@ -33,7 +33,7 @@ private:
 template <class TI, class TO, class E>
 FlatScanObserver<TI,TO,E>::FlatScanObserver(
     const TO& seed,
-    const std::function<ObservableRef<TO,E>(const TO&, const TI&)>& predicate,
+    const std::function<ObservableRef<TO,E>(TO&&, TI&&)>& predicate,
     const std::shared_ptr<Observer<TO,E>>& downstream)
     : state(seed)
     , predicate(predicate)
@@ -44,7 +44,7 @@ template <class TI, class TO, class E>
 Task<Ack,None> FlatScanObserver<TI,TO,E>::onNext(TI&& value) {
     auto self_weak = this->weak_from_this();
 
-    return predicate(state, value)
+    return predicate(std::forward<TO>(state), std::forward<TI>(value))
         ->template mapBothTask<Ack,None>(
             [self_weak](TO&& updated_state) {
                 if (auto self = self_weak.lock()) {

@@ -18,17 +18,17 @@ namespace cask::observable {
 template <class T, class EI, class EO>
 class MapErrorObservable final : public Observable<T,EO> {
 public:
-    MapErrorObservable(const ObservableConstRef<T,EI>& upstream, const std::function<EO(const EI&)>& predicate);
+    MapErrorObservable(const ObservableConstRef<T,EI>& upstream, std::function<EO(EI&&)>&& predicate);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,EO>>& observer) const override;
 private:
     ObservableConstRef<T,EI> upstream;
-    std::function<EO(const EI&)> predicate;
+    std::function<EO(EI&&)> predicate;
 };
 
 template <class T, class EI, class EO>
-MapErrorObservable<T,EI,EO>::MapErrorObservable(const ObservableConstRef<T,EI>& upstream, const std::function<EO(const EI&)>& predicate)
+MapErrorObservable<T,EI,EO>::MapErrorObservable(const ObservableConstRef<T,EI>& upstream, std::function<EO(EI&&)>&& predicate)
     : upstream(upstream)
-    , predicate(predicate)
+    , predicate(std::move(predicate))
 {}
 
 template <class T, class EI, class EO>

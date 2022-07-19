@@ -20,25 +20,25 @@ class ScanTaskObservable final : public Observable<TO,E> {
 public:
     ScanTaskObservable(
         const ObservableConstRef<TI,E>& upstream,
-        const TO& seed,
-        const std::function<Task<TO,E>(const TO&, const TI&)>& predicate);
+        TO&& seed,
+        std::function<Task<TO,E>(TO&&, TI&&)>&& predicate);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const override;
 private:
     ObservableConstRef<TI,E> upstream;
     TO seed;
-    std::function<Task<TO,E>(const TO&, const TI&)> predicate;
+    std::function<Task<TO,E>(TO&&, TI&&)> predicate;
 };
 
 
 template <class TI, class TO, class E>
 ScanTaskObservable<TI,TO,E>::ScanTaskObservable(
     const ObservableConstRef<TI,E>& upstream,
-    const TO& seed,
-    const std::function<Task<TO,E>(const TO&, const TI&)>& predicate
+    TO&& seed,
+    std::function<Task<TO,E>(TO&&, TI&&)>&& predicate
 )
     : upstream(upstream)
-    , seed(seed)
-    , predicate(predicate)
+    , seed(std::forward<TO>(seed))
+    , predicate(std::move(predicate))
 {}
 
 template <class TI, class TO, class E>

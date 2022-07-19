@@ -15,7 +15,7 @@ namespace cask::observable {
 template <class T, class E>
 class AppendAllObservable final : public Observable<T,E> {
 public:
-    explicit AppendAllObservable(const ObservableConstRef<T,E>& first, const ObservableConstRef<T,E>& second);
+    explicit AppendAllObservable(ObservableConstRef<T,E>&& first, ObservableConstRef<T,E>&& second);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     ObservableConstRef<T,E> first;
@@ -23,9 +23,9 @@ private:
 };
 
 template <class T, class E>
-AppendAllObservable<T,E>::AppendAllObservable(const ObservableConstRef<T,E>& first, const ObservableConstRef<T,E>& second)
-    : first(first)
-    , second(second)
+AppendAllObservable<T,E>::AppendAllObservable(ObservableConstRef<T,E>&& first, ObservableConstRef<T,E>&& second)
+    : first(std::move(first))
+    , second(std::move(second))
 {}
 
 template <class T, class E>
