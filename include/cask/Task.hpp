@@ -38,7 +38,7 @@ namespace cask {
  * A Task can be evaluated as many times as you want. Each evaluation will execute
  * independently and will re-compute the entire composition of tasks.
  */
-template <class T = None, class E = std::any>
+template <typename T = None, typename E = std::any>
 class Task {
 public:
     /**
@@ -48,7 +48,7 @@ public:
      * @param value The pure value for this task.
      * @return A task wrapping this pure value.
      */
-    template <class... Args>
+    template <typename... Args>
     static Task<T,E> pure(Args&&... args) noexcept {
         auto value = T(std::forward<Args>(args)...);
         auto erased = Erased(std::move(value));
@@ -63,7 +63,7 @@ public:
      * @param value The pure error for this task.
      * @return A task wrapping this pure error.
      */
-    template <class... Args>
+    template <typename... Args>
     static Task<T,E> raiseError(Args&&... args) noexcept {
         auto error = E(std::forward<Args>(args)...);
         auto erased = Erased(std::move(error));
@@ -247,7 +247,7 @@ public:
      * @param predicate The function to use for transforming the result.
      * @return A new `Task` representing the new output value.
      */
-    template <class T2, typename Predicate, typename = std::enable_if_t<
+    template <typename T2, typename Predicate, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<Predicate>,
             std::function<T2(T&&)>
@@ -280,7 +280,7 @@ public:
      * @param predicate The function to use for transforming the error.
      * @return A new `Task` representing the new transformed error value.
      */
-    template <class E2, typename Predicate, typename = std::enable_if_t<
+    template <typename E2, typename Predicate, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<Predicate>,
             std::function<E2(E&&)>
@@ -319,7 +319,7 @@ public:
      * @param predicate The function to use for transforming the result.
      * @return A new `Task` representing the new output value;
      */
-    template <class T2, typename Predicate, typename = std::enable_if_t<
+    template <typename T2, typename Predicate, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<Predicate>,
             std::function<Task<T2,E>(T&&)>
@@ -356,7 +356,7 @@ public:
      * @param predicate The function to use for transforming the result.
      * @return A new `Task` representing the new output value;
      */
-    template <class E2, typename Predicate, typename = std::enable_if_t<
+    template <typename E2, typename Predicate, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<Predicate>,
             std::function<Task<T,E2>(E&&)>
@@ -389,7 +389,7 @@ public:
      * @param errorPredicate The function to use for transforming error values.
      * @return A new `Task` with transformed success and error values
      */
-    template <class T2, class E2, typename SuccessPredicate, typename ErrorPredicate, typename = std::enable_if_t<
+    template <typename T2, typename E2, typename SuccessPredicate, typename ErrorPredicate, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<SuccessPredicate>,
             std::function<Task<T2,E2>(T&&)>
@@ -595,11 +595,11 @@ public:
      *         both values and errors.
      */
     /*
-    template <class T2, typename std::enable_if<
+    template <typename T2, typename std::enable_if<
         std::is_assignable<Either<T2,E>,T>::value
     >::type* = nullptr>
     */
-   template <class T2, typename = std::enable_if_t<
+   template <typename T2, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<T>,
             Either<T2,E>
@@ -655,7 +655,7 @@ public:
      * @param predicate The recovery method.
      * @return A new `Task` that will recover from errors.
      */
-    template <class Predicate, typename = std::enable_if_t<
+    template <typename Predicate, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<Predicate>,
             std::function<T(E&&)>
@@ -685,7 +685,7 @@ public:
      *                  task should be restarted.
      * @return A new `Task` which restarts as needed.
      */
-    template <class Predicate, typename = std::enable_if_t<
+    template <typename Predicate, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<Predicate>,
             std::function<bool(const T&)>
@@ -710,7 +710,7 @@ public:
      * @param other The task to race the current task with.
      * @result The value of the task which finished first.
      */
-    template <class Arg, typename = std::enable_if_t<
+    template <typename Arg, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<Arg>,
             Task<T,E>
@@ -730,7 +730,7 @@ public:
      * @result A task which mirrors the results of the original task
      *         but with the added evaluation of the given side effect.
      */
-    template <class T2, class Arg, typename = std::enable_if_t<
+    template <typename T2, typename Arg, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<Arg>,
             Task<T2,E>
@@ -752,7 +752,7 @@ public:
      * @result A task which mirrors the results of the original task
      *         but with the added guaranteed evalution of the given task.
      */
-    template <class Arg, typename = std::enable_if_t<
+    template <typename Arg, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<Arg>,
             Task<None,E>
@@ -789,7 +789,7 @@ public:
      * @result A task which will either provide the original result value
      *         or the timeout error if a timeout occurs.
      */
-    template <class Arg, typename = std::enable_if_t<
+    template <typename Arg, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<Arg>,
             E

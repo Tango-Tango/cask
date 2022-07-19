@@ -34,7 +34,7 @@ public:
      * @param left The left value to hold.
      * @return An either holding the left result.
      */
-    constexpr static Either<L,R> left(const L&& left);
+    constexpr static Either<L,R> left(L&& left);
 
     /**
      * Construct an either holding a right value.
@@ -50,7 +50,7 @@ public:
      * @param left The right value to hold.
      * @return An either holding the right result.
      */
-    constexpr static Either<L,R> right(const R&& right);
+    constexpr static Either<L,R> right(R&& right);
 
     /**
      * Check if this either is holding the left result. If true
@@ -109,7 +109,7 @@ constexpr Either<L,R> Either<L,R>::left(const L& left) {
 }
 
 template <class L, class R>
-constexpr Either<L,R> Either<L,R>::left(const L&& left) {
+constexpr Either<L,R> Either<L,R>::left(L&& left) {
     Either<L,R> either;
     either.leftValue = std::move(left);
     return either;
@@ -123,7 +123,7 @@ constexpr Either<L,R> Either<L,R>::right(const R& right) {
 }
 
 template <class L, class R>
-constexpr Either<L,R> Either<L,R>::right(const R&& right) {
+constexpr Either<L,R> Either<L,R>::right(R&& right) {
     Either<L,R> either;
     either.rightValue = std::move(right);
     return either;
