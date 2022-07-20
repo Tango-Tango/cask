@@ -51,7 +51,7 @@ public:
                 return state.put(value);
             })
             .template flatMap<None>([](auto&& task) {
-                return task;
+                return std::move(task);
             });
     }
 
@@ -97,7 +97,7 @@ public:
                 return state.take();
             })
             .template flatMap<T>([](auto&& task) {
-                return task;
+                return std::move(task);
             });
     }
 
