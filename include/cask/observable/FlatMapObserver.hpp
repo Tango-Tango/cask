@@ -18,53 +18,52 @@ namespace cask::observable {
 template <class TI, class TO, class E>
 class FlatMapObserver final : public Observer<TI,E>, public std::enable_shared_from_this<FlatMapObserver<TI,TO,E>> {
 public:
-    FlatMapObserver(const std::function<ObservableRef<TO,E>(const TI&)>& predicate,
+    FlatMapObserver(const std::function<ObservableRef<TO,E>(TI&&)>& predicate,
                     const std::shared_ptr<Observer<TO,E>>& downstream);
     
 
-    Task<Ack,None> onNext(const TI& value) override;
-    Task<None,None> onError(const E& value) override;
+    Task<Ack,None> onNext(TI&& value) override;
+    Task<None,None> onError(E&& error) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
+
+    Task<Ack,None> onNextInternal(TO&& value);
+    Task<None,None> onErrorInternal(E&& error);
+    Task<None,None> onCompleteInternal();
+    Task<None,None> onCancelInternal();
 private:
     std::function<ObservableRef<TO,E>(TI)> predicate;
     std::shared_ptr<Observer<TO,E>> downstream;
-    std::atomic_flag completed = ATOMIC_FLAG_INIT;
+    bool stopped;
 };
 
 
 template <class TI, class TO, class E>
 FlatMapObserver<TI,TO,E>::FlatMapObserver(
-    const std::function<ObservableRef<TO,E>(const TI&)>& predicate,
+    const std::function<ObservableRef<TO,E>(TI&&)>& predicate,
     const std::shared_ptr<Observer<TO,E>>& downstream)
     : predicate(predicate)
     , downstream(downstream)
+    , stopped(false)
 {}
 
 template <class TI, class TO, class E>
-Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(const TI& value) {
-    return predicate(value)
-        ->template mapBothTask<Ack,None>(
-            [downstream = downstream](auto result) {
-                return downstream->onNext(result);
-            },
-            [self_weak = this->weak_from_this()](auto error) {
-                if(auto self = self_weak.lock()) {
-                    return self->onError(error).template map<Ack>([](auto) {
-                        return Stop;
-                    });
-                } else {
-                    return Task<Ack,None>::pure(Stop);
-                }
-            }
-        )
-        ->takeWhileInclusive([](auto ack){
-            return ack == Continue;
+Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(TI&& value) {
+    auto self = this->shared_from_this();
+    auto next_observable = self->predicate(std::forward<TI>(value));
+
+    return Task<None,None>::deferFiber([self, next_observable](auto sched) {
+            return next_observable->subscribeHandlers(
+                sched,
+                [self] (auto&& value) { return self->onNextInternal(std::forward<TO>(value)); },
+                [self] (auto&& error) { return self->onErrorInternal(std::forward<E>(error)); },
+                [self] { return self->onCompleteInternal(); },
+                [self] { return self->onCancelInternal(); }
+            );
         })
-        ->last()
-        .template map<Ack>([](auto lastAckOpt) {
-            if(lastAckOpt.has_value()) {
-                return *lastAckOpt;
+        .template map<Ack>([self](auto) {
+            if (self->stopped) {
+                return Stop;
             } else {
                 return Continue;
             }
@@ -72,30 +71,48 @@ Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(const TI& value) {
 }
 
 template <class TI, class TO, class E>
-Task<None,None> FlatMapObserver<TI,TO,E>::onError(const E& error) {
-    if(!completed.test_and_set()) {
-        return downstream->onError(error);
-    } else {
-        return Task<None,None>::none();
-    }
+Task<None,None> FlatMapObserver<TI,TO,E>::onError(E&& error) {
+    return downstream->onError(std::forward<E>(error));
 }
 
 template <class TI, class TO, class E>
 Task<None,None> FlatMapObserver<TI,TO,E>::onComplete() {
-    if(!completed.test_and_set()) {
-        return downstream->onComplete();
-    } else {
-        return Task<None,None>::none();
-    }
+    return downstream->onComplete();
 }
 
 template <class TI, class TO, class E>
 Task<None,None> FlatMapObserver<TI,TO,E>::onCancel() {
-    if(!completed.test_and_set()) {
-        return downstream->onCancel();
-    } else {
-        return Task<None,None>::none();
-    }
+    return downstream->onCancel();
+}
+
+template <class TI, class TO, class E>
+Task<Ack,None> FlatMapObserver<TI,TO,E>::onNextInternal(TO&& value) {
+    auto self = this->shared_from_this();
+    return downstream->onNext(std::move(value))
+        .template map<Ack>([self](auto ack) {
+            if (ack == Stop) {
+                self->stopped = true;
+            }
+
+            return ack;
+        });
+}
+
+template <class TI, class TO, class E>
+Task<None,None> FlatMapObserver<TI,TO,E>::onErrorInternal(E&& error) {
+    stopped = true;
+    return downstream->onError(std::forward<E>(error));
+}
+
+template <class TI, class TO, class E>
+Task<None,None> FlatMapObserver<TI,TO,E>::onCompleteInternal() {
+    return Task<None,None>::none();
+}
+
+template <class TI, class TO, class E>
+Task<None,None> FlatMapObserver<TI,TO,E>::onCancelInternal() {
+    stopped = true;
+    return downstream->onCancel();
 }
 
 } // namespace cask::observable

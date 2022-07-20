@@ -92,7 +92,7 @@ TEST(Task, DeferError) {
 
 TEST(Task, PureMapAsync) {
     auto sched = Scheduler::global();
-    auto task = Task<int,None>::pure(123).map<float>([](auto value){
+    auto task = Task<int,None>::pure(123).map<float>([](auto&& value){
         return value * 1.5;
     });
     auto result = task.run(sched);
@@ -268,7 +268,7 @@ TEST(Task, RecurseWithoutExploding) {
         });
     };
 
-    auto task = Task<int>::pure(1000).flatMap(recurse);
+    auto task = Task<int>::pure(1000).flatMap<int>(recurse);
     auto result = task.run(sched)->await();
     EXPECT_EQ(result, 0);
 }

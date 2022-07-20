@@ -29,9 +29,7 @@ TEST(ObservableFlatScan, Pure) {
 
 TEST(ObservableFlatScan, Vector) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto fiber = Observable<int>::fromVector({
-            1,2,3,4,5
-        })
+    auto fiber = Observable<int>::sequence(1,2,3,4,5)
         ->flatScan<int>(0, [](auto acc, auto value) {
             return Observable<int>::pure(acc + value);
         })
@@ -52,15 +50,13 @@ TEST(ObservableFlatScan, Vector) {
 
 TEST(ObservableFlatScan, VectorInner) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto fiber = Observable<int>::fromVector({
-            1, 2, 3
-        })
+    auto fiber = Observable<int>::sequence(1, 2, 3)
         ->flatScan<int>(0, [](auto acc, auto value) {
-            return Observable<int>::fromVector({
+            return Observable<int>::sequence(
                 acc * value,
                 (acc * value) + 1,
                 (acc * value) + 2
-            });
+            );
         })
         ->take(10)
         .run(sched);
@@ -189,9 +185,9 @@ TEST(ObservableFlatScan, InnerError) {
 
 TEST(ObservableFlatScan, Stop) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto fiber = Observable<int>::fromVector({
+    auto fiber = Observable<int>::sequence(
             1,2,3,4,5
-        })
+        )
         ->flatScan<int>(0, [](auto acc, auto value) {
             return Observable<int>::pure(acc + value);
         })
@@ -208,15 +204,15 @@ TEST(ObservableFlatScan, Stop) {
 
 TEST(ObservableFlatScan, StopInner) {
     auto sched = std::make_shared<BenchScheduler>();
-    auto fiber = Observable<int>::fromVector({
+    auto fiber = Observable<int>::sequence(
             1, 2, 3
-        })
+        )
         ->flatScan<int>(0, [](auto acc, auto value) {
-            return Observable<int>::fromVector({
+            return Observable<int>::sequence(
                 acc * value,
                 (acc * value) + 1,
                 (acc * value) + 2
-            });
+            );
         })
         ->take(2)
         .run(sched);

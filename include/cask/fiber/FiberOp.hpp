@@ -29,6 +29,21 @@ using DeferredRef = std::shared_ptr<Deferred<T,E>>;
 
 namespace cask::fiber {
 
+template <class T>
+class PoolDeleter {
+public:
+    explicit PoolDeleter(const std::shared_ptr<Pool>& pool)
+        : pool(pool)
+    {}
+
+    void operator()(T* ptr) {
+        pool->deallocate<T>(ptr);
+    }
+
+private:
+    std::shared_ptr<Pool> pool;
+};
+
 enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE, CANCEL, CEDE };
 
 /**
@@ -60,7 +75,7 @@ public:
     using AsyncData = std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>;
     using ThunkData = std::function<Erased()>;
     using FlatMapInput = std::shared_ptr<const FiberOp>;
-    using FlatMapPredicate = std::function<std::shared_ptr<const FiberOp>(const FiberValue&)>;
+    using FlatMapPredicate = std::function<std::shared_ptr<const FiberOp>(FiberValue&&)>;
     using FlatMapData = std::pair<FlatMapInput,FlatMapPredicate>;
     using DelayData = int64_t;
     using RaceData = std::vector<std::shared_ptr<const FiberOp>>;
@@ -71,16 +86,81 @@ public:
      */
     FiberOpType opType;
 
-    static std::shared_ptr<const FiberOp> value(const Erased& v) noexcept;
-    static std::shared_ptr<const FiberOp> value(Erased&& v) noexcept;
-    static std::shared_ptr<const FiberOp> error(const Erased& e) noexcept;
-    static std::shared_ptr<const FiberOp> async(const std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>& predicate) noexcept;
-    static std::shared_ptr<const FiberOp> thunk(const std::function<Erased()>& thunk) noexcept;
-    static std::shared_ptr<const FiberOp> delay(int64_t delay_ms) noexcept;
-    static std::shared_ptr<const FiberOp> race(const std::vector<std::shared_ptr<const FiberOp>>& race) noexcept;
-    static std::shared_ptr<const FiberOp> race(std::vector<std::shared_ptr<const FiberOp>>&& race) noexcept;
-    static std::shared_ptr<const FiberOp> cancel() noexcept;
-    static std::shared_ptr<const FiberOp> cede() noexcept;
+    template <typename Arg>
+    static std::shared_ptr<const FiberOp> value(Arg&& value) noexcept  {
+        auto pool = cask::pool::global_pool();
+        auto erased = Erased(std::forward<Arg>(value));
+        auto constant = pool->allocate<ConstantData>(Either<Erased,Erased>::left(std::move(erased)));
+        auto op = pool->allocate<FiberOp>(constant, pool); 
+        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+    }
+
+    template <typename Arg>
+    static std::shared_ptr<const FiberOp> error(Arg&& error) noexcept {
+        auto pool = cask::pool::global_pool();
+        auto erased = Erased(std::forward<Arg>(error));
+        auto constant = pool->allocate<ConstantData>(Either<Erased,Erased>::right(std::move(erased)));
+        auto op = pool->allocate<FiberOp>(constant, pool); 
+        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+    }
+
+    template <typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>
+        >::value
+    >>
+    static std::shared_ptr<const FiberOp> async(Predicate&& predicate) noexcept {
+        auto pool = cask::pool::global_pool();
+        auto async_data = pool->allocate<AsyncData>(std::forward<Predicate>(predicate));
+        auto op = pool->allocate<FiberOp>(async_data, pool); 
+        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+    }
+
+    template <typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<Erased()>
+        >::value
+    >>
+    static std::shared_ptr<const FiberOp> thunk(Predicate&& thunk) noexcept {
+        auto pool = cask::pool::global_pool();
+        auto thunk_data = pool->allocate<ThunkData>(std::forward<Predicate>(thunk));
+        auto op = pool->allocate<FiberOp>(thunk_data, pool); 
+        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+    }
+
+    static std::shared_ptr<const FiberOp> delay(int64_t delay_ms) noexcept {
+        auto pool = cask::pool::global_pool();
+        auto delay_data = pool->allocate<DelayData>(delay_ms);
+        auto op = pool->allocate<FiberOp>(delay_data, pool); 
+        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+    }
+
+    template <typename Arg = std::vector<std::shared_ptr<const FiberOp>>, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Arg>,
+            std::vector<std::shared_ptr<const FiberOp>>
+        >::value
+    >>
+    static std::shared_ptr<const FiberOp> race(Arg&& race) noexcept {
+        auto pool = cask::pool::global_pool();
+        auto race_data = pool->allocate<RaceData>(std::forward<Arg>(race));
+        auto op = pool->allocate<FiberOp>(race_data, pool); 
+        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+    }
+
+    static std::shared_ptr<const FiberOp> cancel() noexcept {
+        auto pool = cask::pool::global_pool();
+        auto op = pool->allocate<FiberOp>(CANCEL); 
+        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+    }
+
+    static std::shared_ptr<const FiberOp> cede() noexcept  {
+        auto pool = cask::pool::global_pool();
+        auto op = pool->allocate<FiberOp>(CEDE); 
+        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+    }
 
     /**
      * Create a new operation which represents the flat map of this operation
@@ -90,7 +170,46 @@ public:
      * @param predicate The method which maps the input value to a new operation.
      * @return A new operation which transforms the intput to the given output operation.
      */
-    std::shared_ptr<const FiberOp> flatMap(const FlatMapPredicate& predicate) const noexcept;
+    template <typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            FlatMapPredicate
+        >::value
+    >>
+    std::shared_ptr<const FiberOp> flatMap(Predicate&& predicate) const noexcept  {
+        switch(opType) {
+            case VALUE:
+            case ERROR:
+            case THUNK:
+            case ASYNC:
+            case DELAY:
+            case RACE:
+            case CANCEL:
+            case CEDE:
+            {
+                auto pool = cask::pool::global_pool();
+                auto data = pool->allocate<FlatMapData>(this->shared_from_this(), std::forward<Predicate>(predicate));
+                auto op = pool->allocate<FiberOp>(data, pool); 
+                return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+            }
+            break;
+            case FLATMAP:
+            {
+                FiberOp::FlatMapData* data = this->data.flatMapData;
+                auto fixed = [input_predicate = data->second, output_predicate = std::forward<Predicate>(predicate)](FiberValue&& value) mutable {
+                    return input_predicate(std::forward<FiberValue>(value))->flatMap(std::forward<Predicate>(output_predicate));
+                };
+                auto pool = cask::pool::global_pool();
+                auto flatMapData = pool->allocate<FlatMapData>(data->first, fixed);
+                auto op = pool->allocate<FiberOp>(flatMapData, pool); 
+                return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+            }
+            break;
+        }
+    #ifdef __GNUC__
+        __builtin_unreachable();
+    #endif
+}
 
     union {
         AsyncData* asyncData;
@@ -117,12 +236,6 @@ public:
     
 private:
     std::shared_ptr<Pool> pool;
-
-    static std::shared_ptr<const FiberOp> fixed_predicate(
-        const FlatMapPredicate& input_predicate,
-        const FlatMapPredicate& output_predicate,
-        const FiberValue& value
-    );
 };
 
 } // namespace cask::fiber

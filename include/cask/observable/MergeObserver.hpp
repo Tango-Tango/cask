@@ -19,10 +19,10 @@ class MergeObserver final
 {
 public:
     MergeObserver(const std::shared_ptr<Observer<T,E>>& downstream, const std::shared_ptr<Scheduler>& sched);
-    Task<Ack,None> onNext(const ObservableConstRef<T,E>& upstream) override;
-    Task<Ack,None> onNext(const T& value, uint64_t id);
-    Task<None,None> onError(const E& error) override;
-    Task<None,None> onError(const E& error, uint64_t id);
+    Task<Ack,None> onNext(ObservableConstRef<T,E>&& upstream) override;
+    Task<Ack,None> onNext(T&& value, uint64_t id);
+    Task<None,None> onError(E&& error) override;
+    Task<None,None> onError(E&& error, uint64_t id);
     Task<None,None> onComplete() override;
     Task<None,None> onComplete(uint64_t id);
     Task<None,None> onCancel() override;
@@ -43,7 +43,7 @@ private:
     void cancelFibers();
     Task<None,None> errorShutdown();
     Task<PromiseRef<None,None>,None> completeDownstream();
-    Task<None,None> errorDownstream(const E& error);
+    Task<None,None> errorDownstream();
     Task<None,None> cancelDownstream();
     Resource<std::shared_ptr<MergeObserver<T,E>>,None> synchronize();
 };
@@ -63,7 +63,7 @@ MergeObserver<T,E>::MergeObserver(const std::shared_ptr<Observer<T,E>>& downstre
 {}
 
 template <class T, class E>
-Task<Ack,None> MergeObserver<T,E>::onNext(const ObservableConstRef<T,E>& upstream) {
+Task<Ack,None> MergeObserver<T,E>::onNext(ObservableConstRef<T,E>&& upstream) {
     return synchronize().template use<Ack>([upstream](auto self) {
         if (self->awaiting_cancel || self->stopped) {
             return Task<Ack,None>::pure(Stop);
@@ -72,8 +72,8 @@ Task<Ack,None> MergeObserver<T,E>::onNext(const ObservableConstRef<T,E>& upstrea
 
             auto fiber = upstream->subscribeHandlers(
                 self->sched,
-                [id, self](auto value) { return self->onNext(value, id); },
-                [id, self](auto error) { return self->onError(error, id); },
+                [id, self](T&& value) { return self->onNext(std::forward<T>(value), id); },
+                [id, self](E&& error) { return self->onError(std::forward<E>(error), id); },
                 [id, self]() { return self->onComplete(id); },
                 [id, self]() { return self->onCancel(id); }
             );
@@ -87,12 +87,12 @@ Task<Ack,None> MergeObserver<T,E>::onNext(const ObservableConstRef<T,E>& upstrea
 }
 
 template <class T, class E>
-Task<Ack,None> MergeObserver<T,E>::onNext(const T& value, uint64_t) {
-    return synchronize().template use<Ack>([value](auto self) {
+Task<Ack,None> MergeObserver<T,E>::onNext(T&& value, uint64_t) {
+    return synchronize().template use<Ack>([value](auto self) mutable {
         if (self->awaiting_cancel || self->stopped) {
                 return Task<Ack,None>::pure(Stop);
         } else {
-            return self->downstream->onNext(value)
+            return self->downstream->onNext(std::forward<T>(value))
                 .template map<Ack>([self](auto ack) {
                     if (ack == Stop && !self->stopped.exchange(true)) {
                         self->completed_promise->success(None());
@@ -104,16 +104,16 @@ Task<Ack,None> MergeObserver<T,E>::onNext(const T& value, uint64_t) {
 }
 
 template <class T, class E>
-Task<None,None> MergeObserver<T,E>::onError(const E& error) {
-    return synchronize().template use<None>([error](auto self) {
+Task<None,None> MergeObserver<T,E>::onError(E&& error) {
+    return synchronize().template use<None>([error = std::forward<E>(error)](auto self) {
         self->cached_error = error;
         return self->errorShutdown();
     });
 }
 
 template <class T, class E>
-Task<None,None> MergeObserver<T,E>::onError(const E& error, uint64_t id) {
-    return synchronize().template use<None>([id, error](auto self) {
+Task<None,None> MergeObserver<T,E>::onError(E&& error, uint64_t id) {
+    return synchronize().template use<None>([id, error = std::forward<E>(error)](auto self) {
         self->running_fibers.erase(id);
         self->cached_error = error;
         return self->errorShutdown();
@@ -192,7 +192,7 @@ Task<None,None> MergeObserver<T,E>::errorShutdown() {
 
     if (running_fibers.empty()) {
         if (cached_error.has_value()) {
-            return errorDownstream(*cached_error);
+            return errorDownstream();
         } else {
             return cancelDownstream();
         }
@@ -200,7 +200,7 @@ Task<None,None> MergeObserver<T,E>::errorShutdown() {
         cancelFibers();
         if (running_fibers.empty()) {
             if (cached_error.has_value()) {
-                return errorDownstream(*cached_error);
+                return errorDownstream();
             } else {
                 return cancelDownstream();
             }
@@ -224,11 +224,11 @@ Task<PromiseRef<None,None>,None> MergeObserver<T,E>::completeDownstream() {
 }
 
 template <class T, class E>
-Task<None,None> MergeObserver<T,E>::errorDownstream(const E& error) {
+Task<None,None> MergeObserver<T,E>::errorDownstream() {
     if (stopped.exchange(true)) {
         return Task<None,None>::none();
     } else {
-        return downstream->onError(error)
+        return downstream->onError(std::forward<E>(*cached_error))
             .template map<None>([p = completed_promise](auto){
                 p->success(None());
                 return None();

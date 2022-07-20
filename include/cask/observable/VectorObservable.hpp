@@ -14,7 +14,7 @@ namespace cask::observable {
 template <class T, class E>
 class VectorObservable final : public Observable<T,E> {
 public:
-    explicit VectorObservable(const std::vector<T>& source);
+    explicit VectorObservable(std::vector<T>&& source);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     std::vector<T> source;
@@ -29,8 +29,8 @@ private:
 };
 
 template <class T, class E>
-VectorObservable<T,E>::VectorObservable(const std::vector<T>& source)
-    : source(source)
+VectorObservable<T,E>::VectorObservable(std::vector<T>&& source)
+    : source(std::move(source))
 {}
 
 template <class T, class E>
@@ -63,7 +63,8 @@ Task<Ack,None> VectorObservable<T,E>::pushEvent(
                     return Stop;
                 });
         } else if(lastAck == Continue) {
-            return observer->onNext(source[i])
+            T next = source[i];
+            return observer->onNext(std::forward<T>(next))
                 .template flatMap<Ack>([i, source, sched, observer](auto ack) {
                     return pushEvent(i + 1, source, sched, observer, ack);
                 });

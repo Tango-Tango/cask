@@ -125,7 +125,7 @@ TEST(ObservableMapTask, TransformsValueStop) {
     EXPECT_EQ(observer->onNext(123).run(Scheduler::global())->await(), cask::Stop);
 }
 
-TEST(ObservableMapTask, StopsOnError) {
+TEST(ObservableMapTask, ErrorsUpstreamOnError) {
     auto mockDownstream = std::make_shared<MockMapTaskDownstreamObserver>();
     REQUIRE_CALL(*mockDownstream, onError("broke"))
         .RETURN(Task<None,None>::none());
@@ -137,6 +137,6 @@ TEST(ObservableMapTask, StopsOnError) {
         mockDownstream
     );
 
-    EXPECT_EQ(observer->onNext(123).run(Scheduler::global())->await(), cask::Stop);
+    EXPECT_EQ(observer->onNext(123).failed().run(Scheduler::global())->await(), None());
 }
 

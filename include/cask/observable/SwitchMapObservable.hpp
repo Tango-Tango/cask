@@ -20,21 +20,21 @@ namespace cask::observable {
 template <class TI, class TO, class E>
 class SwitchMapObservable final : public Observable<TO,E> {
 public:
-    SwitchMapObservable(const ObservableConstRef<TI,E>& upstream, const std::function<ObservableRef<TO,E>(const TI&)>& predicate);
+    SwitchMapObservable(const ObservableConstRef<TI,E>& upstream, std::function<ObservableRef<TO,E>(TI&&)>&& predicate);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,E>>& observer) const override;
 private:
     ObservableConstRef<TI,E> upstream;
-    std::function<ObservableRef<TO,E>(const TI&)> predicate;
+    std::function<ObservableRef<TO,E>(TI&&)> predicate;
 };
 
 
 template <class TI, class TO, class E>
 SwitchMapObservable<TI,TO,E>::SwitchMapObservable(
     const ObservableConstRef<TI,E>& upstream,
-    const std::function<ObservableRef<TO,E>(const TI&)>& predicate
+    std::function<ObservableRef<TO,E>(TI&&)>&& predicate
 )
     : upstream(upstream)
-    , predicate(predicate)
+    , predicate(std::move(predicate))
 {}
 
 template <class TI, class TO, class E>

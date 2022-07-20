@@ -34,7 +34,9 @@ public:
      * @param max_size The maximum size to bound the queue to.
      * @return An empty Queue reference.
      */
-    static QueueRef<T,E> empty(const std::shared_ptr<Scheduler>& sched, uint32_t max_size);
+    static QueueRef<T,E> empty(const std::shared_ptr<Scheduler>& sched, uint32_t max_size) {
+        return std::make_shared<Queue<T,E>>(sched, max_size);
+    }
 
     /**
      * Enqueue the given value. If the queue is full then the put
@@ -43,7 +45,15 @@ public:
      * @param value The value to put into the Queue.
      * @return A task that completes when the value has been stored.
      */
-    Task<None,E> put(const T& value);
+    template <class Arg>
+    Task<None,E> put(Arg&& value)  {
+        return stateRef->template modify<Task<None,E>>([value = std::forward<Arg>(value)](const auto& state) {
+                return state.put(value);
+            })
+            .template flatMap<None>([](auto&& task) {
+                return std::forward<Task<None,E>>(task);
+            });
+    }
 
      /**
      * Attempt to enqueue the given value. If the queue is
@@ -53,7 +63,27 @@ public:
      * @return True iff the value was stored in the queue or
      *         pushed to an observer via a queued take.
      */
-    bool tryPut(const T& value);
+    template <class Arg>
+    bool tryPut(Arg&& value) {
+        using IntermediateResult = std::tuple<bool,std::function<void()>>;
+
+        auto result_opt = stateRef->template modify<IntermediateResult>([value = std::forward<Arg>(value)](const auto& state) {
+            auto&& [nextState, completed, thunk] = state.tryPut(value);
+            return std::make_tuple(std::move(nextState), std::make_tuple(std::move(completed), std::move(thunk)));
+        })
+        .template map<bool>([](IntermediateResult&& result) {
+            auto&& [completed, thunk] = result;
+            thunk();
+            return completed;
+        })
+        .runSync();
+
+        if(result_opt && result_opt->is_left()) {
+            return result_opt->get_left();
+        } else {
+            return false;
+        }
+    }
 
     /**
      * Attempt to take a value from the Queue. If the queue is
@@ -62,7 +92,14 @@ public:
      *
      * @return A task that completes when a value has been taken.
      */
-    Task<T,E> take();
+    Task<T,E> take()  {
+        return stateRef->template modify<Task<T,E>>([](const auto& state) {
+                return state.take();
+            })
+            .template flatMap<T>([](auto&& task) {
+                return std::forward<Task<T,E>>(task);
+            });
+    }
 
     /**
      * Attempt to take a value from the Queue. If the queue is
@@ -70,124 +107,52 @@ public:
      *
      * @return A value or nothing.
      */
-    std::optional<T> tryTake();
+    std::optional<T> tryTake()  {
+        using IntermediateResult = std::tuple<std::optional<T>,std::function<void()>>;
+
+        auto result_opt = stateRef->template modify<IntermediateResult>([](const auto& state) {
+            auto&& [nextState, valueOpt, thunk] = state.tryTake();
+            return std::make_tuple(std::move(nextState), std::make_tuple(std::move(valueOpt), std::move(thunk)));
+        })
+        .template map<std::optional<T>>([](IntermediateResult&& result) {
+            auto&& [valueOpt, thunk] = result;
+            thunk();
+            return valueOpt;
+        })
+        .runSync();
+
+        if(result_opt && result_opt->is_left()) {
+            return result_opt->get_left();
+        } else {
+            return std::optional<T>();
+        }
+    }
 
     /**
      * Reset this queue to its initial, empty, state. If any values
      * are in the queue they are dropped. If there are any pending
      * puts or takes then they are canceled.
      */
-    void reset();
-private:
-    Queue(const std::shared_ptr<Scheduler>& sched, uint32_t max_size);
-    explicit Queue(const std::shared_ptr<Scheduler>& sched, const T& initialValue);
+    void reset()  {
+        using IntermediateResult = std::function<void()>;
 
+        stateRef->template modify<IntermediateResult>([](const auto& state) {
+            return state.reset();
+        })
+        .template map<None>([](auto&& thunk) {
+            thunk();
+            return None();
+        })
+        .runSync();
+    }
+
+    Queue(const std::shared_ptr<Scheduler>& sched, uint32_t max_size)
+        : stateRef(Ref<queue::QueueState<T,E>,E>::create(sched, max_size))
+    {}
+
+private:
     std::shared_ptr<Ref<queue::QueueState<T,E>,E>> stateRef;
 };
-
-template <class T, class E>
-QueueRef<T,E> Queue<T,E>::empty(const std::shared_ptr<Scheduler>& sched, uint32_t max_size) {
-    return std::shared_ptr<Queue<T,E>>(new Queue<T,E>(sched, max_size));
-}
-
-template <class T, class E>
-Queue<T,E>::Queue(const std::shared_ptr<Scheduler>& sched, uint32_t max_size)
-    : stateRef(Ref<queue::QueueState<T,E>,E>::create(queue::QueueState<T,E>(sched, max_size)))
-{}
-
-template <class T, class E>
-Queue<T,E>::Queue(const std::shared_ptr<Scheduler>& sched, const T& value)
-    : stateRef(Ref<queue::QueueState<T,E>,E>::create(queue::QueueState<T,E>(sched, value)))
-{}
-
-template <class T, class E>
-Task<None,E> Queue<T,E>::put(const T& value) {
-    return stateRef->template modify<Task<None,E>>([value](auto state) {
-            return state.put(value);
-        })
-        .template flatMap<None>([](auto task) {
-            return task;
-        });
-}
-
-template <class T, class E>
-bool Queue<T,E>::tryPut(const T& value) {
-    using IntermediateResult = std::tuple<bool,std::function<void()>>;
-
-    auto result_opt = stateRef->template modify<IntermediateResult>([value](auto state) {
-        auto result = state.tryPut(value);
-        auto nextState = std::get<0>(result);
-        auto completed = std::get<1>(result);
-        auto thunk = std::get<2>(result);
-        return std::make_tuple(nextState, std::make_tuple(completed, thunk));
-    })
-    .template map<bool>([](IntermediateResult result) {
-        auto completed = std::get<0>(result);
-        auto thunk = std::get<1>(result);
-        thunk();
-        return completed;
-    })
-    .runSync();
-
-    if(result_opt && result_opt->is_left()) {
-        return result_opt->get_left();
-    } else {
-        return false;
-    }
-}
-
-template <class T, class E>
-Task<T,E> Queue<T,E>::take() {
-    return stateRef->template modify<Task<T,E>>([](auto state) {
-            return state.take();
-        })
-        .template flatMap<T>([](auto task) {
-            return task;
-        });
-}
-
-template <class T, class E>
-std::optional<T> Queue<T,E>::tryTake() {
-    using IntermediateResult = std::tuple<std::optional<T>,std::function<void()>>;
-
-    auto result_opt = stateRef->template modify<IntermediateResult>([](auto state) {
-        auto result = state.tryTake();
-        auto nextState = std::get<0>(result);
-        auto valueOpt = std::get<1>(result);
-        auto thunk = std::get<2>(result);
-        return std::make_tuple(nextState, std::make_tuple(valueOpt, thunk));
-    })
-    .template map<std::optional<T>>([](IntermediateResult result) {
-        auto valueOpt = std::get<0>(result);
-        auto thunk = std::get<1>(result);
-        thunk();
-        return valueOpt;
-    })
-    .runSync();
-
-    if(result_opt && result_opt->is_left()) {
-        return result_opt->get_left();
-    } else {
-        return std::optional<T>();
-    }
-}
-
-template <class T, class E>
-void Queue<T,E>::reset() {
-    using IntermediateResult = std::function<void()>;
-
-    stateRef->template modify<IntermediateResult>([](auto state) {
-        auto result = state.reset();
-        auto nextState = std::get<0>(result);
-        auto thunk = std::get<1>(result);
-        return std::make_tuple(nextState, thunk);
-    })
-    .template map<None>([](auto thunk) {
-        thunk();
-        return None();
-    })
-    .runSync();
-}
 
 } // namespace cask
 

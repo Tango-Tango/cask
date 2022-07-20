@@ -18,7 +18,7 @@ namespace cask::observable {
 template <class T, class E>
 class FilterObservable final : public Observable<T,E> {
 public:
-    FilterObservable(const ObservableConstRef<T,E>& upstream, const std::function<bool(const T&)>& predicate);
+    FilterObservable(const ObservableConstRef<T,E>& upstream, std::function<bool(const T&)>&& predicate);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     ObservableConstRef<T,E> upstream;
@@ -26,9 +26,9 @@ private:
 };
 
 template <class T, class E>
-FilterObservable<T,E>::FilterObservable(const ObservableConstRef<T,E>& upstream, const std::function<bool(const T&)>& predicate)
+FilterObservable<T,E>::FilterObservable(const ObservableConstRef<T,E>& upstream, std::function<bool(const T&)>&& predicate)
     : upstream(upstream)
-    , predicate(predicate)
+    , predicate(std::move(predicate))
 {}
 
 template <class T, class E>

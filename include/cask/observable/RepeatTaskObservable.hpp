@@ -18,36 +18,36 @@ namespace cask::observable {
 template <class T, class E>
 class RepeatTaskObservable final : public Observable<T,E> {
 public: 
-    explicit RepeatTaskObservable(const Task<T,E>& task);
+    explicit RepeatTaskObservable(Task<T,E>&& task);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     Task<T,E> task;
 };
 
 template <class T, class E>
-RepeatTaskObservable<T,E>::RepeatTaskObservable(const Task<T,E>& task)
-    : task(task)
+RepeatTaskObservable<T,E>::RepeatTaskObservable(Task<T,E>&& task)
+    : task(std::move(task))
 {}
 
 template <class T, class E>
 FiberRef<None,None> RepeatTaskObservable<T,E>::subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const {
-    std::function<Task<Ack,None>(T)> pushToObserver =
-        [observer = observer](T value) -> Task<Ack,None> {
-            return observer->onNext(value);
+    std::function<Task<Ack,None>(T&&)> pushToObserver =
+        [observer = observer](T&& value) -> Task<Ack,None> {
+            return observer->onNext(std::forward<T>(value));
         };
 
-    std::function<Task<Ack,None>(E)> pushError =
-        [observer = observer](E error) -> Task<Ack,None> {
-            return observer->onError(error)
-                .template map<Ack>([](auto) {
+    std::function<Task<Ack,None>(E&&)> pushError =
+        [observer = observer](E&& error) -> Task<Ack,None> {
+            return observer->onError(std::forward<E>(error))
+                .template map<Ack>([](auto&&) {
                     return Stop;
                 });
         };
 
 
     return task.template flatMapBoth<Ack,None>(pushToObserver,pushError)
-        .restartUntil([](auto ack) { return ack == Stop; })
-        .template map<None>([](auto) { return None(); })
+        .restartUntil([](auto&& ack) { return ack == Stop; })
+        .template map<None>([](auto&&) { return None(); })
         .doOnCancel(Task<None,None>::defer([observer] { return observer->onCancel(); }))
         .run(sched);
 }

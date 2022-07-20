@@ -20,25 +20,25 @@ class MapBothTaskObservable final : public Observable<TO,EO> {
 public:
     MapBothTaskObservable(
         const ObservableConstRef<TI,EI>& upstream,
-        const std::function<Task<TO,EO>(const TI&)>& successPredicate,
-        const std::function<Task<TO,EO>(const EI&)>& errorPredicate
+        std::function<Task<TO,EO>(TI&&)>&& successPredicate,
+        std::function<Task<TO,EO>(EI&&)>&& errorPredicate
     );
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<TO,EO>>& observer) const override;
 private:
     ObservableConstRef<TI,EI> upstream;
-    std::function<Task<TO,EO>(const TI&)> successPredicate;
-    std::function<Task<TO,EO>(const EI&)> errorPredicate;
+    std::function<Task<TO,EO>(TI&&)> successPredicate;
+    std::function<Task<TO,EO>(EI&&)> errorPredicate;
 };
 
 template <class TI, class TO, class EI, class EO>
 MapBothTaskObservable<TI,TO,EI,EO>::MapBothTaskObservable(
     const ObservableConstRef<TI,EI>& upstream,
-    const std::function<Task<TO,EO>(const TI&)>& successPredicate,
-    const std::function<Task<TO,EO>(const EI&)>& errorPredicate
+    std::function<Task<TO,EO>(TI&&)>&& successPredicate,
+    std::function<Task<TO,EO>(EI&&)>&& errorPredicate
 )
     : upstream(upstream)
-    , successPredicate(successPredicate)
-    , errorPredicate(errorPredicate)
+    , successPredicate(std::move(successPredicate))
+    , errorPredicate(std::move(errorPredicate))
 {}
 
 template <class TI, class TO, class EI, class EO>

@@ -22,8 +22,8 @@ public:
     SwitchMapInternalObserver(const std::shared_ptr<Observer<T,E>>& downstream,
                               const std::shared_ptr<MVar<switchmap::SwitchMapState,None>>& stateVar);
 
-    Task<Ack,None> onNext(const T& value) override;
-    Task<None,None> onError(const E& value) override;
+    Task<Ack,None> onNext(T&& value) override;
+    Task<None,None> onError(E&& value) override;
     Task<None,None> onComplete() override;
     Task<None,None> onCancel() override;
 private:
@@ -40,9 +40,9 @@ SwitchMapInternalObserver<T,E>::SwitchMapInternalObserver(
 {}
 
 template <class T, class E>
-Task<Ack,None> SwitchMapInternalObserver<T,E>::onNext(const T& value) {
-    return stateVar->template modify<Ack>([downstream = downstream, value](auto state) {
-        return downstream->onNext(value).template map<StatefulResult<Ack>>([state](auto ack) {
+Task<Ack,None> SwitchMapInternalObserver<T,E>::onNext(T&& value) {
+    return stateVar->template modify<Ack>([downstream = downstream, value](auto state) mutable {
+        return downstream->onNext(std::move(value)).template map<StatefulResult<Ack>>([state](auto ack) {
             switchmap::SwitchMapState updated_state = state;
             updated_state.downstream_ack = ack;
             return StatefulResult<Ack>({updated_state, ack});
@@ -51,11 +51,11 @@ Task<Ack,None> SwitchMapInternalObserver<T,E>::onNext(const T& value) {
 }
 
 template <class T, class E>
-Task<None,None> SwitchMapInternalObserver<T,E>::onError(const E& error) {
-    return stateVar->template modify<None>([downstream = downstream, error](auto state) {
+Task<None,None> SwitchMapInternalObserver<T,E>::onError(E&& error) {
+    return stateVar->template modify<None>([downstream = downstream, error = std::forward<E>(error)](auto state) mutable {
         switchmap::SwitchMapState updated_state = state;
         updated_state.downstream_ack = Stop;
-        return downstream->onError(error).template map<StatefulResult<None>>([updated_state](auto) {
+        return downstream->onError(std::forward<E>(error)).template map<StatefulResult<None>>([updated_state](auto) {
             return StatefulResult<None>({updated_state, None()});
         });
     });
@@ -72,7 +72,7 @@ Task<None,None> SwitchMapInternalObserver<T,E>::onComplete() {
                 return StatefulResult<None>({updated_state, None()});
             });
         } else {
-            return Task<StatefulResult<None>,None>::pure({updated_state, None()});
+            return Task<StatefulResult<None>,None>::pure(updated_state, None());
         }
     });
 }

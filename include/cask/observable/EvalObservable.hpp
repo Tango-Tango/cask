@@ -13,7 +13,7 @@ namespace cask::observable {
 template <class T, class E>
 class EvalObservable final : public Observable<T,E> {
 public:
-    explicit EvalObservable(const std::function<T()>& predicate);
+    explicit EvalObservable(std::function<T()>&& predicate);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 
 private:
@@ -21,8 +21,8 @@ private:
 };
 
 template <class T, class E>
-EvalObservable<T,E>::EvalObservable(const std::function<T()>& predicate)
-    : predicate(predicate)
+EvalObservable<T,E>::EvalObservable(std::function<T()>&& predicate)
+    : predicate(std::move(predicate))
 {}
 
 template <class T, class E>
@@ -37,7 +37,7 @@ FiberRef<None,None> EvalObservable<T,E>::subscribe(
                         return observer->onComplete();
                     });
             } catch(E& error) {
-                return observer->onError(error);
+                return observer->onError(std::forward<E>(error));
             }
         })
         .doOnCancel(Task<None,None>::defer([observer] { return observer->onCancel(); }))

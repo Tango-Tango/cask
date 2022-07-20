@@ -14,15 +14,15 @@ namespace cask::observable {
 template <class T, class E>
 class DeferTaskObservable final : public Observable<T,E> {
 public:
-    explicit DeferTaskObservable(const std::function<Task<T,E>()>& predicate);
+    explicit DeferTaskObservable(std::function<Task<T,E>()>&& predicate);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     std::function<Task<T,E>()> predicate;
 };
 
 template <class T, class E>
-DeferTaskObservable<T,E>::DeferTaskObservable(const std::function<Task<T,E>()>& predicate)
-    : predicate(predicate)
+DeferTaskObservable<T,E>::DeferTaskObservable(std::function<Task<T,E>()>&& predicate)
+    : predicate(std::move(predicate))
 {}
 
 template <class T, class E>
@@ -33,18 +33,18 @@ FiberRef<None,None> DeferTaskObservable<T,E>::subscribe(
     auto downstreamTask = Task<None,None>::defer([predicate = predicate, observer] {
         try {
             return predicate().template flatMapBoth<None,None>(
-                [observer](auto result) {
-                    return observer->onNext(result)
+                [observer](auto&& result) {
+                    return observer->onNext(std::forward<T>(result))
                     .template flatMap<None>([observer](auto) {
                         return observer->onComplete();
                     });
                 },
-                [observer](auto error) {
-                    return observer->onError(error);
+                [observer](auto&& error) {
+                    return observer->onError(std::forward<E>(error));
                 }
             );
         } catch(E& error) {
-            return observer->onError(error);
+            return observer->onError(std::forward<E>(error));
         }
     });
 

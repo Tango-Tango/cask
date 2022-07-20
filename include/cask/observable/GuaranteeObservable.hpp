@@ -18,7 +18,7 @@ namespace cask::observable {
 template <class T, class E>
 class GuaranteeObservable final : public Observable<T,E> {
 public:
-    GuaranteeObservable(const ObservableConstRef<T,E>& upstream, const Task<None,None>& task);
+    GuaranteeObservable(const ObservableConstRef<T,E>& upstream, Task<None,None>&& task);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     ObservableConstRef<T,E> upstream;
@@ -26,9 +26,9 @@ private:
 };
 
 template <class T, class E>
-GuaranteeObservable<T,E>::GuaranteeObservable(const ObservableConstRef<T,E>& upstream, const Task<None,None>& task)
+GuaranteeObservable<T,E>::GuaranteeObservable(const ObservableConstRef<T,E>& upstream, Task<None,None>&& task)
     : upstream(upstream)
-    , task(task)
+    , task(std::move(task))
 {}
 
 template <class T, class E>
