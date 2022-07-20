@@ -43,8 +43,8 @@ Task<Ack,None> MapTaskObserver<TI,TO,E>::onNext(TI&& value) {
         [downstream = downstream](auto&& downstreamValue) { return downstream->onNext(std::forward<TO>(downstreamValue)); },
         [self_weak = this->weak_from_this()](auto&& error) {
             if(auto self = self_weak.lock()) {
-                return self->onError(std::forward<E>(error)).template map<Ack>([](auto) {
-                    return Stop;
+                return self->onError(std::forward<E>(error)).template flatMap<Ack>([](auto&&) {
+                    return Task<Ack,None>::raiseError(None());
                 });
             } else {
                 return Task<Ack,None>::pure(Stop);

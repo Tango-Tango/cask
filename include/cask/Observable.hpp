@@ -212,6 +212,7 @@ public:
      * @param observer The observer to attach to the stream.
      * @return The handle which may be used to cancel computation on the stream.
      */
+    [[nodiscard]]
     virtual FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const = 0;
 
     /**
@@ -253,6 +254,7 @@ public:
             >::value 
         >
     >
+    [[nodiscard]]
     FiberRef<None,None> subscribeHandlers(
         const std::shared_ptr<Scheduler>& sched,
         NextPredicate&& onNext,
