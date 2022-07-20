@@ -209,7 +209,7 @@ public:
      * @param sched The scheduler to use for running of the task.
      * @return A `Fiber` reference to the running computation.
      */
-    FiberRef<T,E> run(const std::shared_ptr<Scheduler>& sched) const  {
+    [[nodiscard]] FiberRef<T,E> run(const std::shared_ptr<Scheduler>& sched) const  {
         return Fiber<T,E>::run(op, sched);
     }
 

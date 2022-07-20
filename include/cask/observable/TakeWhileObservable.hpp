@@ -18,7 +18,7 @@ namespace cask::observable {
 template <class T, class E>
 class TakeWhileObservable final : public Observable<T,E> {
 public:
-    TakeWhileObservable(const ObservableConstRef<T,E>& upstream, const std::function<bool(const T&)>& predicate, bool inclusive);
+    TakeWhileObservable(const ObservableConstRef<T,E>& upstream, std::function<bool(const T&)>&& predicate, bool inclusive);
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const;
 private:
     ObservableConstRef<T,E> upstream;
@@ -27,9 +27,9 @@ private:
 };
 
 template <class T, class E>
-TakeWhileObservable<T,E>::TakeWhileObservable(const ObservableConstRef<T,E>& upstream, const std::function<bool(const T&)>& predicate, bool inclusive)
+TakeWhileObservable<T,E>::TakeWhileObservable(const ObservableConstRef<T,E>& upstream, std::function<bool(const T&)>&& predicate, bool inclusive)
     : upstream(upstream)
-    , predicate(predicate)
+    , predicate(std::move(predicate))
     , inclusive(inclusive)
 {}
 

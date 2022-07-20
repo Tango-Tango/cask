@@ -546,8 +546,13 @@ public:
      *                  which emits a new stream of events downstream.
      * @return An observable which applies the given transform to each element of the stream.
      */
-    template <typename T2>
-    ObservableRef<T2,E> switchMap(const std::function<ObservableRef<T2,E>(const T&)>& predicate) const;
+    template <typename T2, typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<ObservableRef<T2,E>(T&&)>
+        >::value
+    >>
+    ObservableRef<T2,E> switchMap(Predicate&& predicate) const;
 
     /**
      * Given a nested observable (an observable who emits other observables)
@@ -559,9 +564,12 @@ public:
      * @return An observable which evaluates each inner observable in-order and
      *         emits its values downstream.
      */
-    template <typename T2, typename std::enable_if<
-        std::is_assignable<ObservableRef<T2,E>,T>::value
-    >::type* = nullptr>
+    template <typename T2, typename = std::enable_if_t<
+        std::is_assignable<
+            ObservableRef<T2,E>,
+            T
+        >::value
+    >>
     ObservableRef<T2,E> flatten() const;
 
     /**
@@ -575,7 +583,13 @@ public:
      * @return An observerable who emits only values which match the given
      *         predicate function.
      */
-    ObservableRef<T,E> filter(const std::function<bool(const T&)>& predicate) const;
+    template <typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<bool(const T&)>
+        >::value
+    >>
+    ObservableRef<T,E> filter(Predicate&& predicate) const;
 
     /**
      * Run the given predicate for every element contained with the observable.
@@ -584,7 +598,13 @@ public:
      * @return A task which completes when the given predicate has been
      *         executed for every element of the observable.
      */
-    Task<None,E> foreach(const std::function<void(const T&)>& predicate) const;
+    template <typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<void(T&&)>
+        >::value
+    >>
+    Task<None,E> foreach(Predicate&& predicate) const;
 
     /**
      * Run the given predicate for every element contained with the observable. The
@@ -594,7 +614,13 @@ public:
      * @return A task which completes when the given predicate has been
      *         executed for every element of the observable.
      */
-    Task<None,E> foreachTask(const std::function<Task<None,E>(const T&)>& predicate) const;
+    template <typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<Task<None,E>(T&&)>
+        >::value
+    >>
+    Task<None,E> foreachTask(Predicate&& predicate) const;
 
     /**
      * Emit the last value of this stream seen. Note that if the stream of
@@ -641,7 +667,13 @@ public:
      * @return An observable that emits only the first elements matching the given
      *         predicate function.
      */
-    ObservableRef<T,E> takeWhile(const std::function<bool(const T&)>& predicate) const;
+    template <typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<bool(const T&)>
+        >::value
+    >>
+    ObservableRef<T,E> takeWhile(Predicate&& predicate) const;
 
     /**
      * Consume from the upstream observable and emit downstream while the
@@ -655,7 +687,13 @@ public:
      * @return An observable that emits only the first elements matching the given
      *         predicate function.
      */
-    ObservableRef<T,E> takeWhileInclusive(const std::function<bool(const T&)>& predicate) const;
+    template <typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<bool(const T&)>
+        >::value
+    >>
+    ObservableRef<T,E> takeWhileInclusive(Predicate&& predicate) const;
 
     /**
      * Ensure the given task will be run when this observer completes on success,
@@ -665,7 +703,13 @@ public:
      * @return An observable for which the given task is guaranteed to execute
      *         before shutdown.
      */
-    ObservableRef<T,E> guarantee(const Task<None,None>& task) const;
+    template <typename Arg, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Arg>,
+            Task<None,None>
+        >::value
+    >>
+    ObservableRef<T,E> guarantee(Arg&& task) const;
 
     virtual ~Observable();
 };
@@ -684,8 +728,6 @@ public:
 #include "observable/FilterObservable.hpp"
 #include "observable/FlatMapObservable.hpp"
 #include "observable/FlatScanObservable.hpp"
-#include "observable/ForeachObserver.hpp"
-#include "observable/ForeachTaskObserver.hpp"
 #include "observable/GuaranteeObservable.hpp"
 #include "observable/LastObserver.hpp"
 #include "observable/MapObservable.hpp"
@@ -937,71 +979,40 @@ ObservableRef<T2,E> Observable<T,E>::scanTask(T2&& seed, Predicate&& predicate) 
 }
 
 template <typename T, typename E>
-template <typename T2>
-ObservableRef<T2,E> Observable<T,E>::switchMap(const std::function<ObservableRef<T2,E>(const T&)>& predicate) const {
+template <typename T2, typename Predicate, typename>
+ObservableRef<T2,E> Observable<T,E>::switchMap(Predicate&& predicate) const {
     auto self = this->shared_from_this();
-    return std::make_shared<observable::SwitchMapObservable<T,T2,E>>(self, predicate);
+    return std::make_shared<observable::SwitchMapObservable<T,T2,E>>(self, std::forward<Predicate>(predicate));
 }
 
 template <typename T, typename E>
-template <typename T2, typename std::enable_if<
-    std::is_assignable<ObservableRef<T2,E>,T>::value
->::type*>
+template <typename T2, typename>
 ObservableRef<T2,E> Observable<T,E>::flatten() const {
     return this->template flatMap<T2>([](auto inner){ return inner; });
 }
 
 template <typename T, typename E>
-ObservableRef<T,E> Observable<T,E>::filter(const std::function<bool(const T&)>& predicate) const {
+template <typename Predicate, typename>
+ObservableRef<T,E> Observable<T,E>::filter(Predicate&& predicate) const {
     auto self = this->shared_from_this();
-    return std::make_shared<observable::FilterObservable<T,E>>(self, predicate);
+    return std::make_shared<observable::FilterObservable<T,E>>(self, std::forward<Predicate>(predicate));
 }
 
 template <typename T, typename E>
-Task<None,E> Observable<T,E>::foreach(const std::function<void(const T&)>& predicate) const {
-    auto self = this->shared_from_this();
-    return Task<None,E>::deferFiber([predicate, self = self](auto sched) {
-        auto promise = Promise<None,E>::create(sched);
-
-        return Task<None,None>::deferAction([promise, predicate, self](auto sched) {
-            auto observer = std::make_shared<observable::ForeachObserver<T,E>>(promise, predicate);
-            auto subscription = self->subscribe(sched, observer);
-            return Deferred<None,None>::forFiber(subscription);
-        })
-        .template flatMapBoth<None,E>(
-            [promise](auto) {
-                return Task<None,E>::forPromise(promise);
-            },
-            [promise](auto) {
-                return Task<None,E>::forPromise(promise);
-            }
-        )
-        .run(sched);
-    });
+template <typename Predicate, typename>
+Task<None,E> Observable<T,E>::foreach(Predicate&& predicate) const {
+    return map<None>([predicate = std::forward<Predicate>(predicate)](auto&& value) {
+        predicate(std::forward<T>(value));
+        return None();
+    })->completed();
 }
 
 template <typename T, typename E>
-Task<None,E> Observable<T,E>::foreachTask(const std::function<Task<None,E>(const T&)>& predicate) const {
-    auto self = this->shared_from_this();
-
-    return Task<None,E>::deferFiber([predicate, self = self](auto sched) {
-        auto promise = Promise<None,E>::create(sched);
-
-        return Task<None,None>::deferAction([promise, predicate, self](auto sched) {
-            auto observer = std::make_shared<observable::ForeachTaskObserver<T,E>>(promise, predicate);
-            auto subscription = self->subscribe(sched, observer);
-            return Deferred<None,None>::forFiber(subscription);
-        })
-        .template flatMapBoth<None,E>(
-            [promise](auto) {
-                return Task<None,E>::forPromise(promise);
-            },
-            [promise](auto) {
-                return Task<None,E>::forPromise(promise);
-            }
-        )
-        .run(sched);
-    });
+template <typename Predicate, typename>
+Task<None,E> Observable<T,E>::foreachTask(Predicate&& predicate) const {
+    return mapTask<None>([predicate = std::forward<Predicate>(predicate)](auto&& value) {
+        return predicate(std::forward<T>(value));
+    })->completed();
 }
 
 template <typename T, typename E>
@@ -1061,21 +1072,24 @@ Task<std::vector<T>,E> Observable<T,E>::take(uint32_t amount) const {
 }
 
 template <typename T, typename E>
-ObservableRef<T,E> Observable<T,E>::takeWhile(const std::function<bool(const T&)>& predicate) const {
+template <typename Predicate, typename>
+ObservableRef<T,E> Observable<T,E>::takeWhile(Predicate&& predicate) const {
     auto self = this->shared_from_this();
-    return std::make_shared<observable::TakeWhileObservable<T,E>>(self, predicate, false);
+    return std::make_shared<observable::TakeWhileObservable<T,E>>(self, std::forward<Predicate>(predicate), false);
 }
 
 template <typename T, typename E>
-ObservableRef<T,E> Observable<T,E>::takeWhileInclusive(const std::function<bool(const T&)>& predicate) const {
+template <typename Predicate, typename>
+ObservableRef<T,E> Observable<T,E>::takeWhileInclusive(Predicate&& predicate) const {
     auto self = this->shared_from_this();
-    return std::make_shared<observable::TakeWhileObservable<T,E>>(self, predicate, true);
+    return std::make_shared<observable::TakeWhileObservable<T,E>>(self, std::forward<Predicate>(predicate), true);
 }
 
 template <typename T, typename E>
-ObservableRef<T,E> Observable<T,E>::guarantee(const Task<None,None>& task) const {
+template <typename Arg, typename>
+ObservableRef<T,E> Observable<T,E>::guarantee(Arg&& task) const {
     auto self = this->shared_from_this();
-    return std::make_shared<observable::GuaranteeObservable<T,E>>(self, task);
+    return std::make_shared<observable::GuaranteeObservable<T,E>>(self, std::forward<Task<None,None>>(task));
 }
 
 template <typename T, typename E>
