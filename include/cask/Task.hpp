@@ -107,7 +107,7 @@ public:
     template <typename Predicate = std::function<Task<T,E>()>>
     static Task<T,E> defer(Predicate&& predicate) noexcept {
         return Task<Task<T,E>,E>::eval(std::forward<Predicate>(predicate))
-            .template flatMap<T>([](auto&& task) { return std::move(task); });
+            .template flatMap<T>([](auto&& task) { return std::forward<Task<T,E>>(task); });
     }
 
     /**
@@ -762,7 +762,7 @@ public:
         return Task<T,E>(
             op->flatMap(
                 [task = std::forward<Arg>(task)](auto&& fiber_value) {
-                    return task.op->flatMap([fiber_value = std::move(fiber_value)](auto&& guaranteed_value) {
+                    return task.op->flatMap([fiber_value = std::forward<fiber::FiberValue>(fiber_value)](auto&& guaranteed_value) {
                         if(guaranteed_value.isError()) {
                             return fiber::FiberOp::error(guaranteed_value.underlying());
                         } else if(guaranteed_value.isCanceled() || fiber_value.isCanceled()) {
