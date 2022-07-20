@@ -3,6 +3,14 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+# 17.0
+- Change many operators, contructors, and passed predicate functions to allow value moves.
+- Change `Observable::onNext` and `Observable::onError` to accept moves.
+- Add the `Observable::sequence` operator.
+- Add the `[[nodiscard]]` attribute to methods that return a `FiberRef`.
+- Fix `Either::left` and `Either::right` to properly accept moves.
+- Fix `FiberValue` to accept moves in its many contructor methods.
+
 # 16.1
 
 - Add `Observable::queue` which creates and observable where upstream and downstream
