@@ -14,7 +14,15 @@ namespace cask::observable {
 template <class T, class E>
 class VectorObservable final : public Observable<T,E> {
 public:
+<<<<<<< Updated upstream
     explicit VectorObservable(const std::vector<T>& source);
+=======
+    template <typename Arg>
+    explicit VectorObservable(Arg&& source)
+        : source(std::forward<Arg>(source))
+    {}
+
+>>>>>>> Stashed changes
     FiberRef<None,None> subscribe(const std::shared_ptr<Scheduler>& sched, const std::shared_ptr<Observer<T,E>>& observer) const override;
 private:
     std::vector<T> source;
@@ -29,11 +37,14 @@ private:
 };
 
 template <class T, class E>
+<<<<<<< Updated upstream
 VectorObservable<T,E>::VectorObservable(const std::vector<T>& source)
     : source(source)
 {}
 
 template <class T, class E>
+=======
+>>>>>>> Stashed changes
 FiberRef<None,None> VectorObservable<T,E>::subscribe(
     const std::shared_ptr<Scheduler>& sched,
     const std::shared_ptr<Observer<T,E>>& observer) const

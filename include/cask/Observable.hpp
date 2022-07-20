@@ -606,9 +606,16 @@ ObservableRef<T,E> Observable<T,E>::fromTask(const Task<T,E>& task) {
     return deferTask([task](){ return task; });
 }
 
+<<<<<<< Updated upstream
 template <class T, class E>
 ObservableRef<T,E> Observable<T,E>::fromVector(const std::vector<T>& vector) {
     return std::make_shared<observable::VectorObservable<T,E>>(vector);
+=======
+template <typename T, typename E>
+template <typename Arg, typename>
+ObservableRef<T,E> Observable<T,E>::fromVector(Arg&& vector) {
+    return std::make_shared<observable::VectorObservable<T,E>>(std::forward<Arg>(vector));
+>>>>>>> Stashed changes
 }
 
 template <class T, class E>
