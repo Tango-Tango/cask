@@ -14,7 +14,12 @@ namespace cask::observable {
 template <class T, class E>
 class VectorObservable final : public Observable<T,E> {
 public:
-    template <typename Arg>
+    template <typename Arg, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Arg>,
+            std::vector<T>
+        >::value
+    >>
     explicit VectorObservable(Arg&& source)
         : source(std::forward<Arg>(source))
     {}
@@ -41,6 +46,7 @@ FiberRef<None,None> VectorObservable<T,E>::subscribe(
             return pushEvent(0, source, sched, observer, Continue)
                 .template map<None>([](auto) { return None(); });
         })
+     
         .doOnCancel(Task<None,None>::defer([observer] {
             return observer->onCancel();
         }))
