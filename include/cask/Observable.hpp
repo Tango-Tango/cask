@@ -808,7 +808,7 @@ ObservableRef<T,E> Observable<T,E>::fromTask(Arg&& task) {
 template <typename T, typename E>
 template <typename Arg, typename>
 ObservableRef<T,E> Observable<T,E>::fromVector(Arg&& vector) {
-    return std::make_shared<observable::VectorObservable<T,E>>(std::forward<std::vector<T>>(vector));
+    return std::make_shared<observable::VectorObservable<T,E>>(std::forward<Arg>(vector));
 }
 
 template <typename T, typename E>
