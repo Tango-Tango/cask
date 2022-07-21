@@ -491,6 +491,27 @@ public:
     ObservableRef<T,E> merge(const ObservableRef<T,E>& other) const;
 
     /**
+     * Run the given predicate for each provided value. The predicate returns an observable
+     * which will be concurrently executed with any other observables returned by the precicate.
+     * Their results will be merged and provided downstream. If downstream backpressures it will
+     * backpressure all observables - causing them to wait until downstream is ready to provide
+     * another value. How the results of each upstream observable are merged is undefined, but
+     * the individual ordering of events from each upstream will be maintained.
+     * 
+     * @param predicate The function to apply to each element of the stream and
+     *                  which emits a new stream of events downstream.
+     * @return An observable which applies the given transform to each element of the stream
+     *         and merges the resulting observables together.
+     */
+    template <typename T2, typename Predicate, typename = std::enable_if_t<
+        std::is_convertible<
+            std::remove_reference_t<Predicate>,
+            std::function<ObservableRef<T2,E>(T&&)>
+        >::value
+    >>
+    ObservableRef<T2,E> mergeMap(Predicate&& predicate) const;
+
+    /**
      * Creates a new observable where upstream and downstream are run concurrently and
      * communicate via a queue of the given maximum size. When the queue reaches the
      * maximum size the upstream will be backpressured.
@@ -957,6 +978,13 @@ ObservableRef<T,E> Observable<T,E>::merge(const ObservableRef<T,E>& other) const
     };
     auto all_observables = Observable<std::shared_ptr<const Observable<T,E>>,E>::fromVector(all_observables_vector);
     return std::make_shared<observable::MergeObservable<T,E>>(all_observables);
+}
+
+template <typename T, typename E>
+template <typename T2, typename Predicate, typename>
+ObservableRef<T2,E> Observable<T,E>::mergeMap(Predicate&& predicate) const {
+    auto map_observable = this->template map<ObservableConstRef<T2,E>>(std::forward<Predicate>(predicate));
+    return std::make_shared<observable::MergeObservable<T2,E>>(std::move(map_observable));
 }
 
 template <typename T, typename E>
