@@ -84,3 +84,246 @@ TEST(TaskGuarantee, AlwaysRuns) {
     
     EXPECT_EQ(counter, 1);
 }
+
+TEST(TaskGuarantee, StackedGuarantees) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto counter = 0;
+    auto deferred = Task<int>::never()
+        .guarantee(Task<None>::eval([&counter] {
+            counter++;
+            return None();
+        }))
+        .guarantee(Task<None>::eval([&counter] {
+            counter++;
+            return None();
+        }))
+        .run(sched);
+
+    deferred->cancel();
+    sched->run_ready_tasks();
+
+    try {
+        deferred->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {}
+    
+    EXPECT_EQ(counter, 2);
+}
+
+TEST(TaskGuarantee, StackedAsyncGuarantee) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto promise = cask::Promise<None>::create(sched);
+    auto counter = 0;
+    auto deferred = Task<int>::never()
+        .guarantee(Task<None>::deferAction([&counter, promise](auto) {
+            counter++;
+            return cask::Deferred<None>::forPromise(promise);
+        }))
+        .guarantee(Task<None>::eval([&counter] {
+            counter++;
+            return None();
+        }))
+        .run(sched);
+
+    deferred->cancel();
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(counter, 1);
+
+    promise->success(None());
+    sched->run_ready_tasks();
+    EXPECT_EQ(counter, 2);
+
+    try {
+        deferred->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {}
+    
+    EXPECT_EQ(counter, 2);
+}
+
+TEST(TaskGuarantee, RacedGuarantees) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto counter = 0;
+    auto task = Task<int>::never()
+        .guarantee(Task<None>::eval([&counter] {
+            counter++;
+            return None();
+        }));
+
+    auto fiber = task
+        .raceWith(task)
+        .raceWith(task)
+        .guarantee(Task<None>::eval([&counter] {
+            counter++;
+            return None();
+        }))
+        .run(sched);
+
+    sched->run_ready_tasks();
+    fiber->cancel();
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(counter, 4);
+
+    try {
+        fiber->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {}
+    
+    EXPECT_EQ(counter, 4);
+}
+
+TEST(TaskGuarantee, GuaranteePureValueRace) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto counter = 0;
+
+    auto fiber = Task<int>::pure(1)
+        .raceWith(Task<int>::pure(2))
+        .guarantee(Task<None>::eval([&counter] {
+            counter++;
+            return None();
+        }))
+        .run(sched);
+
+    fiber->cancel();
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(counter, 1);
+
+    try {
+        fiber->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {}
+    
+    EXPECT_EQ(counter, 1);
+}
+
+TEST(TaskGuarantee, GuaranteePureNeverRace) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto counter = 0;
+
+    auto fiber = Task<int>::pure(1)
+        .raceWith(Task<int>::never())
+        .guarantee(Task<None>::eval([&counter] {
+            counter++;
+            return None();
+        }))
+        .run(sched);
+
+    fiber->cancel();
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(counter, 1);
+
+    try {
+        fiber->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {}
+    
+    EXPECT_EQ(counter, 1);
+}
+
+TEST(TaskGuarantee, GuaranteeNeverPureRace) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto counter = 0;
+
+    auto fiber = Task<int>::never()
+        .raceWith(Task<int>::pure(1))
+        .guarantee(Task<None>::eval([&counter] {
+            counter++;
+            return None();
+        }))
+        .run(sched);
+
+    fiber->cancel();
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(counter, 1);
+
+    try {
+        fiber->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {}
+    
+    EXPECT_EQ(counter, 1);
+}
+
+TEST(TaskGuarantee, GuaranteeNeverNeverRace) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto counter = 0;
+
+    auto fiber = Task<int>::never()
+        .raceWith(Task<int>::never())
+        .guarantee(Task<None>::eval([&counter] {
+            counter++;
+            return None();
+        }))
+        .run(sched);
+
+    fiber->cancel();
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(counter, 1);
+
+    try {
+        fiber->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {}
+    
+    EXPECT_EQ(counter, 1);
+}
+
+TEST(TaskGuarantee, RaceGuaranteedInnerTask) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto counter = 0;
+
+    auto fiber = Task<int>::never()
+        .raceWith(
+            Task<int>::never().guarantee(Task<None>::eval([&counter] {
+                counter++;
+                return None();
+            })
+        ))
+        .run(sched);
+
+    sched->run_ready_tasks();
+    fiber->cancel();
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(counter, 1);
+
+    try {
+        fiber->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {}
+    
+    EXPECT_EQ(counter, 1);
+}
+
+TEST(TaskGuarantee, RaceDoOnCancelInnerTask) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto counter = 0;
+
+    auto fiber = Task<int>::never()
+        .raceWith(
+            Task<int>::never().doOnCancel(Task<None,None>::eval([&counter] {
+                counter++;
+                return None();
+            })
+        ))
+        .run(sched);
+
+    sched->run_ready_tasks();
+    fiber->cancel();
+    sched->run_ready_tasks();
+
+    EXPECT_EQ(counter, 1);
+
+    try {
+        fiber->await();
+        FAIL() << "Expected method to throw";
+    } catch(std::runtime_error&) {}
+    
+    EXPECT_EQ(counter, 1);
+}
