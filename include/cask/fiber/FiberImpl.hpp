@@ -555,9 +555,10 @@ void FiberImpl<T,E>::cancel() {
             }
         }
 
-        for(auto& fiber : local_racers) {
-            fiber->cancel();
+        if (!local_racers.empty()) {
+            local_racers[0]->cancel();
         }
+        
         return;
     }
     

@@ -145,32 +145,16 @@ TEST(TaskGuarantee, StackedAsyncGuarantee) {
 TEST(TaskGuarantee, RacedGuarantees) {
     auto sched = std::make_shared<BenchScheduler>();
     auto counter = 0;
-    auto first_task = Task<int>::never()
+    auto task = Task<int>::never()
         .guarantee(Task<None>::eval([&counter] {
-            std::cout << "First Task Guarantee!" << std::endl;
             counter++;
             return None();
         }));
 
-    auto second_task = Task<int>::never()
+    auto fiber = task
+        .raceWith(task)
+        .raceWith(task)
         .guarantee(Task<None>::eval([&counter] {
-            std::cout << "Second Task Guarantee!" << std::endl;
-            counter++;
-            return None();
-        }));
-
-    auto third_task = Task<int>::never()
-        .guarantee(Task<None>::eval([&counter] {
-            std::cout << "Third Task Guarantee!" << std::endl;
-            counter++;
-            return None();
-        }));
-
-    auto fiber = first_task
-        .raceWith(second_task)
-        .raceWith(third_task)
-        .guarantee(Task<None>::eval([&counter] {
-            std::cout << "Fiber Guarantee!" << std::endl;
             counter++;
             return None();
         }))
