@@ -57,6 +57,7 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
 
 SingleThreadScheduler::~SingleThreadScheduler() {
     should_run.store(false);
+    idlingThread.notify_one();
 
     while(runner_running.load(std::memory_order_relaxed));
     while(timer_running.load(std::memory_order_relaxed));
@@ -116,7 +117,7 @@ void SingleThreadScheduler::run() {
         if(readyQueueSize.load(std::memory_order_relaxed) == 0) {
             idle = true;
             std::unique_lock<std::mutex> lock(idlingThreadMutex);
-            idlingThread.wait_for(lock, 1ms, [this]{ return readyQueueSize.load(std::memory_order_relaxed) != 0 || !should_run.load(std::memory_order_relaxed); });
+            idlingThread.wait(lock);
         } else {
             idle = false;
             while(readyQueueLock.test_and_set(std::memory_order_acquire));
