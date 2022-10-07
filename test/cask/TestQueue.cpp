@@ -155,6 +155,23 @@ TEST(Queue, CleanupCanceledPut) {
     EXPECT_EQ(thirdPut->await(), None());
 }
 
+TEST(Queue, CanceledPutShutdownCallback) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto queue = Queue<int,std::string>::empty(sched, 1);
+    auto counter = 0;
+
+    auto firstPut = queue->put(1).run(sched);
+    auto secondPut = queue->put(2).run(sched);
+
+    secondPut->onFiberShutdown([&counter](auto) {
+        counter++;
+    });
+
+    secondPut->cancel();
+    sched->run_ready_tasks();
+    EXPECT_EQ(counter, 1);
+}
+
 TEST(Queue, CleanupCanceledTake) {
     auto sched = std::make_shared<BenchScheduler>();
     auto queue = Queue<int,std::string>::empty(sched, 1);
@@ -177,6 +194,23 @@ TEST(Queue, CleanupCanceledTake) {
     EXPECT_EQ(firstPut->await(), None());
     EXPECT_EQ(secondPut->await(), None());
     EXPECT_EQ(thirdPut->await(), None());
+}
+
+TEST(Queue, CanceledTakeShutdownCallback) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto queue = Queue<int,std::string>::empty(sched, 1);
+    auto counter = 0;
+
+    auto firstTake = queue->take().asyncBoundary().run(sched);
+    auto secondTake = queue->take().asyncBoundary().run(sched);
+
+    secondTake->onFiberShutdown([&counter](auto) {
+        counter++;
+    });
+
+    secondTake->cancel();
+    sched->run_ready_tasks();
+    EXPECT_EQ(counter, 1);
 }
 
 TEST(Queue, TryPutEmpty) {
