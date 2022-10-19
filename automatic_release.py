@@ -76,7 +76,7 @@ if __name__ == "__main__":
         fetch_tags(args.username, password, args.organization, args.repository)
         next_version = get_next_version()
         write_version_file(next_version)
-        print(f"::set-output version={version_string(next_version)}")
+        print(f"version={version_string(next_version)}")
     elif args.stage == "post-build":
         fetch_tags(args.username, password, args.organization, args.repository)
         next_version = get_next_version()
@@ -84,4 +84,4 @@ if __name__ == "__main__":
         commit_version_file(next_version)
         tag_version(next_version)
         push_tag(args.username, password, args.organization, args.repository, next_version)
-        print(f"::set-output name=version::{version_string(next_version)}")
+        print(f"version={version_string(next_version)}")

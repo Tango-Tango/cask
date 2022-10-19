@@ -171,7 +171,7 @@ jobs:
       run: |
         git config user.name engineering-at-tangotango
         git config user.email engineering@tangotango.net
-        ./automatic_release.py -u engineering-at-tangotango -o Tango-Tango -r cask -s post-build
+        ./automatic_release.py -u engineering-at-tangotango -o Tango-Tango -r cask -s post-build >> $GITHUB_OUTPUT
     - name: Create Release in GitHub
       uses: softprops/action-gh-release@v1
       with:
