@@ -25,11 +25,8 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
+        os: [ubuntu-20.04, ubuntu-22.04]
         target: [debug, release, release_no_atomics, release_always_async, clang, mips, arm]
-        exclude:
-          - os: ubuntu-18.04 # qemu-mipsel on ubuntu 18.04 is slow and buggy
-            target: mips
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
