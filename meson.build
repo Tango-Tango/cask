@@ -4,7 +4,7 @@ project(
     default_options: ['cpp_std=c++17'],
     version: files('VERSION'),
     license: 'BSL-1.0',
-    meson_version: '>= 0.57.0'
+    meson_version: '>= 1.0.0'
 )
 cpp = meson.get_compiler('cpp')
 
@@ -17,7 +17,7 @@ endif
 num_cpu_threads = 1
 bash = find_program('bash', required : false)
 if bash.found()
-    threads_result = run_command(bash, '-c', 'cat /proc/cpuinfo | grep processor | wc -l')
+    threads_result = run_command(bash, '-c', 'cat /proc/cpuinfo | grep processor | wc -l', check: false)
     if threads_result.returncode() == 0
         num_cpu_threads = threads_result.stdout().strip()
     endif
