@@ -44,7 +44,7 @@ jobs:
     - name: Install Apt Development Dependencies
       run: sudo apt-get install -y ninja-build build-essential python3-pip gcovr clang g++-arm-linux-gnueabihf g++-mipsel-linux-gnu qemu-user
     - name: Install Python Development Dependencies
-      run: sudo python3 -m pip install meson==0.61.1
+      run: sudo python3 -m pip install meson==1.0.0
     - name: Generate the Build Environment
       run: ./regenerate_env.sh ${{ matrix.target }}
     - name: Compile
@@ -82,7 +82,7 @@ jobs:
     - name: Install Brew Development Dependencies
       run: brew install ninja
     - name: Install Python Development Dependencies
-      run: sudo python3 -m pip install meson==0.61.1
+      run: sudo python3 -m pip install meson==1.0.0
     - name: Generate the Build Environment
       run: ./regenerate_env.sh ${{ matrix.target }}
     - name: Compile
@@ -125,7 +125,7 @@ jobs:
       with:
         architecture: x64
     - name: Install Python Development Dependencies
-      run: python3 -m pip install meson==0.61.1 ninja
+      run: python3 -m pip install meson==1.0.0 ninja
     - name: Generate the Build Environment
       run: meson setup builddir
     - name: Compile
@@ -147,7 +147,7 @@ jobs:
     - name: Install Apt Development Dependencies
       run: sudo apt-get install -y ninja-build python3-pip gcovr cppcheck clang clang-tidy
     - name: Install Python Development Dependencies
-      run: sudo python3 -m pip install meson==0.61.1
+      run: sudo python3 -m pip install meson==1.0.0
     - name: Generate the Build Environment
       run: ./regenerate_env.sh clang
     - name: Run clang-tidy
