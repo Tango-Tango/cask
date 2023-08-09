@@ -49,10 +49,11 @@ private:
     std::queue<std::function<void()>> readyQueue;
     std::atomic_size_t idleThreads;
     std::mutex timerMutex;
+    std::condition_variable timerCondition;
     std::map<int64_t,std::vector<TimerEntry>> timers;
     std::vector<std::atomic_bool*> threadStatus;
     std::atomic_bool timerThreadStatus;
-    int64_t next_id;
+    std::atomic_int64_t next_id;
     int64_t last_execution_ms;
 
     void run(unsigned int thread_index);

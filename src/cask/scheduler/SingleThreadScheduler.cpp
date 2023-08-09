@@ -4,6 +4,7 @@
 //          https://www.boost.org/LICENSE_1_0.txt)
 
 #include "cask/scheduler/SingleThreadScheduler.hpp"
+#include <algorithm>
 #include <chrono>
 
 #if __linux__
@@ -57,6 +58,8 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
 
 SingleThreadScheduler::~SingleThreadScheduler() {
     should_run.store(false);
+
+    timerCondition.notify_one();
     idlingThread.notify_one();
 
     while(runner_running.load(std::memory_order_relaxed));
@@ -82,24 +85,30 @@ void SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>&
 }
 
 CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
-    std::lock_guard<std::mutex> guard(timerMutex);
-    int64_t executionTick = current_time_ms() + milliseconds + 1;
-
     auto id = next_id++;
-    auto tasks = timers.find(executionTick);
-    auto entry = std::make_tuple(id, task);
+    auto executionTick = current_time_ms() + milliseconds;
+
+    {
+        std::lock_guard<std::mutex> guard(timerMutex);
+
+        auto tasks = timers.find(executionTick);
+        auto entry = std::make_tuple(id, task);
+        
+        if(tasks == timers.end()) {
+            std::vector<TimerEntry> taskVector = {entry};
+            timers[executionTick] = taskVector;
+        } else {
+            tasks->second.push_back(entry);
+        }
+    }
+
     auto cancelable = std::make_shared<CancelableTimer>(
         this->shared_from_this(),
         executionTick,
         id
     );
 
-    if(tasks == timers.end()) {
-        std::vector<TimerEntry> taskVector = {entry};
-        timers[executionTick] = taskVector;
-    } else {
-        tasks->second.push_back(entry);
-    }
+    timerCondition.notify_one();
 
     return cancelable;
 }
@@ -133,24 +142,24 @@ void SingleThreadScheduler::run() {
 }
 
 void SingleThreadScheduler::timer() {
-    const static std::chrono::milliseconds sleep_time(10);
-
     timer_running.store(true, std::memory_order_relaxed);
 
-    while(should_run.load(std::memory_order_relaxed)) {
-        std::this_thread::sleep_for(sleep_time);
+    auto dormant_sleep_time = std::chrono::milliseconds(1000);
+    auto sleep_time = dormant_sleep_time;
 
-        {
-            std::lock_guard<std::mutex> guard(timerMutex);
+    while(true) {
+        auto current_time = current_time_ms();
+        std::unique_lock<std::mutex> lock(timerMutex);
+        timerCondition.wait_for(lock, sleep_time);
 
-            int64_t previous_ticks = last_execution_ms;
-            last_execution_ms = current_time_ms();
+        if (should_run.load(std::memory_order_relaxed)) {
+            std::vector<int64_t> expired;
 
-            for(int64_t i = previous_ticks; i <= last_execution_ms; i++) {
-                auto tasks = timers.find(i);
-                if(tasks != timers.end()) {
+            // Submit any tasks associated with an expired
+            // timer to the scheduler
+            for (auto& [timer_time, entries] : timers) {
+                if (timer_time <= current_time) {
                     std::vector<std::function<void()>> submittedTasks;
-                    auto entries = tasks->second;
 
                     submittedTasks.reserve(entries.size());
 
@@ -159,9 +168,32 @@ void SingleThreadScheduler::timer() {
                     }
 
                     submitBulk(submittedTasks);
-                    timers.erase(i);
+                    expired.push_back(timer_time);
+                } else {
+                    break;
                 }
             }
+
+            // Erase those timers from timer storage
+            for (auto& timer_time : expired) {
+                timers.erase(timer_time);
+            }
+
+            // Compute the next sleep time
+            if (timers.empty()) {
+                sleep_time = dormant_sleep_time;
+            } else {
+                auto next_timer = timers.begin();
+                auto next_timer_time = next_timer->first;
+                auto next_timer_sleep_time = std::chrono::milliseconds(next_timer_time - current_time);
+
+                next_timer_sleep_time = std::min(next_timer_sleep_time, dormant_sleep_time);
+                next_timer_sleep_time = std::max(next_timer_sleep_time, std::chrono::milliseconds(0));
+
+                sleep_time = std::chrono::milliseconds(next_timer_sleep_time);
+            }
+        } else {
+            break;
         }
     }
 

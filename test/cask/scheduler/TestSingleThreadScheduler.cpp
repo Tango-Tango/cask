@@ -86,12 +86,12 @@ TEST_F(SingleThreadSchedulerTest, SubmitAfter) {
     std::mutex mutex;
     mutex.lock();
 
-    auto before = std::chrono::high_resolution_clock::now();
+    auto before = std::chrono::steady_clock::now();
     sched->submitAfter(25, [&mutex] {
         mutex.unlock();
     });
     mutex.lock();
-    auto after = std::chrono::high_resolution_clock::now();
+    auto after = std::chrono::steady_clock::now();
 
     auto delta = after - before;
     auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
