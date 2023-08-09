@@ -65,7 +65,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-10.15, macos-11, macos-12]
+        os: [macos-11, macos-12]
         target: [clang]
       fail-fast: false
 
