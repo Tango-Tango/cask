@@ -11,6 +11,8 @@
 
 using cask::Observable;
 using cask::Scheduler;
+using cask::Task;
+using cask::observable::QueueOverflowStrategy;
 using cask::scheduler::BenchScheduler;
 using cask::scheduler::SingleThreadScheduler;
 
@@ -212,3 +214,52 @@ TEST(ObservableQueue, DownstreamStopSmallQueue) {
     EXPECT_EQ(result[0], 0);
     EXPECT_EQ(result[1], 1);
 }
+
+TEST(ObservableQueue, TailDropOverflowStrategy) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto fiber = Observable<int, cask::None>::sequence(1, 2, 3, 4)
+        ->queue(1, QueueOverflowStrategy::TailDrop)
+        ->mapTask<int>([](auto&& value) {
+            return Task<int, cask::None>::pure(value).delay(1);
+        })
+        ->last()
+        .run(sched);
+    
+    sched->run_ready_tasks();
+    sched->advance_time(1);
+    sched->run_ready_tasks();
+    sched->advance_time(1);
+    sched->run_ready_tasks();
+
+    auto result = fiber->await();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, 2);
+}
+
+TEST(ObservableQueue, BackpressureOverflowStrategy) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto fiber = Observable<int, cask::None>::sequence(1, 2, 3, 4)
+        ->queue(1, QueueOverflowStrategy::Backpressure)
+        ->mapTask<int>([](auto&& value) {
+            return Task<int, cask::None>::pure(value).delay(1);
+        })
+        ->last()
+        .run(sched);
+    
+    sched->run_ready_tasks();
+    sched->advance_time(1);
+    sched->run_ready_tasks();
+    sched->advance_time(1);
+    sched->run_ready_tasks();
+    sched->advance_time(1);
+    sched->run_ready_tasks();
+    sched->advance_time(1);
+    sched->run_ready_tasks();
+
+    auto result = fiber->await();
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, 4);
+}
+

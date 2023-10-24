@@ -8,6 +8,7 @@
 
 #include "../Observer.hpp"
 #include "../Queue.hpp"
+#include "QueueOverflowStrategy.hpp"
 
 namespace cask::observable {
 
@@ -17,6 +18,7 @@ public:
     QueueObserver(
         const std::shared_ptr<Observer<T,E>>& downstream,
         uint32_t queue_size,
+        QueueOverflowStrategy overflow_strategy,
         const std::shared_ptr<Scheduler>& sched
     );
     Task<Ack,None> onNext(T&& value) override;
@@ -49,6 +51,7 @@ private:
     std::shared_ptr<Observer<T,E>> downstream;
     std::shared_ptr<Scheduler> sched;
     QueueRef<std::shared_ptr<QueueEvent>,None> queue;
+    QueueOverflowStrategy overflow_strategy;
     std::atomic_bool stopped;
     PromiseRef<None,None> downstream_shutdown_complete;
     FiberRef<None,None> downstream_fiber;
@@ -58,10 +61,12 @@ template <class T, class E>
 QueueObserver<T,E>::QueueObserver(
         const std::shared_ptr<Observer<T,E>>& downstream,
         uint32_t queue_size,
+        QueueOverflowStrategy overflow_strategy,
         const std::shared_ptr<Scheduler>& sched)
     : downstream(downstream)
     , sched(sched)
     , queue(Queue<std::shared_ptr<QueueEvent>,None>::empty(sched, queue_size))
+    , overflow_strategy(overflow_strategy)
     , stopped(false)
     , downstream_shutdown_complete(Promise<None,None>::create(sched))
     , downstream_fiber()
@@ -88,20 +93,30 @@ Task<Ack,None> QueueObserver<T,E>::onNext(T&& value) {
         });
     }
 
-    return queue->put(event)
-        .onCancelRaiseError(None())
-        .template flatMapBoth<Ack,None>(
-            [self](auto) {
-                if (self->stopped.load()) {
+    if (overflow_strategy == QueueOverflowStrategy::Backpressure) {
+        return queue->put(event)
+            .onCancelRaiseError(None())
+            .template flatMapBoth<Ack,None>(
+                [self](auto) {
+                    if (self->stopped.load()) {
+                        return Task<Ack,None>::pure(Stop);
+                    } else {
+                        return Task<Ack,None>::pure(Continue);
+                    }
+                },
+                [](auto) {
                     return Task<Ack,None>::pure(Stop);
-                } else {
-                    return Task<Ack,None>::pure(Continue);
                 }
-            },
-            [](auto) {
-                return Task<Ack,None>::pure(Stop);
-            }
-        );
+            );
+    } else {
+        queue->tryPut(event);
+
+        if (self->stopped.load()) {
+            return Task<Ack,None>::pure(Stop);
+        } else {
+            return Task<Ack,None>::pure(Continue);
+        }
+    }
 }
 
 template <class T, class E>

@@ -11,6 +11,7 @@
 #include "Cancelable.hpp"
 #include "Observer.hpp"
 #include "Task.hpp"
+#include "observable/QueueOverflowStrategy.hpp"
 
 namespace cask {
 
@@ -498,7 +499,7 @@ public:
      * @param queue_size The maximum size of the queue.
      * @return An observable with a queue between upstream and downstream
      */
-    ObservableRef<T,E> queue(uint32_t queue_size) const;
+    ObservableRef<T,E> queue(uint32_t queue_size, observable::QueueOverflowStrategy overflow_strategy = observable::Backpressure) const;
 
     /**
      * Apply a pure function to each element of the observable and the result of the previous
@@ -960,9 +961,9 @@ ObservableRef<T,E> Observable<T,E>::merge(const ObservableRef<T,E>& other) const
 }
 
 template <typename T, typename E>
-ObservableRef<T,E> Observable<T,E>::queue(uint32_t queue_size) const {
+ObservableRef<T,E> Observable<T,E>::queue(uint32_t queue_size, observable::QueueOverflowStrategy overflow_strategy) const {
     auto self = this->shared_from_this();
-    return std::make_shared<observable::QueueObservable<T,E>>(self, queue_size);
+    return std::make_shared<observable::QueueObservable<T,E>>(self, queue_size, overflow_strategy);
 }
 
 template <typename T, typename E>
