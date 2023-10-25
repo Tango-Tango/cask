@@ -33,7 +33,7 @@ ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
 
 #if defined(__linux__) && defined(_GNU_SOURCE)
         auto handle = poolThread.native_handle();
-        int core_id = (i + thread_offset) % std::thread::hardware_concurrency();
+        int core_id = (static_cast<unsigned int>(i) + thread_offset) % static_cast<int>(std::thread::hardware_concurrency());
 
         cpu_set_t cpuset;
         CPU_ZERO(&cpuset);
