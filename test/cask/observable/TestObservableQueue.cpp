@@ -12,6 +12,7 @@
 using cask::Observable;
 using cask::Scheduler;
 using cask::Task;
+using cask::Fiber;
 using cask::observable::QueueOverflowStrategy;
 using cask::scheduler::BenchScheduler;
 using cask::scheduler::SingleThreadScheduler;
@@ -218,6 +219,9 @@ TEST(ObservableQueue, DownstreamStopSmallQueue) {
 TEST(ObservableQueue, TailDropOverflowStrategy) {
     auto sched = std::make_shared<BenchScheduler>();
     auto fiber = Observable<int, cask::None>::sequence(1, 2, 3, 4)
+        ->mapTask<int>([](auto&& value) {
+            return Task<int, cask::None>::pure(value).asyncBoundary();
+        })
         ->queue(1, QueueOverflowStrategy::TailDrop)
         ->mapTask<int>([](auto&& value) {
             return Task<int, cask::None>::pure(value).delay(1);

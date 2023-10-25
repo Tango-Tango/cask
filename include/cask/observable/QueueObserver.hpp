@@ -47,6 +47,8 @@ private:
     class CancelEvent : public QueueEvent {};
 
     Task<None,None> onEvent(const std::shared_ptr<QueueEvent>& event);
+    void initDownstreamFiber();
+    Task<Ack,None> upstreamResult();
 
     std::shared_ptr<Observer<T,E>> downstream;
     std::shared_ptr<Scheduler> sched;
@@ -77,45 +79,23 @@ Task<Ack,None> QueueObserver<T,E>::onNext(T&& value) {
     auto self = this->shared_from_this();
     auto self_weak = this->weak_from_this();
     auto event = std::make_shared<NextEvent>(std::forward<T>(value));
+    auto syncPutResult = queue->tryPut(event);
 
-    if (downstream_fiber == nullptr) {
-        downstream_fiber = Observable<std::shared_ptr<QueueEvent>,None>::repeatTask(queue->take())
-            ->template mapTask<None>([self](auto event){
-                return self->onEvent(event);
-            })
-            ->completed()
-            .run(sched);
+    initDownstreamFiber();
 
-        downstream_fiber->onFiberShutdown([self](auto) {
-            self->downstream_shutdown_complete->success(None());
-            self->downstream_fiber = nullptr;
-            self->queue->reset();
-        });
-    }
-
-    if (overflow_strategy == QueueOverflowStrategy::Backpressure) {
+    if (syncPutResult || overflow_strategy == QueueOverflowStrategy::TailDrop) {
+        return upstreamResult();
+    } else {
         return queue->put(event)
             .onCancelRaiseError(None())
             .template flatMapBoth<Ack,None>(
                 [self](auto) {
-                    if (self->stopped.load()) {
-                        return Task<Ack,None>::pure(Stop);
-                    } else {
-                        return Task<Ack,None>::pure(Continue);
-                    }
+                    return self->upstreamResult();
                 },
                 [](auto) {
                     return Task<Ack,None>::pure(Stop);
                 }
             );
-    } else {
-        queue->tryPut(event);
-
-        if (self->stopped.load()) {
-            return Task<Ack,None>::pure(Stop);
-        } else {
-            return Task<Ack,None>::pure(Continue);
-        }
     }
 }
 
@@ -215,6 +195,35 @@ Task<None,None> QueueObserver<T,E>::onEvent(const std::shared_ptr<QueueEvent>& e
                 self->downstream_fiber->cancel();
                 return None();
             });
+    }
+}
+
+template <class T, class E>
+void QueueObserver<T,E>::initDownstreamFiber() {
+    if (downstream_fiber == nullptr) {
+        auto self = this->shared_from_this();
+
+        downstream_fiber = Observable<std::shared_ptr<QueueEvent>,None>::repeatTask(queue->take())
+            ->template mapTask<None>([self](auto event){
+                return self->onEvent(event);
+            })
+            ->completed()
+            .run(sched);
+
+        downstream_fiber->onFiberShutdown([self](auto) {
+            self->downstream_shutdown_complete->success(None());
+            self->downstream_fiber = nullptr;
+            self->queue->reset();
+        });
+    }
+}
+
+template <class T, class E>
+Task<Ack,None> QueueObserver<T,E>::upstreamResult() {
+    if (stopped.load()) {
+        return Task<Ack,None>::pure(Stop);
+    } else {
+        return Task<Ack,None>::pure(Continue);
     }
 }
 
