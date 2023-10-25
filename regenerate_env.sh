@@ -48,6 +48,16 @@ if [ "$BUILD_TARGET" = "release_always_async" ] || [ "$BUILD_TARGET" = "all" ]; 
         -Dbatch_size=1
 fi
 
+if [ "$BUILD_TARGET" = "release_forced_cede_disabled" ] || [ "$BUILD_TARGET" = "all" ]; then
+    rm -rf release_forced_cede_disabled
+    CC=gcc CXX=g++ meson setup build_release_forced_cede_disabled \
+        -Dinitial_blocks_per_pool=64 \
+        -Dbuildtype=release \
+        -Dwarning_level=3 \
+        -Dwerror=true \
+        -Dbatch_size=0
+fi
+
 
 if [ "$BUILD_TARGET" = "clang" ] || [ "$BUILD_TARGET" = "all" ]; then
     rm -rf build_clang

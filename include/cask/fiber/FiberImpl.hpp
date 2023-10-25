@@ -122,6 +122,8 @@ bool FiberImpl<T,E>::resume(const std::shared_ptr<Scheduler>& sched) {
 template <class T, class E>
 template <bool Async>
 bool FiberImpl<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned int batch_size) {
+    const auto forced_cede_disabled = batch_size == 0;
+
     FiberState current_state = state.load(std::memory_order_relaxed);
 
     if(state != READY || (state == READY && !state.compare_exchange_strong(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed))) {
@@ -130,7 +132,7 @@ bool FiberImpl<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsig
 
     last_used_scheduler = std::weak_ptr<Scheduler>(sched);
 
-    while(batch_size-- > 0) {
+    while(forced_cede_disabled || batch_size-- > 0) {
         if(this->template evaluateOp<Async>(sched)) {
             return true;
         }
