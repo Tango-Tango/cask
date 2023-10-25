@@ -1,4 +1,4 @@
 option('ref_uses_atomics', type: 'boolean', value: true)
-option('batch_size', type: 'integer', min: 1, value: 1024)
+option('batch_size', type: 'integer', min: 0, value: 1024)
 option('initial_blocks_per_pool', type: 'integer', min: 64, value: 2048)
 option('cache_line_size', type: 'integer', min: 32, value: 64)
