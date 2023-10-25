@@ -22,13 +22,18 @@ ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
     , last_execution_ms(current_time_ms())
 {
     threadStatus.reserve(poolSize);
+
+#if defined(__linux__) && defined(_GNU_SOURCE)
+    int thread_offset = rand();
+#endif
+
     for(unsigned int i = 0; i < poolSize; i++) {
         threadStatus.push_back(new std::atomic_bool(false));
         std::thread poolThread(std::bind(&ThreadPoolScheduler::run, this, i));
 
 #if defined(__linux__) && defined(_GNU_SOURCE)
         auto handle = poolThread.native_handle();
-        int core_id = i % std::thread::hardware_concurrency();
+        int core_id = (i + thread_offset) % std::thread::hardware_concurrency();
 
         cpu_set_t cpuset;
         CPU_ZERO(&cpuset);
