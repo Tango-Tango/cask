@@ -3,7 +3,13 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
-# 17.0
+## 17.1
+
+- Add the ability to set a queue overflow strategy on queue observers. The default
+  behavior is to backpressure upstream, which matches the previous behavior.
+
+## 17.0
+
 - Change many operators, contructors, and passed predicate functions to allow value moves.
 - Change `Observable::onNext` and `Observable::onError` to accept moves.
 - Add the `Observable::sequence` operator.
@@ -11,12 +17,12 @@ in this file. This project follows [semantic versioning](https://semver.org/).
 - Fix `Either::left` and `Either::right` to properly accept moves.
 - Fix `FiberValue` to accept moves in its many contructor methods.
 
-# 16.1
+## 16.1
 
 - Add `Observable::queue` which creates and observable where upstream and downstream
   run concurrently and are seperated by a queue of a given maximum size.
 
-# 16.0
+## 16.0
 
 - Make `Fiber::run` and `Task::run` execute as much of the given task synchronously
   on the current thread for as long as possible. This both increases efficiency (by
@@ -27,12 +33,12 @@ in this file. This project follows [semantic versioning](https://semver.org/).
   boundary could be optimized away by the fiber run loop.
 - Add the `CEDE` instruction to `FiberOp` to support guaranteed ceding to the scheduler.
 
-# 15.1
+## 15.1
 
 - Add `Observable::cancel` which allows a user to create an observable which will always
   cancel downstream when evaluating.
 
-# 15.0
+## 15.0
 
 - Add the `merge`, `mergeAll`, `flatScan`, `scan` and `scanTask` operators to `Observable`.
 - `Fiber` ids are now guaranteed to be globally unique. The id of the current fiber can
@@ -41,7 +47,7 @@ in this file. This project follows [semantic versioning](https://semver.org/).
   Child classes may still opt-in to this behavior (by inheriting directly) on an as-needed
   basis.
 
-# 14.0
+## 14.0
 
 - Allow the pool cache line size to be directly configured rather than guessed via
   the `cache_line_size` configure parameter.
@@ -51,11 +57,13 @@ in this file. This project follows [semantic versioning](https://semver.org/).
   and remove issues at shutdown time due to the previously undefined behavior of the pool's
   static destruction.
 
-# 13.1
+## 13.1
+
 - Add the `distinctUntilChanged` operator to `Observable`.
 - Add the `distinctUntilChangedBy` operator to `Observable`.
 
-# 13.0
+## 13.0
+
 - Update the `Pool` to solve various bugs, to allocate into block sizes based on
   best fit for ag iven type, and to allocate memory in large chunks for better
   performance.
@@ -64,15 +72,18 @@ in this file. This project follows [semantic versioning](https://semver.org/).
 - Remove move constructors from `Erased` to clarify behavior for the compiler.
 
 ## 12.0
+
 - Add the `Pool` type as a simple memory pool.
 - Add pooling to `Erased` and `FiberOp` object creations.
 - Add configuration options to control the pool block sizes and initial
   pool sizes.
 
 ## 11.4
+
 - Allow a thread priority to be set for the single threaded scheduler.
 
 ## 11.3
+
 - Add the `Observable::flatMapOptional` operator to speed up flows which simply
   want to provide value or nothing downstream.
 - Add the `ref_uses_atomics` configuration flag. This provides a configurable
@@ -80,14 +91,17 @@ in this file. This project follows [semantic versioning](https://semver.org/).
   MIPS platforms).
 
 ## 11.2
+
 - Add the `Queue::tryTake` method to allow for atomic takes on the queue without
   pending in the scheduler.
 
 ## 11.1
+
 - Add the `Observable::never` operator.
 - Add the `Observable::concat` operator as an alias for `Observable::appendAll`.
 
 ## 11.0
+
 - Add `Fiber` as a replacement for the `TrampolineRunLoop`.
 - Add the `forFiber` method to `Deferred`.
 - Add the `modify` method to `MVar`.
@@ -107,6 +121,7 @@ in this file. This project follows [semantic versioning](https://semver.org/).
 - Resolve a memory leak resulting from an infinite series of async operations.
 
 ## 10.2
+
 - Add the `runCancelableThenPromise` method to `Task`.
 - Add the `onShutdown` method to `Cancelable`.
 - Add the `forCancelable` method to `Deferred`.
@@ -116,6 +131,7 @@ in this file. This project follows [semantic versioning](https://semver.org/).
   guaranteed effects are guaranteed to be evaluated _before_ a result can be observered.
 
 ## 10.1
+
 - Add the `appendAll` operator to `Observable`.
 
 ## 10.0
@@ -158,7 +174,7 @@ in this file. This project follows [semantic versioning](https://semver.org/).
   Enhance the timer handler to better deal with scew where the OS does not
   schedule the timer thread on exact scheduled boundaries.
 - Add `Scheduler::submitBulk` as an optimization for clients which wawnt to
-  submit several items to the scheduler in a single operation. 
+  submit several items to the scheduler in a single operation.
 - Add `Scheduler::isIdle` to allow users to check if the scheduler is currently
   idle (that is - not executing tasks and nothing in the ready queue).
 
@@ -191,7 +207,7 @@ in this file. This project follows [semantic versioning](https://semver.org/).
   its behalf.
 - Update `TrampolineOp` and `TrampolineRunLoop` to use `Erased` rather than
   `std::any`. While this doesn't effect consumers directly (it is hidden
-  behind the type-safe `Task` and `Observable` APIs) in most cases - 
+  behind the type-safe `Task` and `Observable` APIs) in most cases -
   it is a breaking API change to that portion of cask. The performance of
   type erasure has a _significant_ impact on the performance of cask and this
   change allows us to optimize this behavior as needed for cask itself.
