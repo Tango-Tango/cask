@@ -51,7 +51,9 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
 
 #if defined(__linux__) && defined(_GNU_SOURCE)
     auto handle = runThread.native_handle();
-    int core_id = rand() % static_cast<int>(std::thread::hardware_concurrency());
+
+    // NOLINTNEXTLINE(bugprone-narrowing-conversions)
+    int core_id = rand() % std::thread::hardware_concurrency();
 
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
