@@ -25,6 +25,17 @@ ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
     for(unsigned int i = 0; i < poolSize; i++) {
         threadStatus.push_back(new std::atomic_bool(false));
         std::thread poolThread(std::bind(&ThreadPoolScheduler::run, this, i));
+
+#if defined(__linux__) && defined(_GNU_SOURCE)
+        auto handle = poolThread.native_handle();
+        int core_id = i % std::thread::hardware_concurrency();
+
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(core_id, &cpuset);
+        pthread_setaffinity_np(handle, sizeof(cpu_set_t), &cpuset);
+#endif
+
         poolThread.detach();
     }
 

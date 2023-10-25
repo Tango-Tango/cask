@@ -49,6 +49,16 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
     setpriority(which, timer_thread_id, priority);
 #endif
 
+#if defined(__linux__) && defined(_GNU_SOURCE)
+    auto handle = runThread.native_handle();
+    int core_id = rand() % std::thread::hardware_concurrency();
+
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
+    pthread_setaffinity_np(handle, sizeof(cpu_set_t), &cpuset);
+#endif
+
     runThread.detach();
     timerThread.detach();
 
