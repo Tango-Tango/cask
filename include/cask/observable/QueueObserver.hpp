@@ -8,6 +8,7 @@
 
 #include "../Observer.hpp"
 #include "../Queue.hpp"
+#include "QueueOverflowStrategy.hpp"
 
 namespace cask::observable {
 
@@ -17,6 +18,7 @@ public:
     QueueObserver(
         const std::shared_ptr<Observer<T,E>>& downstream,
         uint32_t queue_size,
+        QueueOverflowStrategy overflow_strategy,
         const std::shared_ptr<Scheduler>& sched
     );
     Task<Ack,None> onNext(T&& value) override;
@@ -45,10 +47,13 @@ private:
     class CancelEvent : public QueueEvent {};
 
     Task<None,None> onEvent(const std::shared_ptr<QueueEvent>& event);
+    void initDownstreamFiber();
+    Task<Ack,None> upstreamResult();
 
     std::shared_ptr<Observer<T,E>> downstream;
     std::shared_ptr<Scheduler> sched;
     QueueRef<std::shared_ptr<QueueEvent>,None> queue;
+    QueueOverflowStrategy overflow_strategy;
     std::atomic_bool stopped;
     PromiseRef<None,None> downstream_shutdown_complete;
     FiberRef<None,None> downstream_fiber;
@@ -58,10 +63,12 @@ template <class T, class E>
 QueueObserver<T,E>::QueueObserver(
         const std::shared_ptr<Observer<T,E>>& downstream,
         uint32_t queue_size,
+        QueueOverflowStrategy overflow_strategy,
         const std::shared_ptr<Scheduler>& sched)
     : downstream(downstream)
     , sched(sched)
     , queue(Queue<std::shared_ptr<QueueEvent>,None>::empty(sched, queue_size))
+    , overflow_strategy(overflow_strategy)
     , stopped(false)
     , downstream_shutdown_complete(Promise<None,None>::create(sched))
     , downstream_fiber()
@@ -72,36 +79,24 @@ Task<Ack,None> QueueObserver<T,E>::onNext(T&& value) {
     auto self = this->shared_from_this();
     auto self_weak = this->weak_from_this();
     auto event = std::make_shared<NextEvent>(std::forward<T>(value));
+    auto syncPutResult = queue->tryPut(event);
 
-    if (downstream_fiber == nullptr) {
-        downstream_fiber = Observable<std::shared_ptr<QueueEvent>,None>::repeatTask(queue->take())
-            ->template mapTask<None>([self](auto event){
-                return self->onEvent(event);
-            })
-            ->completed()
-            .run(sched);
+    initDownstreamFiber();
 
-        downstream_fiber->onFiberShutdown([self](auto) {
-            self->downstream_shutdown_complete->success(None());
-            self->downstream_fiber = nullptr;
-            self->queue->reset();
-        });
-    }
-
-    return queue->put(event)
-        .onCancelRaiseError(None())
-        .template flatMapBoth<Ack,None>(
-            [self](auto) {
-                if (self->stopped.load()) {
+    if (syncPutResult || overflow_strategy == QueueOverflowStrategy::TailDrop) {
+        return upstreamResult();
+    } else {
+        return queue->put(event)
+            .onCancelRaiseError(None())
+            .template flatMapBoth<Ack,None>(
+                [self](auto) {
+                    return self->upstreamResult();
+                },
+                [](auto) {
                     return Task<Ack,None>::pure(Stop);
-                } else {
-                    return Task<Ack,None>::pure(Continue);
                 }
-            },
-            [](auto) {
-                return Task<Ack,None>::pure(Stop);
-            }
-        );
+            );
+    }
 }
 
 template <class T, class E>
@@ -200,6 +195,35 @@ Task<None,None> QueueObserver<T,E>::onEvent(const std::shared_ptr<QueueEvent>& e
                 self->downstream_fiber->cancel();
                 return None();
             });
+    }
+}
+
+template <class T, class E>
+void QueueObserver<T,E>::initDownstreamFiber() {
+    if (downstream_fiber == nullptr) {
+        auto self = this->shared_from_this();
+
+        downstream_fiber = Observable<std::shared_ptr<QueueEvent>,None>::repeatTask(queue->take())
+            ->template mapTask<None>([self](auto event){
+                return self->onEvent(event);
+            })
+            ->completed()
+            .run(sched);
+
+        downstream_fiber->onFiberShutdown([self](auto) {
+            self->downstream_shutdown_complete->success(None());
+            self->downstream_fiber = nullptr;
+            self->queue->reset();
+        });
+    }
+}
+
+template <class T, class E>
+Task<Ack,None> QueueObserver<T,E>::upstreamResult() {
+    if (stopped.load()) {
+        return Task<Ack,None>::pure(Stop);
+    } else {
+        return Task<Ack,None>::pure(Continue);
     }
 }
 
