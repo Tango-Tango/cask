@@ -19,7 +19,7 @@ ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
     , threadStatus()
     , timerThreadStatus(false)
     , next_id(0)
-    , last_execution_ms(current_time_ms())
+    , last_execution_ns(current_time_ns())
 {
     threadStatus.reserve(poolSize);
 
@@ -86,7 +86,7 @@ void ThreadPoolScheduler::submitBulk(const std::vector<std::function<void()>>& t
 
 CancelableRef ThreadPoolScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
     auto id = next_id++;
-    auto executionTick = current_time_ms() + milliseconds;
+    auto executionTick = current_time_ns() + std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(milliseconds)).count();
 
     {
         std::lock_guard<std::mutex> guard(timerMutex);
@@ -154,11 +154,11 @@ void ThreadPoolScheduler::run(unsigned int thread_index) {
 void ThreadPoolScheduler::timer() {
     timerThreadStatus.store(true, std::memory_order_relaxed);
 
-    auto dormant_sleep_time = std::chrono::milliseconds(1000);
+    auto dormant_sleep_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::seconds(1));
     auto sleep_time = dormant_sleep_time;
 
     while(true) {
-        auto current_time = current_time_ms();
+        auto current_time = current_time_ns();
         std::unique_lock<std::mutex> lock(timerMutex);
         timerCondition.wait_for(lock, sleep_time);
 
@@ -195,12 +195,12 @@ void ThreadPoolScheduler::timer() {
             } else {
                 auto next_timer = timers.begin();
                 auto next_timer_time = next_timer->first;
-                auto next_timer_sleep_time = std::chrono::milliseconds(next_timer_time - current_time);
+                auto next_timer_sleep_time = std::chrono::nanoseconds(next_timer_time - current_time);
 
                 next_timer_sleep_time = std::min(next_timer_sleep_time, dormant_sleep_time);
-                next_timer_sleep_time = std::max(next_timer_sleep_time, std::chrono::milliseconds(0));
+                next_timer_sleep_time = std::max(next_timer_sleep_time, std::chrono::nanoseconds(0));
 
-                sleep_time = std::chrono::milliseconds(next_timer_sleep_time);
+                sleep_time = next_timer_sleep_time;
             }
         } else {
             break;
@@ -210,8 +210,8 @@ void ThreadPoolScheduler::timer() {
     timerThreadStatus.store(false, std::memory_order_relaxed);
 }
 
-int64_t ThreadPoolScheduler::current_time_ms() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+int64_t ThreadPoolScheduler::current_time_ns() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 ThreadPoolScheduler::CancelableTimer::CancelableTimer(

@@ -54,11 +54,11 @@ private:
     std::vector<std::atomic_bool*> threadStatus;
     std::atomic_bool timerThreadStatus;
     std::atomic_int64_t next_id;
-    int64_t last_execution_ms;
+    int64_t last_execution_ns;
 
     void run(unsigned int thread_index);
     void timer();
-    static int64_t current_time_ms();
+    static int64_t current_time_ns();
 
     class CancelableTimer final : public Cancelable {
     public:
