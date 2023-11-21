@@ -57,10 +57,7 @@ Task<Ack,None> GuaranteeObserver<T,E>::onNext(T&& value) {
 template <class T, class E>
 Task<None,None> GuaranteeObserver<T,E>::onError(E&& error) {
     if(!completed->test_and_set()) {
-        return downstream->onError(std::forward<E>(error))
-            .template flatMap<None>([task = task](auto) {
-                return task;
-            });
+        return downstream->onError(std::forward<E>(error)).guarantee(task);
     } else {
         return Task<None,None>::none();
     }
@@ -69,10 +66,7 @@ Task<None,None> GuaranteeObserver<T,E>::onError(E&& error) {
 template <class T, class E>
 Task<None,None> GuaranteeObserver<T,E>::onComplete() {
     if(!completed->test_and_set()) {
-        return downstream->onComplete()
-            .template flatMap<None>([task = task](auto) {
-                return task;
-            });
+        return downstream->onComplete().guarantee(task);
     } else {
         return Task<None,None>::none();
     }
