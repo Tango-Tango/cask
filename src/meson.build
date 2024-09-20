@@ -12,6 +12,7 @@ cask_sources = [
 cask_lib = static_library('cask',
     cask_sources,
     include_directories: includes,
-    dependencies: dependencies
+    dependencies: dependencies,
+    install: true
 )
 

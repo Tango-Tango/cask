@@ -5,6 +5,7 @@
 
 #include "cask/scheduler/ThreadPoolScheduler.hpp"
 #include <chrono>
+#include <cstdlib>
 
 namespace cask::scheduler {
 
@@ -24,7 +25,7 @@ ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
     threadStatus.reserve(poolSize);
 
 #if defined(__linux__) && defined(_GNU_SOURCE)
-    int thread_offset = rand();
+    int thread_offset = std::rand();
 #endif
 
     for(unsigned int i = 0; i < poolSize; i++) {
