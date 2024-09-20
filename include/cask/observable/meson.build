@@ -20,6 +20,8 @@ install_headers(
     'GuaranteeObservable.hpp',
     'GuaranteeObserver.hpp',
     'LastObserver.hpp',
+    'MapBothTaskObservable.hpp',
+    'MapBothTaskObserver.hpp',
     'MapErrorObservable.hpp',
     'MapErrorObserver.hpp',
     'MapObservable.hpp',
