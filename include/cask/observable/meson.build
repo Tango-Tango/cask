@@ -6,6 +6,7 @@ install_headers(
     'CallbackObserver.hpp',
     'CancelObservable.hpp',
     'DeferObservable.hpp',
+    'DeferTaskObservable.hpp',
     'DistinctUntilChangedObservable.hpp',
     'DistinctUntilChangedObserver.hpp',
     'EmptyObservable.hpp',
