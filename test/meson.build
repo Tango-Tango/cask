@@ -1,4 +1,4 @@
-if not meson.is_subproject()
+if get_option('build_tests')
     test_dependencies = [
         subproject('gtest').get_variable('gtest_dep'),
         subproject('trompeloeil').get_variable('trompeloeil_dep')
