@@ -104,3 +104,6 @@ cask_dep = declare_dependency(
     link_with: [cask_lib],
     include_directories: includes
 )
+
+pkg = import('pkgconfig')
+pkg.generate(cask_lib)
