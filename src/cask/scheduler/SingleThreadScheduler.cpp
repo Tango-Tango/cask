@@ -35,16 +35,13 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
 #if __linux__
     auto which = PRIO_PROCESS;
     setpriority(which, runThread.native_handle(), priority);
-    setpriority(which, timerThread.native_handle(), priority);
 #elif __APPLE__
     auto which = PRIO_PROCESS;
     uint64_t run_thread_id = 0;
-    uint64_t timer_thread_id = 0;
 
     pthread_threadid_np(runThread.native_handle(), &run_thread_id);
 
     setpriority(which, run_thread_id, priority);
-    setpriority(which, timer_thread_id, priority);
 #endif
 
 #if defined(__linux__) && defined(_GNU_SOURCE)
