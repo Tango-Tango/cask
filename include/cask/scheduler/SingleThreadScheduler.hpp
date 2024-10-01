@@ -60,13 +60,11 @@ private:
     mutable std::atomic_flag readyQueueLock = ATOMIC_FLAG_INIT;
     std::queue<std::function<void()>> readyQueue;
     std::mutex timerMutex;
-    std::condition_variable timerCondition;
     std::map<int64_t,std::vector<TimerEntry>> timers;
     int64_t last_execution_ms;
     std::atomic_int64_t next_id;
 
     void run();
-    void timer();
     static int64_t current_time_ms();
 
     class CancelableTimer final : public Cancelable {

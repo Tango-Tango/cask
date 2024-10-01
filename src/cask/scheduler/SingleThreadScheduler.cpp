@@ -31,7 +31,6 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
     , last_execution_ms(current_time_ms())
 {
     std::thread runThread(std::bind(&SingleThreadScheduler::run, this));
-    std::thread timerThread(std::bind(&SingleThreadScheduler::timer, this));
 
 #if __linux__
     auto which = PRIO_PROCESS;
@@ -43,7 +42,6 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
     uint64_t timer_thread_id = 0;
 
     pthread_threadid_np(runThread.native_handle(), &run_thread_id);
-    pthread_threadid_np(timerThread.native_handle(), &timer_thread_id);
 
     setpriority(which, run_thread_id, priority);
     setpriority(which, timer_thread_id, priority);
@@ -62,20 +60,14 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
 #endif
 
     runThread.detach();
-    timerThread.detach();
 
     while(!runner_running.load(std::memory_order_relaxed));
-    while(!timer_running.load(std::memory_order_relaxed));
 }
 
 SingleThreadScheduler::~SingleThreadScheduler() {
     should_run.store(false);
-
-    timerCondition.notify_one();
     idlingThread.notify_one();
-
     while(runner_running.load(std::memory_order_relaxed));
-    while(timer_running.load(std::memory_order_relaxed));
 }
 
 void SingleThreadScheduler::submit(const std::function<void()>& task) {
@@ -120,7 +112,7 @@ CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std
         id
     );
 
-    timerCondition.notify_one();
+    idlingThread.notify_one();
 
     return cancelable;
 }
@@ -132,14 +124,49 @@ bool SingleThreadScheduler::isIdle() const {
 void SingleThreadScheduler::run() {
     std::function<void()> task;
 
+    auto dormant_sleep_time = std::chrono::milliseconds(1000);
+    auto sleep_time = dormant_sleep_time;
+
     runner_running.store(true, std::memory_order_relaxed);
 
     while(should_run.load(std::memory_order_relaxed)) {
-        if(readyQueueSize.load(std::memory_order_relaxed) == 0) {
-            idle = true;
-            std::unique_lock<std::mutex> lock(idlingThreadMutex);
-            idlingThread.wait(lock);
-        } else {
+        auto current_time = current_time_ms();
+        std::vector<int64_t> expiredTimes;
+        std::vector<std::function<void()>> expiredTasks;
+
+        // Accumulate any expired tasks
+        {   
+            std::lock_guard<std::mutex> guard(timerMutex);
+            for (auto& [timer_time, entries] : timers) {
+                if (timer_time <= current_time) {
+                    expiredTasks.reserve(expiredTasks.size() + entries.size());
+
+                    for(auto& entry : entries) {
+                        expiredTasks.emplace_back(std::get<1>(entry));
+                    }
+
+                    expiredTimes.push_back(timer_time);
+                } else {
+                    break;
+                }
+            }
+
+            // Erase those timers from timer storage
+            for (auto& timerTime : expiredTimes) {
+                timers.erase(timerTime);
+            }
+        }
+
+        // Execute any expired timer tasks immediately
+        for(auto& timerTask : expiredTasks) {
+            timerTask();
+        }
+
+        // Drain the ready queue - being careful to observe if we should continue running
+        // and capping the number of tasks we'll run in a single loop iteration
+        auto task_batch_size = 128;
+
+        while (readyQueueSize.load(std::memory_order_relaxed) > 0 && should_run.load(std::memory_order_relaxed) && task_batch_size-- > 0) {
             idle = false;
             while(readyQueueLock.test_and_set(std::memory_order_acquire));
             task = readyQueue.front();
@@ -148,50 +175,13 @@ void SingleThreadScheduler::run() {
             readyQueueLock.clear(std::memory_order_release);
             task();
         }
-    }
 
-    runner_running.store(false, std::memory_order_relaxed);
-}
-
-void SingleThreadScheduler::timer() {
-    timer_running.store(true, std::memory_order_relaxed);
-
-    auto dormant_sleep_time = std::chrono::milliseconds(1000);
-    auto sleep_time = dormant_sleep_time;
-
-    while(true) {
-        auto current_time = current_time_ms();
-        std::unique_lock<std::mutex> lock(timerMutex);
-        timerCondition.wait_for(lock, sleep_time);
-
-        if (should_run.load(std::memory_order_relaxed)) {
-            std::vector<int64_t> expired;
-
-            // Submit any tasks associated with an expired
-            // timer to the scheduler
-            for (auto& [timer_time, entries] : timers) {
-                if (timer_time <= current_time) {
-                    std::vector<std::function<void()>> submittedTasks;
-
-                    submittedTasks.reserve(entries.size());
-
-                    for(auto& entry : entries) {
-                        submittedTasks.emplace_back(std::get<1>(entry));
-                    }
-
-                    submitBulk(submittedTasks);
-                    expired.push_back(timer_time);
-                } else {
-                    break;
-                }
-            }
-
-            // Erase those timers from timer storage
-            for (auto& timer_time : expired) {
-                timers.erase(timer_time);
-            }
-
-            // Compute the next sleep time
+        // Compute the next sleep time based on the current time, the next timer, and
+        // the number of remaining tasks in the ready queue
+        if (readyQueueSize.load(std::memory_order_relaxed) > 0) {
+            sleep_time = std::chrono::milliseconds(0);
+        } else {
+            std::lock_guard<std::mutex> guard(timerMutex);
             if (timers.empty()) {
                 sleep_time = dormant_sleep_time;
             } else {
@@ -204,12 +194,18 @@ void SingleThreadScheduler::timer() {
 
                 sleep_time = std::chrono::milliseconds(next_timer_sleep_time);
             }
-        } else {
-            break;
+        }
+
+        // Idle the run thread only if we've detect that we should sleep for
+        // some positive amount of time
+        if (sleep_time > std::chrono::milliseconds(0)) {
+            idle = true;
+            std::unique_lock<std::mutex> lock(idlingThreadMutex);
+            idlingThread.wait_for(lock, sleep_time);
         }
     }
 
-    timer_running.store(false, std::memory_order_relaxed);
+    runner_running.store(false, std::memory_order_relaxed);
 }
 
 int64_t SingleThreadScheduler::current_time_ms() {
