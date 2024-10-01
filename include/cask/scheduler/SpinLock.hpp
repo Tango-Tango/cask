@@ -36,12 +36,12 @@ private:
 
 class SpinLockGuard {
 public:
-    SpinLockGuard(SpinLock& lock);
+    explicit SpinLockGuard(SpinLock& lock);
     ~SpinLockGuard();
 private:
     SpinLock& lock;
 };
 
-}
+} // namespace cask::scheduler
 
 #endif
