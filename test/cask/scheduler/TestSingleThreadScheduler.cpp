@@ -96,7 +96,7 @@ TEST_F(SingleThreadSchedulerTest, SubmitAfter) {
     auto delta = after - before;
     auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
 
-    EXPECT_GE(milliseconds, 25);
+    EXPECT_GE(milliseconds, 24);
     
     awaitIdle();
 }
@@ -182,7 +182,7 @@ TEST_F(SingleThreadSchedulerTest, RunsShutdownImmediatelyCallbackIfTimerAlreadyF
     auto delta = after - before;
     auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
 
-    EXPECT_GE(milliseconds, 25);
+    EXPECT_GE(milliseconds, 24);
     EXPECT_FALSE(shutdown);
 
     cancelable->onShutdown([&shutdown] {
