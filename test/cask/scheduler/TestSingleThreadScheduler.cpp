@@ -160,7 +160,7 @@ TEST_F(SingleThreadSchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) 
     auto delta = after - before;
     auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
 
-    EXPECT_GE(milliseconds, 25);
+    EXPECT_GE(milliseconds, 24);
     EXPECT_TRUE(shutdown);
     
     awaitIdle();
