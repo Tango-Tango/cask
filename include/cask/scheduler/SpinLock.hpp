@@ -36,7 +36,7 @@ private:
 
 class SpinLockGuard {
 public:
-    explicit SpinLockGuard(SpinLock& lock);
+    explicit SpinLockGuard(SpinLock& lock); // NOLINT(google-runtime-references)
     ~SpinLockGuard();
 private:
     SpinLock& lock;
