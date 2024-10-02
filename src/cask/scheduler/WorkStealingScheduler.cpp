@@ -9,12 +9,16 @@
 
 namespace cask::scheduler {
 
-WorkStealingScheduler::WorkStealingScheduler(unsigned int poolSize, int priority) {
+WorkStealingScheduler::WorkStealingScheduler(unsigned int poolSize, int priority)
+    : runningThreadCount(0)
+{
     assert(poolSize > 0 && "Pool size must be greater than 0");
-    auto idle_callback = std::bind(&WorkStealingScheduler::onThreadIdle, this->weak_from_this(), std::placeholders::_1);
+    auto idle_callback = std::bind(&WorkStealingScheduler::onThreadIdle, this->weak_from_this());
+    auto resume_callback = std::bind(&WorkStealingScheduler::onThreadResume, this->weak_from_this());
+    auto request_work_callback = std::bind(&WorkStealingScheduler::onThreadRequestWork, this->weak_from_this());
 
     for(unsigned int i = 0; i < poolSize; i++) {
-        auto sched = std::make_shared<SingleThreadScheduler>(priority, idle_callback);
+        auto sched = std::make_shared<SingleThreadScheduler>(priority, idle_callback, resume_callback, request_work_callback);
         auto thread_id = sched->run_thread_id();
 
         threadIds.push_back(thread_id);
@@ -71,36 +75,60 @@ bool WorkStealingScheduler::isIdle() const {
     return true;
 }
 
-void WorkStealingScheduler::onThreadIdle(std::weak_ptr<WorkStealingScheduler> parent_scheduler, std::shared_ptr<SingleThreadScheduler> idle_scheduler) {
-    if (auto parent = parent_scheduler.lock()) {
-        auto random_start_index = std::size_t(std::abs(std::rand())) % parent->threadIds.size();
+void WorkStealingScheduler::onThreadIdle(std::weak_ptr<WorkStealingScheduler> self_weak) {
+    if (auto self = self_weak.lock()) {
+        self->runningThreadCount.fetch_sub(1);
+    }
+}
+
+void WorkStealingScheduler::onThreadResume(std::weak_ptr<WorkStealingScheduler> self_weak) {
+    if (auto self = self_weak.lock()) {
+        self->runningThreadCount.fetch_add(1);
+    }
+}
+
+std::vector<std::function<void()>> WorkStealingScheduler::onThreadRequestWork(std::weak_ptr<WorkStealingScheduler> self_weak) {
+    auto current_thread_id = std::this_thread::get_id();
+
+    if (auto self = self_weak.lock()) {
+        // Select a random starting point for work stealing as a simple way to balance work
+        // and avoid lock contention
+        auto random_start_index = std::size_t(std::abs(std::rand())) % self->threadIds.size();
         auto i = random_start_index;
 
         while (true) {
             // Try and find a scheduler to steal work from
-            auto thread_id = parent->threadIds[i];
-            auto scheduler_lookup = parent->schedulers.find(thread_id);
-            if (scheduler_lookup == parent->schedulers.end()) {
-                return;
-            }
+            auto thread_id = self->threadIds[i];
 
-            // Try and steal some work
-            auto batch = scheduler_lookup->second->steal(128);
+            // Skip the current thread (the scheduler thread) to avoid attempting to
+            // steal work from the scheduler requesting the work in the first place
+            if (thread_id != current_thread_id) {
+                // Check if the scheduler exists. If it doesn't then just give up since
+                // we are probably shutting down.
+                auto scheduler_lookup = self->schedulers.find(thread_id);
+                if (scheduler_lookup == self->schedulers.end()) {
+                    break;
+                }
 
-            // If a batch was stolen, submit it to the idle scheduler
-            if (batch.size() > 0) {
-                idle_scheduler->submitBulk(batch);
-                return;
+                // Try and steal some work
+                auto batch = scheduler_lookup->second->steal(128);
+
+                // If a batch was stolen, submit it to the idle scheduler
+                if (batch.size() > 0) {
+                    return batch;
+                }
             }
 
             // Move to the next thread - giving up if we've already
             // checked all threads
-            i = (i + 1) % parent->threadIds.size();
+            i = (i + 1) % self->threadIds.size();
             if (i == random_start_index) {
-                return;
+                break;
             }
         }
     }
+
+    return std::vector<std::function<void()>>();
 }
 
 } // namespace cask::scheduler

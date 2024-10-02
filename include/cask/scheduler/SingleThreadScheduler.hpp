@@ -7,7 +7,6 @@
 #define _CASK_SINGLE_THREAD_SCHEDULER_H_
 
 #include <atomic>
-#include <condition_variable>
 #include <map>
 #include <mutex>
 #include <thread>
@@ -15,18 +14,12 @@
 #include <vector>
 
 #include "../Scheduler.hpp"
-#include "SpinLock.hpp"
 
 namespace cask::scheduler {
     
 /**
- * The single thread scheduler only utilizes a single thread for processing submitted
- * work. It uses simpler lock-free protections where possible to protect its internal
- * structures. The result is a scheduler that is more optimized for applications where
- * the need for computational span across cores is not as strong. The benefit is greater
- * cache coherency and less time interacting with the OS for things like mutexes resulting
- * in faster handling of asynchrounous boundaries. This comes at the expensive of some amount
- * of fairness (because of spinlocks) and the inability to spread load across multiple cores.
+ * The single thread scheduler only utilizes a single thread for processing
+ * submitted work.
  */
 class SingleThreadScheduler final : public Scheduler, public std::enable_shared_from_this<SingleThreadScheduler> {
 public:
@@ -35,8 +28,9 @@ public:
      */
     explicit SingleThreadScheduler(
         int priority = 0,
-        std::function<void(std::shared_ptr<SingleThreadScheduler>)> on_idle = [](auto){},
-        std::function<void(std::shared_ptr<SingleThreadScheduler>)> on_resume = [](auto){}
+        std::function<void()> on_idle = [](){},
+        std::function<void()> on_resume = [](){},
+        std::function<std::vector<std::function<void()>>()> on_request_work = [](){ return std::vector<std::function<void()>>(); }
     );
 
     /**
@@ -62,24 +56,20 @@ public:
 private:
     using TimerEntry = std::tuple<int64_t, std::function<void()>>;
 
-    std::function<void(std::shared_ptr<SingleThreadScheduler>)> on_idle;
-    std::function<void(std::shared_ptr<SingleThreadScheduler>)> on_resume;
+    std::function<void()> on_idle;
+    std::function<void()> on_resume;
+    std::function<std::vector<std::function<void()>>()> on_request_work;
 
     std::atomic_bool should_run;
-    std::atomic_bool idle;
+    bool idle;
     std::atomic_bool runner_running;
 
-    std::condition_variable dataInQueue;
-
-    mutable std::mutex idlingThreadMutex;
-    mutable std::condition_variable idlingThread;
-    mutable std::atomic_size_t readyQueueSize;
-    mutable SpinLock readyQueueLock;
-    mutable SpinLock timerLock;
+    mutable std::mutex mutex;
+    mutable std::condition_variable workAvailable;
+    
     std::queue<std::function<void()>> readyQueue;
     std::map<int64_t,std::vector<TimerEntry>> timers;
-    int64_t last_execution_ms;
-    std::atomic_int64_t next_id;
+    std::int64_t next_id;
     std::thread::id runThreadId;
 
     void run();

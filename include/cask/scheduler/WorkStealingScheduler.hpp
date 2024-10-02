@@ -6,6 +6,7 @@
 #ifndef _CASK_WORK_STEALING_SCHEDULER_H_
 #define _CASK_WORK_STEALING_SCHEDULER_H_
 
+#include <atomic>
 #include <map>
 #include <memory>
 #include <set>
@@ -27,10 +28,13 @@ public:
     bool isIdle() const override;
 
 private:
+    std::atomic_size_t runningThreadCount;
     std::vector<std::thread::id> threadIds;
     std::map<std::thread::id, std::shared_ptr<SingleThreadScheduler>> schedulers;
 
-    static void onThreadIdle(std::weak_ptr<WorkStealingScheduler> parent_scheduler, std::shared_ptr<SingleThreadScheduler> idle_scheduler);
+    static void onThreadIdle(std::weak_ptr<WorkStealingScheduler> self_weak);
+    static void onThreadResume(std::weak_ptr<WorkStealingScheduler> self_weak);
+    static std::vector<std::function<void()>> onThreadRequestWork(std::weak_ptr<WorkStealingScheduler> self_weak);
 };
 
 } // namespace cask::scheduler

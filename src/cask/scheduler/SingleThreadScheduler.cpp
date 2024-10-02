@@ -21,18 +21,17 @@ namespace cask::scheduler {
 
 SingleThreadScheduler::SingleThreadScheduler(
     int priority,
-    std::function<void(std::shared_ptr<SingleThreadScheduler>)> on_idle,
-    std::function<void(std::shared_ptr<SingleThreadScheduler>)> on_resume)
+    std::function<void()> on_idle,
+    std::function<void()> on_resume,
+    std::function<std::vector<std::function<void()>>()> on_request_work)
     : on_idle(on_idle)
     , on_resume(on_resume)
+    , on_request_work(on_request_work)
     , should_run(true)
     , idle(true)
     , runner_running(false)
-    , dataInQueue()
-    , readyQueueSize(0)
     , readyQueue()
     , timers()
-    , last_execution_ms(current_time_ms())
 {
     std::thread runThread(std::bind(&SingleThreadScheduler::run, this));
 
@@ -71,8 +70,7 @@ SingleThreadScheduler::SingleThreadScheduler(
 
 SingleThreadScheduler::~SingleThreadScheduler() {
     should_run.store(false);
-    idlingThread.notify_one();
-
+    workAvailable.notify_all();
 
     // Wait for the run thread to stop. Use a relaxed fence since we're
     // just waiting for the thread to stop and it's fine if the value
@@ -85,68 +83,53 @@ std::thread::id SingleThreadScheduler::run_thread_id() const {
 }
 
 std::vector<std::function<void()>> SingleThreadScheduler::steal(std::size_t batch_size) {
+    std::lock_guard<std::mutex> lock(mutex);
+
     std::function<void()> task;
     std::vector<std::function<void()>> batch;
 
-    {
-        SpinLockGuard guard(readyQueueLock);
-        auto queueSize = readyQueueSize.load(std::memory_order_relaxed);
-        auto batchSize = std::min(queueSize, batch_size);
-        batch.reserve(batchSize);
+    auto batchSize = std::min(readyQueue.size(), batch_size);
+    batch.reserve(batchSize);
 
-        while(batch.size() < batchSize) {
-            task = readyQueue.front();
-            readyQueue.pop();
-            batch.emplace_back(task);
-        }
+    while(batch.size() < batchSize) {
+        task = readyQueue.front();
+        readyQueue.pop();
+        batch.emplace_back(task);
     }
 
     return batch;
 }
 
 void SingleThreadScheduler::submit(const std::function<void()>& task) {
-    {
-        SpinLockGuard guard(readyQueueLock);
-        readyQueue.emplace(task);
-
-        // Increment the ready queue size with relaxed memory ordering
-        // since the SpinLockGuard above provides the necessary release
-        // fence
-        readyQueueSize.fetch_add(1, std::memory_order_relaxed);
-    }
-    idlingThread.notify_one();
+    std::lock_guard<std::mutex> lock(mutex);
+    readyQueue.emplace(task);
+    workAvailable.notify_all();
 }
 
 void SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
-    {
-        SpinLockGuard guard(readyQueueLock);
-        for(auto& task: tasks) {
-            readyQueue.emplace(task);
-        }
-
-        // Increment the ready queue size with relaxed memory ordering
-        // since the SpinLockGuard above provides the necessary release
-        // fence
-        readyQueueSize.fetch_add(tasks.size(), std::memory_order_relaxed);
+    std::lock_guard<std::mutex> lock(mutex);
+    
+    for(auto& task: tasks) {
+        readyQueue.emplace(task);
     }
-    idlingThread.notify_one();
+
+    workAvailable.notify_all();
 }
 
 CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
+    std::lock_guard<std::mutex> lock(mutex);
+
     auto id = next_id++;
     auto executionTick = current_time_ms() + milliseconds;
 
-    {
-        SpinLockGuard guard(timerLock);
-        auto tasks = timers.find(executionTick);
-        auto entry = std::make_tuple(id, task);
-        
-        if(tasks == timers.end()) {
-            std::vector<TimerEntry> taskVector = {entry};
-            timers[executionTick] = taskVector;
-        } else {
-            tasks->second.push_back(entry);
-        }
+    auto tasks = timers.find(executionTick);
+    auto entry = std::make_tuple(id, task);
+    
+    if(tasks == timers.end()) {
+        std::vector<TimerEntry> taskVector = {entry};
+        timers[executionTick] = taskVector;
+    } else {
+        tasks->second.push_back(entry);
     }
 
     auto cancelable = std::make_shared<CancelableTimer>(
@@ -155,13 +138,14 @@ CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std
         id
     );
 
-    idlingThread.notify_one();
+    workAvailable.notify_all();
 
     return cancelable;
 }
 
 bool SingleThreadScheduler::isIdle() const {
-    return idle && readyQueueSize.load() == 0;
+    std::lock_guard<std::mutex> lock(mutex);
+    return idle;
 }
 
 void SingleThreadScheduler::run() {
@@ -176,26 +160,21 @@ void SingleThreadScheduler::run() {
 
     runner_running.store(true, std::memory_order_relaxed);
     while(should_run.load(std::memory_order_relaxed)) {
+        std::vector<std::function<void()>> batch;
         auto iterationStartTime = current_time_ms();
-        std::vector<int64_t> expiredTimes;
-        std::vector<std::function<void()>> expiredTasks;
 
-        if (idle) {
-            idle = false;
-            if (auto self = this->weak_from_this().lock()) {
-                on_resume(self);
-            }
-        }
+        // Grab the lock and accumulate a batch of work including any
+        // expired timers, tasks drained from the ready queue, and
+        // finally work stolen from other schedulers.
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            std::vector<int64_t> expiredTimes;
 
-        // Accumulate any expired tasks
-        {   
-            SpinLockGuard guard(timerLock);
+            // Accumulate any expired tasks
             for (auto& [timer_time, entries] : timers) {
                 if (timer_time <= iterationStartTime) {
-                    expiredTasks.reserve(expiredTasks.size() + entries.size());
-
                     for(auto& entry : entries) {
-                        expiredTasks.emplace_back(std::get<1>(entry));
+                        batch.emplace_back(std::get<1>(entry));
                     }
 
                     expiredTimes.push_back(timer_time);
@@ -208,35 +187,25 @@ void SingleThreadScheduler::run() {
             for (auto& timerTime : expiredTimes) {
                 timers.erase(timerTime);
             }
-        }
 
-        // Execute any expired timer tasks immediately
-        for(auto& timerTask : expiredTasks) {
-            timerTask();
-        }
-
-        // Drain a batch of tasks from the ready queue. We'll determine the batch
-        // size with relaxed memory ordering because even a stale value is fine
-        // since any stale values will be strictly less than the current value (this
-        // method is the only method that _decrements_ the value and it does so inside
-        // of a guard providing acquire/release fencing).
-        std::vector<std::function<void()>> batch;
-        auto queueSize = readyQueueSize.load(std::memory_order_relaxed);
-        auto batchSize = std::min(queueSize, std::size_t(128));
-
-        if (batchSize > 0) {
-            SpinLockGuard guard(readyQueueLock);
-            batch.reserve(batchSize);
+            // Fill the batch with ready tasks by draining the ready queue
+            auto batchSize = std::min(readyQueue.size(), std::size_t(128));
             while(batch.size() < batchSize) {
                 task = readyQueue.front();
                 readyQueue.pop();
                 batch.emplace_back(task);
             }
 
-            // Decrement the ready queue size with a relaxed fence
-            // since the SpinLockGuard above provides the necessary
-            // release fence
-            readyQueueSize.fetch_sub(batchSize, std::memory_order_relaxed);
+            // If we didn't find any work, request some from the parent scheduler
+            if (batch.empty()) {
+                batch = on_request_work();
+            }
+
+            // If we are transitioning from idle to running, call the on_resume callback
+            if (idle && !batch.empty()) {
+                idle = false;
+                on_resume();
+            }
         }
 
         // Execute the batch of tasks
@@ -244,15 +213,10 @@ void SingleThreadScheduler::run() {
             task();
         }
 
-        // Compute the next sleep time based on the current time, the next timer expiration
-        // time, and the number of remaining tasks in the ready queue
-        if (readyQueueSize.load(std::memory_order_relaxed) > 0) {
-            sleep_time = std::chrono::milliseconds(0);
-        } else {
-            SpinLockGuard guard(timerLock);
-            if (timers.empty()) {
-                sleep_time = dormant_sleep_time;
-            } else {
+        {
+            std::unique_lock<std::mutex> lock(mutex);
+
+            if (readyQueue.empty()) {
                 auto next_timer = timers.begin();
                 auto next_timer_time = next_timer->first;
                 auto next_timer_sleep_time = std::chrono::milliseconds(next_timer_time - iterationStartTime);
@@ -261,32 +225,13 @@ void SingleThreadScheduler::run() {
                 next_timer_sleep_time = std::max(next_timer_sleep_time, std::chrono::milliseconds(0));
 
                 sleep_time = std::chrono::milliseconds(next_timer_sleep_time);
-            }
-        }
 
-        // Idle the run thread only if we've detect that we should sleep for
-        // some positive amount of time. This should be the _only_ time we
-        // give the kernel the opportunity to sleep our run thread.
-        //
-        // We'll also call the on_idle callback if we're going to sleep. That
-        // gives an opportunity for a higher-level scheduler to add work
-        // if needed.
-        if (sleep_time > std::chrono::milliseconds(0)) {
-            
-            idle = true;
-            
-            // Try and call the on_idle callback
-            if (auto self = this->weak_from_this().lock()) {
-                on_idle(self);
-            }
+                if (!idle) {
+                    idle = true;
+                    on_idle();
+                }
 
-            // Check again to see if any new tasks were stolen
-            if (readyQueueSize.load(std::memory_order_relaxed) > 0) {
-                continue;
-            } else {
-                // The idle callback produced no new work, so we can sleep
-                std::unique_lock<std::mutex> lock(idlingThreadMutex);
-                idlingThread.wait_for(lock, sleep_time);
+                workAvailable.wait_for(lock, sleep_time);
             }
         }
     }
@@ -317,7 +262,7 @@ void SingleThreadScheduler::CancelableTimer::cancel() {
     if(canceled) {
         return;
     } else {
-        SpinLockGuard parent_guard(parent->timerLock);
+        std::lock_guard<std::mutex> parent_guard(parent->mutex);
         std::lock_guard<std::mutex> self_guard(callback_mutex);
         auto tasks = parent->timers.find(time_slot);
         if(tasks != parent->timers.end()) {
@@ -361,7 +306,7 @@ void SingleThreadScheduler::CancelableTimer::onShutdown(const std::function<void
     bool found = false;
 
     {
-        SpinLockGuard parent_guard(parent->timerLock);
+        std::lock_guard<std::mutex> parent_guard(parent->mutex);
         std::lock_guard<std::mutex> self_guard(callback_mutex);
         auto tasks = parent->timers.find(time_slot);
 
