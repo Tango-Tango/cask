@@ -6,6 +6,7 @@ cask_sources = [
     'cask/pool/InternalPool.cpp',
     'cask/scheduler/BenchScheduler.cpp',
     'cask/scheduler/SingleThreadScheduler.cpp',
+    'cask/scheduler/SpinLock.cpp',
     'cask/scheduler/ThreadPoolScheduler.cpp'
 ]
 

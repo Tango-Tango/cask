@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "../Scheduler.hpp"
+#include "SpinLock.hpp"
 
 namespace cask::scheduler {
     
@@ -49,7 +50,6 @@ private:
 
     std::atomic_bool should_run;
     std::atomic_bool idle;
-    std::atomic_bool timer_running;
     std::atomic_bool runner_running;
 
     std::condition_variable dataInQueue;
@@ -57,16 +57,14 @@ private:
     mutable std::mutex idlingThreadMutex;
     mutable std::condition_variable idlingThread;
     mutable std::atomic_size_t readyQueueSize;
-    mutable std::atomic_flag readyQueueLock = ATOMIC_FLAG_INIT;
+    mutable SpinLock readyQueueLock;
+    mutable SpinLock timerLock;
     std::queue<std::function<void()>> readyQueue;
-    std::mutex timerMutex;
-    std::condition_variable timerCondition;
     std::map<int64_t,std::vector<TimerEntry>> timers;
     int64_t last_execution_ms;
     std::atomic_int64_t next_id;
 
     void run();
-    void timer();
     static int64_t current_time_ms();
 
     class CancelableTimer final : public Cancelable {

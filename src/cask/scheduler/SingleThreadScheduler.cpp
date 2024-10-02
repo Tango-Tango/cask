@@ -4,6 +4,7 @@
 //          https://www.boost.org/LICENSE_1_0.txt)
 
 #include "cask/scheduler/SingleThreadScheduler.hpp"
+#include "cask/scheduler/SpinLock.hpp"
 #include <algorithm>
 #include <chrono>
 
@@ -21,32 +22,25 @@ namespace cask::scheduler {
 SingleThreadScheduler::SingleThreadScheduler(int priority)
     : should_run(true)
     , idle(true)
-    , timer_running(false)
     , runner_running(false)
     , dataInQueue()
     , readyQueueSize(0)
     , readyQueue()
-    , timerMutex()
     , timers()
     , last_execution_ms(current_time_ms())
 {
     std::thread runThread(std::bind(&SingleThreadScheduler::run, this));
-    std::thread timerThread(std::bind(&SingleThreadScheduler::timer, this));
 
 #if __linux__
     auto which = PRIO_PROCESS;
     setpriority(which, runThread.native_handle(), priority);
-    setpriority(which, timerThread.native_handle(), priority);
 #elif __APPLE__
     auto which = PRIO_PROCESS;
     uint64_t run_thread_id = 0;
-    uint64_t timer_thread_id = 0;
 
     pthread_threadid_np(runThread.native_handle(), &run_thread_id);
-    pthread_threadid_np(timerThread.native_handle(), &timer_thread_id);
 
     setpriority(which, run_thread_id, priority);
-    setpriority(which, timer_thread_id, priority);
 #endif
 
 #if defined(__linux__) && defined(_GNU_SOURCE)
@@ -62,37 +56,49 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
 #endif
 
     runThread.detach();
-    timerThread.detach();
 
+    // Wait for the run thread to start. Use a relaxed fence since we're
+    // just waiting for the thread to start and it's fine if the value
+    // takes some time to propagate.
     while(!runner_running.load(std::memory_order_relaxed));
-    while(!timer_running.load(std::memory_order_relaxed));
 }
 
 SingleThreadScheduler::~SingleThreadScheduler() {
     should_run.store(false);
-
-    timerCondition.notify_one();
     idlingThread.notify_one();
 
+
+    // Wait for the run thread to stop. Use a relaxed fence since we're
+    // just waiting for the thread to stop and it's fine if the value
+    // takes some time to propagate.
     while(runner_running.load(std::memory_order_relaxed));
-    while(timer_running.load(std::memory_order_relaxed));
 }
 
 void SingleThreadScheduler::submit(const std::function<void()>& task) {
-    while(readyQueueLock.test_and_set(std::memory_order_acquire));
-    readyQueue.emplace(task);
-    readyQueueSize.fetch_add(1, std::memory_order_relaxed);
-    readyQueueLock.clear(std::memory_order_release);
+    {
+        SpinLockGuard guard(readyQueueLock);
+        readyQueue.emplace(task);
+
+        // Increment the ready queue size with relaxed memory ordering
+        // since the SpinLockGuard above provides the necessary release
+        // fence
+        readyQueueSize.fetch_add(1, std::memory_order_relaxed);
+    }
     idlingThread.notify_one();
 }
 
 void SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
-    while(readyQueueLock.test_and_set(std::memory_order_acquire));
-    for(auto& task: tasks) {
-        readyQueue.emplace(task);
+    {
+        SpinLockGuard guard(readyQueueLock);
+        for(auto& task: tasks) {
+            readyQueue.emplace(task);
+        }
+
+        // Increment the ready queue size with relaxed memory ordering
+        // since the SpinLockGuard above provides the necessary release
+        // fence
+        readyQueueSize.fetch_add(tasks.size(), std::memory_order_relaxed);
     }
-    readyQueueSize.fetch_add(tasks.size(), std::memory_order_relaxed);
-    readyQueueLock.clear(std::memory_order_release);
     idlingThread.notify_one();
 }
 
@@ -101,8 +107,7 @@ CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std
     auto executionTick = current_time_ms() + milliseconds;
 
     {
-        std::lock_guard<std::mutex> guard(timerMutex);
-
+        SpinLockGuard guard(timerLock);
         auto tasks = timers.find(executionTick);
         auto entry = std::make_tuple(id, task);
         
@@ -120,7 +125,7 @@ CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std
         id
     );
 
-    timerCondition.notify_one();
+    idlingThread.notify_one();
 
     return cancelable;
 }
@@ -132,84 +137,110 @@ bool SingleThreadScheduler::isIdle() const {
 void SingleThreadScheduler::run() {
     std::function<void()> task;
 
-    runner_running.store(true, std::memory_order_relaxed);
-
-    while(should_run.load(std::memory_order_relaxed)) {
-        if(readyQueueSize.load(std::memory_order_relaxed) == 0) {
-            idle = true;
-            std::unique_lock<std::mutex> lock(idlingThreadMutex);
-            idlingThread.wait(lock);
-        } else {
-            idle = false;
-            while(readyQueueLock.test_and_set(std::memory_order_acquire));
-            task = readyQueue.front();
-            readyQueue.pop();
-            readyQueueSize.fetch_sub(1, std::memory_order_relaxed);
-            readyQueueLock.clear(std::memory_order_release);
-            task();
-        }
-    }
-
-    runner_running.store(false, std::memory_order_relaxed);
-}
-
-void SingleThreadScheduler::timer() {
-    timer_running.store(true, std::memory_order_relaxed);
-
     auto dormant_sleep_time = std::chrono::milliseconds(1000);
     auto sleep_time = dormant_sleep_time;
 
-    while(true) {
-        auto current_time = current_time_ms();
-        std::unique_lock<std::mutex> lock(timerMutex);
-        timerCondition.wait_for(lock, sleep_time);
+    // Using relaxed fences here since the values of these flags
+    // can be stale so long as they eventually (within a few
+    // iterations) become the correct value.
 
-        if (should_run.load(std::memory_order_relaxed)) {
-            std::vector<int64_t> expired;
+    runner_running.store(true, std::memory_order_relaxed);
+    while(should_run.load(std::memory_order_relaxed)) {
+        auto iterationStartTime = current_time_ms();
+        std::vector<int64_t> expiredTimes;
+        std::vector<std::function<void()>> expiredTasks;
 
-            // Submit any tasks associated with an expired
-            // timer to the scheduler
+        // Accumulate any expired tasks
+        {   
+            SpinLockGuard guard(timerLock);
             for (auto& [timer_time, entries] : timers) {
-                if (timer_time <= current_time) {
-                    std::vector<std::function<void()>> submittedTasks;
-
-                    submittedTasks.reserve(entries.size());
+                if (timer_time <= iterationStartTime) {
+                    expiredTasks.reserve(expiredTasks.size() + entries.size());
 
                     for(auto& entry : entries) {
-                        submittedTasks.emplace_back(std::get<1>(entry));
+                        expiredTasks.emplace_back(std::get<1>(entry));
                     }
 
-                    submitBulk(submittedTasks);
-                    expired.push_back(timer_time);
+                    expiredTimes.push_back(timer_time);
                 } else {
                     break;
                 }
             }
 
             // Erase those timers from timer storage
-            for (auto& timer_time : expired) {
-                timers.erase(timer_time);
+            for (auto& timerTime : expiredTimes) {
+                timers.erase(timerTime);
+            }
+        }
+
+        // Execute any expired timer tasks immediately
+        for(auto& timerTask : expiredTasks) {
+            timerTask();
+        }
+
+        // Drain a batch of tasks from the ready queue. We'll determine the batch
+        // size with relaxed memory ordering because even a stale value is fine
+        // since any stale values will be strictly less than the current value (this
+        // method is the only method that _decrements_ the value and it does so inside
+        // of a guard providing acquire/release fencing).
+        std::vector<std::function<void()>> batch;
+        auto queueSize = readyQueueSize.load(std::memory_order_relaxed);
+        auto batchSize = std::min(queueSize, std::size_t(128));
+
+        if (batchSize > 0) {
+            SpinLockGuard guard(readyQueueLock);
+            batch.reserve(batchSize);
+            while(batch.size() < batchSize) {
+                task = readyQueue.front();
+                readyQueue.pop();
+                batch.emplace_back(task);
             }
 
-            // Compute the next sleep time
+            // Decrement the ready queue size with a relaxed fence
+            // since the SpinLockGuard above provides the necessary
+            // release fence
+            readyQueueSize.fetch_sub(batchSize, std::memory_order_relaxed);
+        }
+
+        // Execute the batch of tasks
+        for(auto& task : batch) {
+            task();
+        }
+
+        // Compute the next sleep time based on the current time, the next timer expiration
+        // time, and the number of remaining tasks in the ready queue
+        if (readyQueueSize.load(std::memory_order_relaxed) > 0) {
+            sleep_time = std::chrono::milliseconds(0);
+        } else {
+            SpinLockGuard guard(timerLock);
             if (timers.empty()) {
                 sleep_time = dormant_sleep_time;
             } else {
                 auto next_timer = timers.begin();
                 auto next_timer_time = next_timer->first;
-                auto next_timer_sleep_time = std::chrono::milliseconds(next_timer_time - current_time);
+                auto next_timer_sleep_time = std::chrono::milliseconds(next_timer_time - iterationStartTime);
 
                 next_timer_sleep_time = std::min(next_timer_sleep_time, dormant_sleep_time);
                 next_timer_sleep_time = std::max(next_timer_sleep_time, std::chrono::milliseconds(0));
 
                 sleep_time = std::chrono::milliseconds(next_timer_sleep_time);
             }
-        } else {
-            break;
+        }
+
+        // Idle the run thread only if we've detect that we should sleep for
+        // some positive amount of time. This should be the _only_ time we
+        // give the kernel the opportunity to sleep our run thread.
+        if (sleep_time > std::chrono::milliseconds(0)) {
+            idle = true;
+            std::unique_lock<std::mutex> lock(idlingThreadMutex);
+            idlingThread.wait_for(lock, sleep_time);
         }
     }
 
-    timer_running.store(false, std::memory_order_relaxed);
+    // A relaxed fence is sufficient here since this is only used for
+    // synchronization with the destructor and it's fine if the value
+    // takes some amount of time to propagate.
+    runner_running.store(false, std::memory_order_relaxed);
 }
 
 int64_t SingleThreadScheduler::current_time_ms() {
@@ -232,7 +263,7 @@ void SingleThreadScheduler::CancelableTimer::cancel() {
     if(canceled) {
         return;
     } else {
-        std::lock_guard<std::mutex> parent_guard(parent->timerMutex);
+        SpinLockGuard parent_guard(parent->timerLock);
         std::lock_guard<std::mutex> self_guard(callback_mutex);
         auto tasks = parent->timers.find(time_slot);
         if(tasks != parent->timers.end()) {
@@ -276,7 +307,7 @@ void SingleThreadScheduler::CancelableTimer::onShutdown(const std::function<void
     bool found = false;
 
     {
-        std::lock_guard<std::mutex> parent_guard(parent->timerMutex);
+        SpinLockGuard parent_guard(parent->timerLock);
         std::lock_guard<std::mutex> self_guard(callback_mutex);
         auto tasks = parent->timers.find(time_slot);
 
