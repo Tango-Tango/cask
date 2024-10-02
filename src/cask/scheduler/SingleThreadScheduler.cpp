@@ -22,7 +22,6 @@ namespace cask::scheduler {
 SingleThreadScheduler::SingleThreadScheduler(int priority)
     : should_run(true)
     , idle(true)
-    , timer_running(false)
     , runner_running(false)
     , dataInQueue()
     , readyQueueSize(0)

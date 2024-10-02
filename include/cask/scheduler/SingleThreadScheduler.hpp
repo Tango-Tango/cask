@@ -50,7 +50,6 @@ private:
 
     std::atomic_bool should_run;
     std::atomic_bool idle;
-    std::atomic_bool timer_running;
     std::atomic_bool runner_running;
 
     std::condition_variable dataInQueue;
