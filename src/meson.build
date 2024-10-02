@@ -7,7 +7,8 @@ cask_sources = [
     'cask/scheduler/BenchScheduler.cpp',
     'cask/scheduler/SingleThreadScheduler.cpp',
     'cask/scheduler/SpinLock.cpp',
-    'cask/scheduler/ThreadPoolScheduler.cpp'
+    'cask/scheduler/ThreadPoolScheduler.cpp',
+    'cask/scheduler/WorkStealingScheduler.cpp'
 ]
 
 cask_lib = static_library('cask',

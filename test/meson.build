@@ -54,6 +54,7 @@ if get_option('build_tests')
         'cask/scheduler/TestBenchScheduler.cpp',
         'cask/scheduler/TestSingleThreadScheduler.cpp',
         'cask/scheduler/TestThreadPoolScheduler.cpp',
+        'cask/scheduler/TestWorkStealingScheduler.cpp',
         'cask/task/TestTaskAssignment.cpp',
         'cask/task/TestTaskAsyncBoundary.cpp',
         'cask/task/TestTaskDefer.cpp',

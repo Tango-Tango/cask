@@ -33,7 +33,11 @@ public:
     /**
      * Construct a single threaded scheduler.
      */
-    explicit SingleThreadScheduler(int priority = 0);
+    explicit SingleThreadScheduler(
+        int priority = 0,
+        std::function<void(std::shared_ptr<SingleThreadScheduler>)> on_idle = [](auto){},
+        std::function<void(std::shared_ptr<SingleThreadScheduler>)> on_resume = [](auto){}
+    );
 
     /**
      * Destruct the scheduler. Destruction waits for all running and timer
@@ -41,12 +45,25 @@ public:
      */
     ~SingleThreadScheduler();
 
+    /**
+     * Determine the run thread's ID
+     */
+    std::thread::id run_thread_id() const;
+
+    /**
+     * Steal some work from this scheduler's ready queue.
+     */
+    std::vector<std::function<void()>> steal(std::size_t batch_size);
+
     void submit(const std::function<void()>& task) override;
     void submitBulk(const std::vector<std::function<void()>>& tasks) override;
     CancelableRef submitAfter(int64_t milliseconds, const std::function<void()>& task) override;
     bool isIdle() const override;
 private:
     using TimerEntry = std::tuple<int64_t, std::function<void()>>;
+
+    std::function<void(std::shared_ptr<SingleThreadScheduler>)> on_idle;
+    std::function<void(std::shared_ptr<SingleThreadScheduler>)> on_resume;
 
     std::atomic_bool should_run;
     std::atomic_bool idle;
@@ -63,6 +80,7 @@ private:
     std::map<int64_t,std::vector<TimerEntry>> timers;
     int64_t last_execution_ms;
     std::atomic_int64_t next_id;
+    std::thread::id runThreadId;
 
     void run();
     static int64_t current_time_ms();

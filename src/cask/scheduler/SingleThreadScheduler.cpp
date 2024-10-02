@@ -19,8 +19,13 @@ using namespace std::chrono_literals;
 
 namespace cask::scheduler {
 
-SingleThreadScheduler::SingleThreadScheduler(int priority)
-    : should_run(true)
+SingleThreadScheduler::SingleThreadScheduler(
+    int priority,
+    std::function<void(std::shared_ptr<SingleThreadScheduler>)> on_idle,
+    std::function<void(std::shared_ptr<SingleThreadScheduler>)> on_resume)
+    : on_idle(on_idle)
+    , on_resume(on_resume)
+    , should_run(true)
     , idle(true)
     , runner_running(false)
     , dataInQueue()
@@ -55,6 +60,7 @@ SingleThreadScheduler::SingleThreadScheduler(int priority)
     pthread_setaffinity_np(handle, sizeof(cpu_set_t), &cpuset);
 #endif
 
+    runThreadId = runThread.get_id();
     runThread.detach();
 
     // Wait for the run thread to start. Use a relaxed fence since we're
@@ -72,6 +78,30 @@ SingleThreadScheduler::~SingleThreadScheduler() {
     // just waiting for the thread to stop and it's fine if the value
     // takes some time to propagate.
     while(runner_running.load(std::memory_order_relaxed));
+}
+
+std::thread::id SingleThreadScheduler::run_thread_id() const {
+    return runThreadId;
+}
+
+std::vector<std::function<void()>> SingleThreadScheduler::steal(std::size_t batch_size) {
+    std::function<void()> task;
+    std::vector<std::function<void()>> batch;
+
+    {
+        SpinLockGuard guard(readyQueueLock);
+        auto queueSize = readyQueueSize.load(std::memory_order_relaxed);
+        auto batchSize = std::min(queueSize, batch_size);
+        batch.reserve(batchSize);
+
+        while(batch.size() < batchSize) {
+            task = readyQueue.front();
+            readyQueue.pop();
+            batch.emplace_back(task);
+        }
+    }
+
+    return batch;
 }
 
 void SingleThreadScheduler::submit(const std::function<void()>& task) {
@@ -149,6 +179,13 @@ void SingleThreadScheduler::run() {
         auto iterationStartTime = current_time_ms();
         std::vector<int64_t> expiredTimes;
         std::vector<std::function<void()>> expiredTasks;
+
+        if (idle) {
+            idle = false;
+            if (auto self = this->weak_from_this().lock()) {
+                on_resume(self);
+            }
+        }
 
         // Accumulate any expired tasks
         {   
@@ -230,10 +267,27 @@ void SingleThreadScheduler::run() {
         // Idle the run thread only if we've detect that we should sleep for
         // some positive amount of time. This should be the _only_ time we
         // give the kernel the opportunity to sleep our run thread.
+        //
+        // We'll also call the on_idle callback if we're going to sleep. That
+        // gives an opportunity for a higher-level scheduler to add work
+        // if needed.
         if (sleep_time > std::chrono::milliseconds(0)) {
+            
             idle = true;
-            std::unique_lock<std::mutex> lock(idlingThreadMutex);
-            idlingThread.wait_for(lock, sleep_time);
+            
+            // Try and call the on_idle callback
+            if (auto self = this->weak_from_this().lock()) {
+                on_idle(self);
+            }
+
+            // Check again to see if any new tasks were stolen
+            if (readyQueueSize.load(std::memory_order_relaxed) > 0) {
+                continue;
+            } else {
+                // The idle callback produced no new work, so we can sleep
+                std::unique_lock<std::mutex> lock(idlingThreadMutex);
+                idlingThread.wait_for(lock, sleep_time);
+            }
         }
     }
 
