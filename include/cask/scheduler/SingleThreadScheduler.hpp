@@ -9,6 +9,7 @@
 #include <atomic>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <queue>
 #include <vector>
@@ -27,7 +28,8 @@ public:
      * Construct a single threaded scheduler.
      */
     explicit SingleThreadScheduler(
-        int priority = 0,
+        std::optional<int> priority = std::nullopt,
+        std::optional<int> pinned_core = std::nullopt,
         std::function<void()> on_idle = [](){},
         std::function<void()> on_resume = [](){},
         std::function<std::vector<std::function<void()>>()> on_request_work = [](){ return std::vector<std::function<void()>>(); }

@@ -7,6 +7,10 @@
 #include "gtest/gtest.h"
 #include "gtest/trompeloeil.hpp"
 #include "cask/Observable.hpp"
+#include "cask/Scheduler.hpp"
+#include "cask/scheduler/SingleThreadScheduler.hpp"
+#include "cask/scheduler/WorkStealingScheduler.hpp"
+#include "cask/scheduler/ThreadPoolScheduler.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::Observable;
@@ -18,6 +22,9 @@ using cask::None;
 using cask::Ack;
 using cask::observable::SwitchMapObserver;
 using cask::scheduler::BenchScheduler;
+using cask::scheduler::SingleThreadScheduler;
+using cask::scheduler::ThreadPoolScheduler;
+using cask::scheduler::WorkStealingScheduler;
 
 class MockSwitchMapDownstreamObserver : public trompeloeil::mock_interface<Observer<float,std::string>> {
 public:
@@ -43,8 +50,18 @@ void awaitIdle() {
     FAIL() << "Expected scheduler to return to idle within 60 seconds.";
 }
 
-TEST(ObservableSwitchMap, Empty) {
-    auto sched = Scheduler::global();
+class ObservableSwitchMapTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
+protected:
+
+    void SetUp() override {
+        sched = GetParam();
+    }
+
+    std::shared_ptr<Scheduler> sched;
+};
+
+
+TEST_P(ObservableSwitchMapTest, Empty) {
     auto result = Observable<int>::empty()
         ->switchMap<float>([](auto value) {
             return Observable<float>::pure(value * 1.5);
@@ -57,8 +74,7 @@ TEST(ObservableSwitchMap, Empty) {
     awaitIdle();
 }
 
-TEST(ObservableSwitchMap, Pure) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, Pure) {
     auto result = Observable<int>::pure(123)
         ->switchMap<float>([](auto value) {
             return Observable<float>::pure(value * 1.5);
@@ -72,8 +88,7 @@ TEST(ObservableSwitchMap, Pure) {
     awaitIdle();
 }
 
-TEST(ObservableSwitchMap, UpstreamError) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, UpstreamError) {
     auto result = Observable<int,std::string>::raiseError("broke")
         ->switchMap<float>([](auto value) {
             return Observable<float,std::string>::pure(value * 1.5);
@@ -87,8 +102,7 @@ TEST(ObservableSwitchMap, UpstreamError) {
     awaitIdle();
 }
 
-TEST(ObservableSwitchMap, ProducesError) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, ProducesError) {
     auto result = Observable<int,std::string>::pure(123)
         ->switchMap<float>([](auto) {
             return Observable<float,std::string>::raiseError("broke");
@@ -102,8 +116,7 @@ TEST(ObservableSwitchMap, ProducesError) {
     awaitIdle();
 }
 
-TEST(ObservableSwitchMap, ErrorStopsInfiniteUpstream) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, ErrorStopsInfiniteUpstream) {
     int counter = 0;
     auto result = Observable<int,std::string>::repeatTask(Task<int,std::string>::pure(123).delay(1))
         ->switchMap<float>([&counter](auto) {
@@ -120,8 +133,7 @@ TEST(ObservableSwitchMap, ErrorStopsInfiniteUpstream) {
     awaitIdle();
 }
 
-TEST(ObservableSwitchMap, CancelStopsInfiniteUpstream) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, CancelStopsInfiniteUpstream) {
     auto deferred = Observable<int,std::string>::repeatTask(
             Task<int,std::string>::pure(123).delay(10)
         )
@@ -141,8 +153,7 @@ TEST(ObservableSwitchMap, CancelStopsInfiniteUpstream) {
     awaitIdle();
 }
 
-TEST(ObservableSwitchMap, StopsUpstreamOnDownstreamComplete) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, StopsUpstreamOnDownstreamComplete) {
     int counter = 0;
     auto result = Observable<int,std::string>::repeatTask(Task<int,std::string>::pure(123).delay(1))
         ->switchMap<float>([&counter](auto) {
@@ -207,3 +218,21 @@ TEST(ObservableSwitchMap, CancelInnerObservable) {
 
     EXPECT_TRUE(fiber->isCanceled());
 }
+
+INSTANTIATE_TEST_SUITE_P(ObservableSwitchMap, ObservableSwitchMapTest,
+    ::testing::Values(
+        std::make_shared<SingleThreadScheduler>(),
+        std::make_shared<WorkStealingScheduler>(1),
+        std::make_shared<WorkStealingScheduler>(2),
+        std::make_shared<WorkStealingScheduler>(4),
+        std::make_shared<WorkStealingScheduler>(8),
+        std::make_shared<ThreadPoolScheduler>(1),
+        std::make_shared<ThreadPoolScheduler>(2),
+        std::make_shared<ThreadPoolScheduler>(4),
+        std::make_shared<ThreadPoolScheduler>(8)
+    ),
+    [](const ::testing::TestParamInfo<ObservableSwitchMapTest::ParamType>& info) {
+        return info.param->toString();
+    }
+);
+

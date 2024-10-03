@@ -9,6 +9,7 @@
 #include <atomic>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <thread>
 #include <vector>
@@ -20,7 +21,10 @@ namespace cask::scheduler {
 
 class WorkStealingScheduler final : public Scheduler, public std::enable_shared_from_this<WorkStealingScheduler> {
 public:
-    explicit WorkStealingScheduler(unsigned int poolSize = std::thread::hardware_concurrency(), int priority = 0);
+    explicit WorkStealingScheduler(
+        unsigned int poolSize = std::thread::hardware_concurrency(),
+        std::optional<int> priority = std::nullopt
+    );
 
     void submit(const std::function<void()>& task) override;
     void submitBulk(const std::vector<std::function<void()>>& tasks) override;

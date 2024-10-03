@@ -9,7 +9,7 @@
 
 namespace cask::scheduler {
 
-WorkStealingScheduler::WorkStealingScheduler(unsigned int poolSize, int priority)
+WorkStealingScheduler::WorkStealingScheduler(unsigned int poolSize, std::optional<int> priority)
     : runningThreadCount(0)
 {
     assert(poolSize > 0 && "Pool size must be greater than 0");
@@ -18,7 +18,7 @@ WorkStealingScheduler::WorkStealingScheduler(unsigned int poolSize, int priority
     auto request_work_callback = std::bind(&WorkStealingScheduler::onThreadRequestWork, this->weak_from_this());
 
     for(unsigned int i = 0; i < poolSize; i++) {
-        auto sched = std::make_shared<SingleThreadScheduler>(priority, idle_callback, resume_callback, request_work_callback);
+        auto sched = std::make_shared<SingleThreadScheduler>(priority, std::nullopt, idle_callback, resume_callback, request_work_callback);
         auto thread_id = sched->run_thread_id();
 
         threadIds.push_back(thread_id);

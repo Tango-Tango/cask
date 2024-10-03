@@ -4,6 +4,7 @@
 //          https://www.boost.org/LICENSE_1_0.txt)
 
 #include "cask/scheduler/ThreadPoolScheduler.hpp"
+#include <cassert>
 #include <chrono>
 #include <cstdlib>
 
@@ -22,6 +23,7 @@ ThreadPoolScheduler::ThreadPoolScheduler(unsigned int poolSize)
     , next_id(0)
     , last_execution_ms(current_time_ms())
 {
+    assert(poolSize > 0 && "Pool size must be greater than 0");
     threadStatus.reserve(poolSize);
 
 #if defined(__linux__) && defined(_GNU_SOURCE)

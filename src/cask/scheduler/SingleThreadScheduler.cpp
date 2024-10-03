@@ -4,9 +4,9 @@
 //          https://www.boost.org/LICENSE_1_0.txt)
 
 #include "cask/scheduler/SingleThreadScheduler.hpp"
-#include "cask/scheduler/SpinLock.hpp"
 #include <algorithm>
 #include <chrono>
+#include <iostream>
 
 #if __linux__
 #include <sys/resource.h>
@@ -20,7 +20,8 @@ using namespace std::chrono_literals;
 namespace cask::scheduler {
 
 SingleThreadScheduler::SingleThreadScheduler(
-    int priority,
+    std::optional<int> priority,
+    std::optional<int> pinned_core,
     std::function<void()> on_idle,
     std::function<void()> on_resume,
     std::function<std::vector<std::function<void()>>()> on_request_work)
@@ -35,29 +36,33 @@ SingleThreadScheduler::SingleThreadScheduler(
 {
     std::thread runThread(std::bind(&SingleThreadScheduler::run, this));
 
+    if (priority.has_value()) {
 #if __linux__
-    auto which = PRIO_PROCESS;
-    setpriority(which, runThread.native_handle(), priority);
+        auto which = PRIO_PROCESS;
+        setpriority(which, runThread.native_handle(), *prio);
 #elif __APPLE__
-    auto which = PRIO_PROCESS;
-    uint64_t run_thread_id = 0;
+        auto which = PRIO_PROCESS;
+        uint64_t run_thread_id = 0;
 
-    pthread_threadid_np(runThread.native_handle(), &run_thread_id);
+        pthread_threadid_np(runThread.native_handle(), &run_thread_id);
 
-    setpriority(which, run_thread_id, priority);
+        setpriority(which, run_thread_id, *priority);
+#else
+        std::cerr << "Setting thread priority is not supported on this platform." << std::endl;
 #endif
+    }
 
+    if (pinned_core.has_value()) {
 #if defined(__linux__) && defined(_GNU_SOURCE)
-    auto handle = runThread.native_handle();
-
-    // NOLINTNEXTLINE(bugprone-narrowing-conversions)
-    int core_id = rand() % std::thread::hardware_concurrency();
-
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(core_id, &cpuset);
-    pthread_setaffinity_np(handle, sizeof(cpu_set_t), &cpuset);
+        auto handle = runThread.native_handle();
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(*pinned_core, &cpuset);
+        pthread_setaffinity_np(handle, sizeof(cpu_set_t), &cpuset);
+#else
+        std::cerr << "Setting thread affinity is not supported on this platform." << std::endl;
 #endif
+    }
 
     runThreadId = runThread.get_id();
     runThread.detach();
@@ -155,8 +160,6 @@ std::string SingleThreadScheduler::toString() const {
 void SingleThreadScheduler::run() {
     std::function<void()> task;
 
-    static const auto dormant_sleep_time = std::chrono::milliseconds(10);
-
     // Using relaxed fences here since the values of these flags
     // can be stale so long as they eventually (within a few
     // iterations) become the correct value.
@@ -220,18 +223,36 @@ void SingleThreadScheduler::run() {
             std::unique_lock<std::mutex> lock(mutex);
 
             if (readyQueue.empty()) {
+                // If we have no work to do, sleep until either the next timer is ready or
+                // some random amount of time to wake up and look for work. This will avoid
+                // all of the schedulers looking for work "at the same time" when operating
+                // in a work-starved environment.
+
+                // Compute a random sleep time between 0 and 100ms
+                auto random_sleep_time = std::chrono::milliseconds(std::abs(std::rand()) % 100);
+
+                // Compute the next timer sleep time
                 auto next_timer = timers.begin();
                 auto next_timer_time = next_timer->first;
                 auto next_sleep_time = std::chrono::milliseconds(next_timer_time - iterationStartTime);
 
-                next_sleep_time = std::min(next_sleep_time, dormant_sleep_time);
+                // Choose the next sleep time as the minimum of the randomly selected time
+                // and hte next timer expiration time
+                next_sleep_time = std::min(next_sleep_time, random_sleep_time);
                 next_sleep_time = std::max(next_sleep_time, std::chrono::milliseconds(0));
 
+                // There is a possibility we've chosen to sleep for 0 milliseconds either randomly or because
+                // a timer needs to fire immediately. In that case we'll still "sleep" and go to idle. This will
+                // give the OS a chance to schedule other work and keeps things consistent from an idle detection
+                // standpoint.
+                
+                // If we are transitioning to idle call the on_idle callback
                 if (!idle) {
                     idle = true;
                     on_idle();
                 }
 
+                // Nap time!
                 workAvailable.wait_for(lock, next_sleep_time);
             }
         }
