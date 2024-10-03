@@ -5,13 +5,30 @@
 
 #include "gtest/gtest.h"
 #include "cask/Resource.hpp"
+#include "cask/Scheduler.hpp"
+#include "cask/scheduler/WorkStealingScheduler.hpp"
+#include "cask/scheduler/ThreadPoolScheduler.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::Task;
 using cask::Resource;
 using cask::None;
 using cask::Scheduler;
+using cask::scheduler::SingleThreadScheduler;
+using cask::scheduler::ThreadPoolScheduler;
+using cask::scheduler::WorkStealingScheduler;
 
-TEST(Resource,BasicUsage) {
+class ResourceTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
+protected:
+
+    void SetUp() override {
+        sched = GetParam();
+    }
+
+    std::shared_ptr<Scheduler> sched;
+};
+
+TEST_P(ResourceTest,BasicUsage) {
     auto resource = Resource<int>::make(
         Task<int>::pure(123),
         [](int){
@@ -19,7 +36,6 @@ TEST(Resource,BasicUsage) {
         }
     );
 
-    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](int value) {
         return Task<float>::pure(value * 1.5);
     });
@@ -27,7 +43,7 @@ TEST(Resource,BasicUsage) {
     EXPECT_EQ(result.run(sched)->await(), 184.5);
 }
 
-TEST(Resource,CallsAcquireRelease) {
+TEST_P(ResourceTest,CallsAcquireRelease) {
     int calls = 0;
     int openResourceCount = 0;
 
@@ -44,7 +60,6 @@ TEST(Resource,CallsAcquireRelease) {
         }
     );
 
-    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](int value) {
         return Task<float>::pure(value * 1.5);
     });
@@ -54,7 +69,7 @@ TEST(Resource,CallsAcquireRelease) {
     EXPECT_EQ(openResourceCount, 0);
 }
 
-TEST(Resource,ReleasesAfterUsage) {
+TEST_P(ResourceTest,ReleasesAfterUsage) {
     bool released = false;
 
     auto resource = Resource<int>::make(
@@ -65,19 +80,18 @@ TEST(Resource,ReleasesAfterUsage) {
         }
     );
 
-    auto sched = Scheduler::global();
     auto releasedBeforeUse = resource
         .template use<bool>([&released](int) {
             return Task<bool>::pure(released);
         })
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_FALSE(releasedBeforeUse);
     EXPECT_TRUE(released);
 }
 
-TEST(Resource,CallsReleaseOnError) {
+TEST_P(ResourceTest,CallsReleaseOnError) {
     int calls = 0;
     int openResourceCount = 0;
 
@@ -94,7 +108,6 @@ TEST(Resource,CallsReleaseOnError) {
         }
     );
 
-    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](int) {
         return Task<float, std::string>::raiseError("something went wrong");
     });
@@ -106,7 +119,7 @@ TEST(Resource,CallsReleaseOnError) {
     EXPECT_EQ(openResourceCount, 0);
 }
 
-TEST(Resource,ReleaseRaisesError) {
+TEST_P(ResourceTest,ReleaseRaisesError) {
     auto resource = Resource<int, std::string>::make(
         Task<int, std::string>::eval([]() {
             return 123;
@@ -116,7 +129,6 @@ TEST(Resource,ReleaseRaisesError) {
         }
     );
 
-    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](int value) {
         return Task<float,std::string>::pure(value * 1.5);
     });
@@ -125,7 +137,7 @@ TEST(Resource,ReleaseRaisesError) {
     EXPECT_EQ(failure, "it broke");
 }
 
-TEST(Resource,AcquireRaisesError) {
+TEST_P(ResourceTest,AcquireRaisesError) {
     auto resource = Resource<int, std::string>::make(
         Task<int, std::string>::raiseError("acquire broke"),
         [](int){
@@ -133,7 +145,6 @@ TEST(Resource,AcquireRaisesError) {
         }
     );
 
-    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](int value) {
         return Task<float, std::string>::pure(value * 1.5);
     });
@@ -142,7 +153,7 @@ TEST(Resource,AcquireRaisesError) {
     EXPECT_EQ(failure, "acquire broke");
 }
 
-TEST(Resource, Map) {
+TEST_P(ResourceTest, Map) {
     auto resource = Resource<int>::make(
         Task<int>::pure(123),
         [](int){
@@ -153,7 +164,6 @@ TEST(Resource, Map) {
         return value * 1.5;
     });
 
-    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](float value) {
         return Task<float>::pure(value);
     });
@@ -161,7 +171,7 @@ TEST(Resource, Map) {
     EXPECT_EQ(result.run(sched)->await(), 184.5);
 }
 
-TEST(Resource, MapAcquireError) {
+TEST_P(ResourceTest, MapAcquireError) {
     auto resource = Resource<int,int>::make(
         Task<int,int>::raiseError(123),
         [](int){
@@ -172,7 +182,6 @@ TEST(Resource, MapAcquireError) {
         return value * 1.5;
     });
 
-    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](float value) {
         return Task<float,float>::pure(value);
     });
@@ -181,7 +190,7 @@ TEST(Resource, MapAcquireError) {
 }
 
 
-TEST(Resource, MapReleaseError) {
+TEST_P(ResourceTest, MapReleaseError) {
     auto resource = Resource<int,int>::make(
         Task<int,int>::pure(678),
         [](int){
@@ -192,7 +201,6 @@ TEST(Resource, MapReleaseError) {
         return value * 1.5;
     });
 
-    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](float value) {
         return Task<float,float>::pure(value);
     });
@@ -201,7 +209,7 @@ TEST(Resource, MapReleaseError) {
 }
 
 
-TEST(Resource, FlatMapAcquiresAndReleasesBoth) {
+TEST_P(ResourceTest, FlatMapAcquiresAndReleasesBoth) {
     int calls = 0;
     int openResourceCount = 0;
 
@@ -231,7 +239,6 @@ TEST(Resource, FlatMapAcquiresAndReleasesBoth) {
         );
     });
 
-    auto sched = Scheduler::global();
     auto result = resource.template use<float>([](float value) {
         return Task<float>::pure(value);
     });
@@ -240,3 +247,21 @@ TEST(Resource, FlatMapAcquiresAndReleasesBoth) {
     EXPECT_EQ(calls, 4);
     EXPECT_EQ(openResourceCount, 0);
 }
+
+INSTANTIATE_TEST_SUITE_P(ResourceTest, ResourceTest,
+    ::testing::Values(
+        std::make_shared<SingleThreadScheduler>(),
+        std::make_shared<WorkStealingScheduler>(1),
+        std::make_shared<WorkStealingScheduler>(2),
+        std::make_shared<WorkStealingScheduler>(4),
+        std::make_shared<WorkStealingScheduler>(8),
+        std::make_shared<ThreadPoolScheduler>(1),
+        std::make_shared<ThreadPoolScheduler>(2),
+        std::make_shared<ThreadPoolScheduler>(4),
+        std::make_shared<ThreadPoolScheduler>(8)
+    ),
+    [](const ::testing::TestParamInfo<ResourceTest::ParamType>& info) {
+        return info.param->toString();
+    }
+);
+

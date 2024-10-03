@@ -242,18 +242,19 @@ void SingleThreadScheduler::run() {
                 next_sleep_time = std::max(next_sleep_time, std::chrono::milliseconds(0));
 
                 // There is a possibility we've chosen to sleep for 0 milliseconds either randomly or because
-                // a timer needs to fire immediately. In that case we'll still "sleep" and go to idle. This will
-                // give the OS a chance to schedule other work and keeps things consistent from an idle detection
-                // standpoint.
-                
-                // If we are transitioning to idle call the on_idle callback
-                if (!idle) {
-                    idle = true;
-                    on_idle();
-                }
+                // a timer needs to fire immediately. In that case we won't transition to idle and instead
+                // will immediately check for more work.
 
-                // Nap time!
-                workAvailable.wait_for(lock, next_sleep_time);
+                if (next_sleep_time > std::chrono::milliseconds::zero()) {
+                    // If we are transitioning to idle call the on_idle callback
+                    if (!idle) {
+                        idle = true;
+                        on_idle();
+                    }
+
+                    // Nap time!
+                    workAvailable.wait_for(lock, next_sleep_time);
+                }
             }
         }
     }
