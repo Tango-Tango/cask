@@ -5,17 +5,27 @@
 
 #include <atomic>
 #include "gtest/gtest.h"
+#include "cask/Deferred.hpp"
+#include "cask/Task.hpp"
+#include "cask/Scheduler.hpp"
 #include "cask/scheduler/SingleThreadScheduler.hpp"
+#include "cask/scheduler/WorkStealingScheduler.hpp"
+#include "cask/scheduler/ThreadPoolScheduler.hpp"
 
+using cask::Deferred;
+using cask::Task;
+using cask::Scheduler;
 using cask::scheduler::SingleThreadScheduler;
+using cask::scheduler::ThreadPoolScheduler;
+using cask::scheduler::WorkStealingScheduler;
 
 const static std::chrono::milliseconds sleep_time(1);
 
-class SingleThreadSchedulerTest : public ::testing::Test {
+class SchedulerTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
 protected:
 
     void SetUp() override {
-        sched = std::make_shared<SingleThreadScheduler>();
+        sched = GetParam();
     }
 
     void awaitIdle() {
@@ -32,14 +42,14 @@ protected:
         FAIL() << "Expected scheduler to return to idle within 1 second.";
     }
     
-    std::shared_ptr<SingleThreadScheduler> sched;
+    std::shared_ptr<Scheduler> sched;
 };
 
-TEST_F(SingleThreadSchedulerTest, IdlesAtStart) {
+TEST_P(SchedulerTest, IdlesAtStart) {
     EXPECT_TRUE(sched->isIdle());
 }
 
-TEST_F(SingleThreadSchedulerTest, SubmitSingle) {
+TEST_P(SchedulerTest, SubmitSingle) {
     std::mutex mutex;
     mutex.lock();
 
@@ -52,7 +62,7 @@ TEST_F(SingleThreadSchedulerTest, SubmitSingle) {
     awaitIdle();
 }
 
-TEST_F(SingleThreadSchedulerTest, SubmitBulk) {
+TEST_P(SchedulerTest, SubmitBulk) {
     const static int num_tasks = 100;
     int num_exec_retries = 1000;
 
@@ -82,16 +92,16 @@ TEST_F(SingleThreadSchedulerTest, SubmitBulk) {
     awaitIdle();
 }
 
-TEST_F(SingleThreadSchedulerTest, SubmitAfter) {
+TEST_P(SchedulerTest, SubmitAfter) {
     std::mutex mutex;
     mutex.lock();
 
-    auto before = std::chrono::steady_clock::now();
+    auto before = std::chrono::high_resolution_clock::now();
     sched->submitAfter(25, [&mutex] {
         mutex.unlock();
     });
     mutex.lock();
-    auto after = std::chrono::steady_clock::now();
+    auto after = std::chrono::high_resolution_clock::now();
 
     auto delta = after - before;
     auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
@@ -101,7 +111,7 @@ TEST_F(SingleThreadSchedulerTest, SubmitAfter) {
     awaitIdle();
 }
 
-TEST_F(SingleThreadSchedulerTest, SubmitAfterCancel) {
+TEST_P(SchedulerTest, SubmitAfterCancel) {
     std::mutex mutex;
     mutex.lock();
 
@@ -122,7 +132,7 @@ TEST_F(SingleThreadSchedulerTest, SubmitAfterCancel) {
     awaitIdle();
 }
 
-TEST_F(SingleThreadSchedulerTest, RegistersCallbackAfterCancelled) {
+TEST_P(SchedulerTest, RegistersCallbackAfterCancelled) {
     std::mutex mutex;
     mutex.lock();
 
@@ -140,7 +150,7 @@ TEST_F(SingleThreadSchedulerTest, RegistersCallbackAfterCancelled) {
     awaitIdle();
 }
 
-TEST_F(SingleThreadSchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
+TEST_P(SchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
     bool shutdown = false;
     std::mutex shutdown_mutex;
 
@@ -166,7 +176,7 @@ TEST_F(SingleThreadSchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) 
     awaitIdle();
 }
 
-TEST_F(SingleThreadSchedulerTest, RunsShutdownImmediatelyCallbackIfTimerAlreadyFired) {
+TEST_P(SchedulerTest, RunsShutdownImmediatelyCallbackIfTimerAlreadyFired) {
     bool shutdown = false;
     std::mutex mutex;
     mutex.lock();
@@ -193,3 +203,35 @@ TEST_F(SingleThreadSchedulerTest, RunsShutdownImmediatelyCallbackIfTimerAlreadyF
     
     awaitIdle();
 }
+
+TEST_P(SchedulerTest, AwaitTaskOnScheduler) {
+    auto result = Task<int>::deferFiber([](auto sched) {
+        auto result = Task<int>::eval([] {
+                return 42;
+            })
+            .asyncBoundary()
+            .run(sched)
+            ->await();
+        
+        return Task<int>::pure(result).asyncBoundary().run(sched);
+    }).run(sched)->await();
+
+    EXPECT_EQ(result, 42);
+}
+
+INSTANTIATE_TEST_SUITE_P(Scheduler, SchedulerTest,
+    ::testing::Values(
+        std::make_shared<SingleThreadScheduler>(),
+        std::make_shared<WorkStealingScheduler>(1),
+        std::make_shared<WorkStealingScheduler>(2),
+        std::make_shared<WorkStealingScheduler>(4),
+        std::make_shared<WorkStealingScheduler>(8),
+        std::make_shared<ThreadPoolScheduler>(1),
+        std::make_shared<ThreadPoolScheduler>(2),
+        std::make_shared<ThreadPoolScheduler>(4),
+        std::make_shared<ThreadPoolScheduler>(8)
+    ),
+    [](const ::testing::TestParamInfo<SchedulerTest::ParamType>& info) {
+        return info.param->toString();
+    }
+);

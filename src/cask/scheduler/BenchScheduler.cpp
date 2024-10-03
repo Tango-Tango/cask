@@ -97,6 +97,10 @@ bool BenchScheduler::isIdle() const {
     return timers.empty() && ready_queue.empty();
 }
 
+std::string BenchScheduler::toString() const {
+    return "BenchScheduler";
+}
+
 BenchScheduler::BenchCancelableTimer::BenchCancelableTimer(
     const std::shared_ptr<BenchScheduler>& parent,
     int64_t id

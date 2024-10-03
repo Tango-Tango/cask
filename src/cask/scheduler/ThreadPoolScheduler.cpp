@@ -118,6 +118,10 @@ bool ThreadPoolScheduler::isIdle() const {
     return idleThreads.load() == threadStatus.size() && readyQueue.empty();
 }
 
+std::string ThreadPoolScheduler::toString() const {
+    return "ThreadPoolScheduler_" + std::to_string(threadStatus.size());
+}
+
 void ThreadPoolScheduler::run(unsigned int thread_index) {
     std::unique_lock<std::mutex> readyQueueLock(readyQueueMutex, std::defer_lock);
     std::chrono::milliseconds max_wait_time(10);

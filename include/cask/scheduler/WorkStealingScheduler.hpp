@@ -26,6 +26,7 @@ public:
     void submitBulk(const std::vector<std::function<void()>>& tasks) override;
     CancelableRef submitAfter(int64_t milliseconds, const std::function<void()>& task) override;
     bool isIdle() const override;
+    std::string toString() const override;
 
 private:
     std::atomic_size_t runningThreadCount;

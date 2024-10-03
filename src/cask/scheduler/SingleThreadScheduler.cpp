@@ -148,11 +148,14 @@ bool SingleThreadScheduler::isIdle() const {
     return idle;
 }
 
+std::string SingleThreadScheduler::toString() const {
+    return "SingleThreadScheduler";
+}
+
 void SingleThreadScheduler::run() {
     std::function<void()> task;
 
-    auto dormant_sleep_time = std::chrono::milliseconds(1000);
-    auto sleep_time = dormant_sleep_time;
+    static const auto dormant_sleep_time = std::chrono::milliseconds(10);
 
     // Using relaxed fences here since the values of these flags
     // can be stale so long as they eventually (within a few
@@ -219,19 +222,17 @@ void SingleThreadScheduler::run() {
             if (readyQueue.empty()) {
                 auto next_timer = timers.begin();
                 auto next_timer_time = next_timer->first;
-                auto next_timer_sleep_time = std::chrono::milliseconds(next_timer_time - iterationStartTime);
+                auto next_sleep_time = std::chrono::milliseconds(next_timer_time - iterationStartTime);
 
-                next_timer_sleep_time = std::min(next_timer_sleep_time, dormant_sleep_time);
-                next_timer_sleep_time = std::max(next_timer_sleep_time, std::chrono::milliseconds(0));
-
-                sleep_time = std::chrono::milliseconds(next_timer_sleep_time);
+                next_sleep_time = std::min(next_sleep_time, dormant_sleep_time);
+                next_sleep_time = std::max(next_sleep_time, std::chrono::milliseconds(0));
 
                 if (!idle) {
                     idle = true;
                     on_idle();
                 }
 
-                workAvailable.wait_for(lock, sleep_time);
+                workAvailable.wait_for(lock, next_sleep_time);
             }
         }
     }

@@ -75,6 +75,10 @@ bool WorkStealingScheduler::isIdle() const {
     return true;
 }
 
+std::string WorkStealingScheduler::toString() const {
+    return "WorkStealingScheduler_" + std::to_string(schedulers.size());
+}
+
 void WorkStealingScheduler::onThreadIdle(std::weak_ptr<WorkStealingScheduler> self_weak) {
     if (auto self = self_weak.lock()) {
         self->runningThreadCount.fetch_sub(1);
