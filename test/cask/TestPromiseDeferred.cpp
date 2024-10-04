@@ -8,6 +8,8 @@
 #include "cask/Task.hpp"
 #include "cask/None.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "cask/scheduler/SingleThreadScheduler.hpp"
+#include "cask/scheduler/WorkStealingScheduler.hpp"
 #include <chrono>
 #include <thread>
 
@@ -18,13 +20,33 @@ using cask::Scheduler;
 using cask::Either;
 using cask::Task;
 using cask::scheduler::BenchScheduler;
+using cask::scheduler::SingleThreadScheduler;
+using cask::scheduler::WorkStealingScheduler;
 
-TEST(Deferred, Pure) {
+class DeferredTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
+protected:
+
+    void SetUp() override {
+        sched = GetParam();
+    }
+
+    std::shared_ptr<Scheduler> sched;
+};
+
+TEST(DeferredTest, Pure) {
     auto deferred = Deferred<int,float>::pure(123);
-    EXPECT_EQ(deferred->get()->get_left(), 123);
+    
+    auto result_opt = deferred->get();
+    ASSERT_TRUE(result_opt.has_value());
+    
+    auto result_either = result_opt.value();
+    ASSERT_TRUE(result_either.is_left());
+
+    auto result = result_either.get_left();
+    EXPECT_EQ(result, 123);
 }
 
-TEST(Deferred, PureOnComplete) {
+TEST(DeferredTest, PureOnComplete) {
     Either<int,float> result = Either<int,float>::left(0);
     auto deferred = Deferred<int,float>::pure(123);
 
@@ -32,10 +54,11 @@ TEST(Deferred, PureOnComplete) {
         result = value;
     });
 
+    ASSERT_TRUE(result.is_left());
     EXPECT_EQ(result.get_left(), 123);
 }
 
-TEST(Deferred, PureOnSuccess) {
+TEST_P(DeferredTest, PureOnSuccess) {
     int result = 0;
     auto deferred = Deferred<int,float>::pure(123);
 
@@ -46,7 +69,7 @@ TEST(Deferred, PureOnSuccess) {
     EXPECT_EQ(result, 123);
 }
 
-TEST(Deferred, PureOnError) {
+TEST(DeferredTest, PureOnError) {
     int result = 0;
     auto deferred = Deferred<int,float>::pure(123);
 
@@ -57,23 +80,23 @@ TEST(Deferred, PureOnError) {
     EXPECT_EQ(result, 0);
 }
 
-TEST(Deferred, PureAwait) {
+TEST(DeferredTest, PureAwait) {
     auto deferred = Deferred<int>::pure(123);
     EXPECT_EQ(deferred->await(), 123);
 }
 
-TEST(Deferred, PureIgnoresCancel) {
+TEST(DeferredTest, PureIgnoresCancel) {
     auto deferred = Deferred<int, std::string>::pure(123);
     deferred->cancel();
     EXPECT_EQ(deferred->await(), 123);
 }
 
-TEST(Deferred, Error) {
+TEST(DeferredTest, Error) {
     auto deferred = Deferred<int,std::string>::raiseError("broke");
     EXPECT_EQ(deferred->get()->get_right(), "broke");
 }
 
-TEST(Deferred, ErrorOnComplete) {
+TEST(DeferredTest, ErrorOnComplete) {
     Either<int,std::string> result = Either<int,std::string>::right("not broke");
     auto deferred = Deferred<int,std::string>::raiseError("broke");
 
@@ -84,7 +107,7 @@ TEST(Deferred, ErrorOnComplete) {
     EXPECT_EQ(result.get_right(), "broke");
 }
 
-TEST(Deferred, ErrorOnSuccess) {
+TEST(DeferredTest, ErrorOnSuccess) {
     std::string result = "not called";
     auto deferred = Deferred<int,std::string>::raiseError("broke");
 
@@ -95,7 +118,7 @@ TEST(Deferred, ErrorOnSuccess) {
     EXPECT_EQ(result, "not called");
 }
 
-TEST(Deferred, ErrorOnError) {
+TEST(DeferredTest, ErrorOnError) {
     std::string result = "not called";
     auto deferred = Deferred<int,std::string>::raiseError("broke");
 
@@ -106,7 +129,7 @@ TEST(Deferred, ErrorOnError) {
     EXPECT_EQ(result, "broke");
 }
 
-TEST(Deferred, ErrorAwait) {
+TEST(DeferredTest, ErrorAwait) {
     auto deferred = Deferred<int,std::string>::raiseError("broke");
     try {
         deferred->await();
@@ -116,7 +139,7 @@ TEST(Deferred, ErrorAwait) {
     }
 }
 
-TEST(Deferred, ErrorIgnoresCancel) {
+TEST(DeferredTest, ErrorIgnoresCancel) {
     auto deferred = Deferred<int,std::string>::raiseError("broke");
     deferred->cancel();
     try {
@@ -127,18 +150,18 @@ TEST(Deferred, ErrorIgnoresCancel) {
     }
 }
 
-TEST(Deferred, Promise) {
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+TEST_P(DeferredTest, Promise) {
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     EXPECT_FALSE(deferred->get().has_value());
 }
 
-TEST(Deferred, PromiseOnCompleteSuccess) {
+TEST_P(DeferredTest, PromiseOnCompleteSuccess) {
     std::mutex mutex;
     mutex.lock();
 
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     Either<int,std::string> result = Either<int,std::string>::left(0);
@@ -153,11 +176,11 @@ TEST(Deferred, PromiseOnCompleteSuccess) {
     EXPECT_EQ(result.get_left(), 123);
 }
 
-TEST(Deferred, PromiseOnCompleteError) {
+TEST_P(DeferredTest, PromiseOnCompleteError) {
     std::mutex mutex;
     mutex.lock();
 
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     Either<int,std::string> result = Either<int,std::string>::left(0);
@@ -172,11 +195,11 @@ TEST(Deferred, PromiseOnCompleteError) {
     EXPECT_EQ(result.get_right(), "broke");
 }
 
-TEST(Deferred, PromiseOnSuccess) {
+TEST_P(DeferredTest, PromiseOnSuccess) {
     std::mutex mutex;
     mutex.lock();
 
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     int result = 0;
@@ -191,11 +214,11 @@ TEST(Deferred, PromiseOnSuccess) {
     EXPECT_EQ(result, 123);
 }
 
-TEST(Deferred, PromiseOnError) {
+TEST_P(DeferredTest, PromiseOnError) {
     std::mutex mutex;
     mutex.lock();
 
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     std::string result = "not called";
@@ -210,8 +233,8 @@ TEST(Deferred, PromiseOnError) {
     EXPECT_EQ(result, "broke");
 }
 
-TEST(Deferred, PromiseAwaitSyncSuccess) {
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+TEST_P(DeferredTest, PromiseAwaitSyncSuccess) {
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     promise->success(123);
@@ -219,8 +242,8 @@ TEST(Deferred, PromiseAwaitSyncSuccess) {
     EXPECT_EQ(deferred->await(), 123);
 }
 
-TEST(Deferred, PromiseAwaitSyncError) {
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+TEST_P(DeferredTest, PromiseAwaitSyncError) {
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     promise->error("broke");
@@ -233,11 +256,11 @@ TEST(Deferred, PromiseAwaitSyncError) {
     }
 }
 
-TEST(Deferred, PromiseAwaitAsync) {
+TEST_P(DeferredTest, PromiseAwaitAsync) {
     std::mutex mutex;
     mutex.lock();
 
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
     int value;
 
@@ -264,8 +287,8 @@ TEST(Deferred, PromiseAwaitAsync) {
     EXPECT_EQ(deferred->await(), 123);
 }
 
-TEST(Deferred, PromiseCancel) {
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+TEST_P(DeferredTest, PromiseCancel) {
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     deferred->cancel();
@@ -276,8 +299,8 @@ TEST(Deferred, PromiseCancel) {
     } catch(std::runtime_error&) {}
 }
 
-TEST(Deferred, PromiseSuccessIgnoresCancel) {
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+TEST_P(DeferredTest, PromiseSuccessIgnoresCancel) {
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     promise->success(123);
@@ -286,8 +309,8 @@ TEST(Deferred, PromiseSuccessIgnoresCancel) {
     EXPECT_EQ(deferred->await(), 123);
 }
 
-TEST(Deferred, PromiseErrorIgnoresCancel) {
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+TEST_P(DeferredTest, PromiseErrorIgnoresCancel) {
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     promise->error("broke");
@@ -301,8 +324,8 @@ TEST(Deferred, PromiseErrorIgnoresCancel) {
     }
 }
 
-TEST(Deferred, PromiseCancelIgnoresSuccess) {
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+TEST_P(DeferredTest, PromiseCancelIgnoresSuccess) {
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     promise->cancel();
@@ -314,8 +337,8 @@ TEST(Deferred, PromiseCancelIgnoresSuccess) {
     } catch(std::runtime_error&) {}
 }
 
-TEST(Deferred, PromiseCancelIgnoresError) {
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+TEST_P(DeferredTest, PromiseCancelIgnoresError) {
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     promise->cancel();
@@ -327,8 +350,8 @@ TEST(Deferred, PromiseCancelIgnoresError) {
     } catch(std::runtime_error&) {}
 }
 
-TEST(Deferred, PromiseCancelIgnoresSubsequentCancel) {
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+TEST_P(DeferredTest, PromiseCancelIgnoresSubsequentCancel) {
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     promise->cancel();
@@ -340,8 +363,8 @@ TEST(Deferred, PromiseCancelIgnoresSubsequentCancel) {
     } catch(std::runtime_error&) {}
 }
 
-TEST(Deferred, PromiseCancelAffectsPeers) {
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+TEST_P(DeferredTest, PromiseCancelAffectsPeers) {
+    auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
     auto sibling = Deferred<int,std::string>::forPromise(promise);
 
@@ -353,8 +376,8 @@ TEST(Deferred, PromiseCancelAffectsPeers) {
     } catch(std::runtime_error&) {}
 }
 
-TEST(Deferred, DoesntAllowMultipleSuccesses) {
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+TEST_P(DeferredTest, DoesntAllowMultipleSuccesses) {
+    auto promise = Promise<int,std::string>::create(sched);
     promise->success(123);
     
     try {
@@ -366,8 +389,8 @@ TEST(Deferred, DoesntAllowMultipleSuccesses) {
     }
 }
 
-TEST(Deferred, DoesntAllowMultipleErrors) {
-    auto promise = Promise<int,std::string>::create(Scheduler::global());
+TEST_P(DeferredTest, DoesntAllowMultipleErrors) {
+    auto promise = Promise<int,std::string>::create(sched);
     promise->error("fail");
     
     try {
@@ -379,7 +402,7 @@ TEST(Deferred, DoesntAllowMultipleErrors) {
     }
 }
 
-TEST(Deferred, MapSyncSuccess) {
+TEST(DeferredTest, MapSyncSuccess) {
     auto deferred = Deferred<int,float>::pure(123)->mapBoth<std::string, std::runtime_error>(
         [](auto) { return "works"; },
         [](auto) { return std::runtime_error("broke"); }
@@ -388,7 +411,7 @@ TEST(Deferred, MapSyncSuccess) {
     EXPECT_EQ(deferred->get()->get_left(), "works");
 }
 
-TEST(Deferred, MapSyncError) {
+TEST(DeferredTest, MapSyncError) {
     auto deferred = Deferred<int,float>::raiseError(1.23)->mapBoth<std::string, std::runtime_error>(
         [](auto) { return "works"; },
         [](auto) { return std::runtime_error("broke"); }
@@ -397,8 +420,8 @@ TEST(Deferred, MapSyncError) {
     EXPECT_EQ(deferred->get()->get_right().what(), std::string("broke"));
 }
 
-TEST(Deferred, MapASync) {
-    auto promise = Promise<int,float>::create(Scheduler::global());
+TEST_P(DeferredTest, MapASync) {
+    auto promise = Promise<int,float>::create(sched);
     auto deferred = Deferred<int,float>::forPromise(promise)->mapBoth<std::string, std::runtime_error>(
         [](auto) { return "works"; },
         [](auto) { return std::runtime_error("broke"); }
@@ -408,7 +431,7 @@ TEST(Deferred, MapASync) {
 }
 
 
-TEST(Deferred, MapBothValue) {
+TEST(DeferredTest, MapBothValue) {
     Either<std::string, std::runtime_error> result = Either<std::string, std::runtime_error>::left("dont work");
     auto deferred = Deferred<int,float>::pure(123)->mapBoth<std::string, std::runtime_error>(
         [](auto) { return "works"; },
@@ -422,7 +445,7 @@ TEST(Deferred, MapBothValue) {
     EXPECT_EQ(result.get_left(), "works");
 }
 
-TEST(Deferred, MapBothError) {
+TEST(DeferredTest, MapBothError) {
     Either<std::string, std::runtime_error> result = Either<std::string, std::runtime_error>::left("dont work");
     auto deferred = Deferred<int,float>::raiseError(1.23f)->mapBoth<std::string, std::runtime_error>(
         [](auto) { return "works"; },
@@ -436,7 +459,7 @@ TEST(Deferred, MapBothError) {
     EXPECT_EQ(result.get_right().what(), std::string("broke"));
 }
 
-TEST(Deferred, MapBothCancels) {
+TEST(DeferredTest, MapBothCancels) {
     auto sched = std::make_shared<BenchScheduler>();
     bool canceled = false;
 
@@ -455,7 +478,7 @@ TEST(Deferred, MapBothCancels) {
     EXPECT_TRUE(canceled);
 }
 
-TEST(Deferred, MapBothOnSuccess) {
+TEST(DeferredTest, MapBothOnSuccess) {
     std::string result = "dont work";
     auto deferred = Deferred<int,float>::pure(123)->mapBoth<std::string, std::runtime_error>(
         [](auto) { return "works"; },
@@ -469,7 +492,7 @@ TEST(Deferred, MapBothOnSuccess) {
     EXPECT_EQ(result, "works");
 }
 
-TEST(Deferred, MapBothOnError) {
+TEST(DeferredTest, MapBothOnError) {
     std::runtime_error result("not broke");
     auto deferred = Deferred<int,float>::raiseError(1.23f)->mapBoth<std::string, std::runtime_error>(
         [](auto) { return "works"; },
@@ -483,7 +506,7 @@ TEST(Deferred, MapBothOnError) {
     EXPECT_EQ(result.what(), std::string("broke"));
 }
 
-TEST(Deferred, MapBothAwait) {
+TEST(DeferredTest, MapBothAwait) {
     auto deferred = Deferred<int,float>::pure(123)->mapBoth<std::string, std::runtime_error>(
         [](auto) { return "works"; },
         [](auto) { return std::runtime_error("broke"); }
@@ -492,7 +515,7 @@ TEST(Deferred, MapBothAwait) {
     EXPECT_EQ(deferred->await(), "works");
 }
 
-TEST(Deferred, FiberValue) {
+TEST(DeferredTest, FiberValue) {
     auto result = Either<int, std::string>::left(0);
     auto sched = std::make_shared<BenchScheduler>();
     auto fiber = Task<int,std::string>::pure(123).run(sched);
@@ -508,7 +531,7 @@ TEST(Deferred, FiberValue) {
     EXPECT_EQ(result.get_left(), 123);
 }
 
-TEST(Deferred, FiberError) {
+TEST(DeferredTest, FiberError) {
     auto result = Either<int, std::string>::left(0);
     auto sched = std::make_shared<BenchScheduler>();
     auto fiber = Task<int,std::string>::raiseError("broke").run(sched);
@@ -524,7 +547,7 @@ TEST(Deferred, FiberError) {
     EXPECT_EQ(result.get_right(), "broke");
 }
 
-TEST(Deferred, FiberCancel) {
+TEST(DeferredTest, FiberCancel) {
     bool canceled = false;
     auto sched = std::make_shared<BenchScheduler>();
     auto fiber = Task<int,std::string>::never().run(sched);
@@ -539,7 +562,7 @@ TEST(Deferred, FiberCancel) {
     EXPECT_TRUE(canceled);
 }
 
-TEST(Deferred, FiberOnSuccess) {
+TEST(DeferredTest, FiberOnSuccess) {
     int result = 0;
     auto sched = std::make_shared<BenchScheduler>();
     auto fiber = Task<int,std::string>::pure(123).run(sched);
@@ -553,7 +576,7 @@ TEST(Deferred, FiberOnSuccess) {
     EXPECT_EQ(result, 123);
 }
 
-TEST(Deferred, FiberOnError) {
+TEST(DeferredTest, FiberOnError) {
     std::string result = "not broke";
     auto sched = std::make_shared<BenchScheduler>();
     auto fiber = Task<int,std::string>::raiseError("broke").run(sched);
@@ -567,7 +590,7 @@ TEST(Deferred, FiberOnError) {
     EXPECT_EQ(result, "broke");
 }
 
-TEST(Deferred, FiberAwait) {
+TEST(DeferredTest, FiberAwait) {
     auto sched = std::make_shared<BenchScheduler>();
     auto fiber = Task<int,std::string>::pure(123).run(sched);
     auto deferred = Deferred<int,std::string>::forFiber(fiber);
@@ -578,4 +601,18 @@ TEST(Deferred, FiberAwait) {
     EXPECT_EQ(*(fiber->getValue()), 123);
     EXPECT_EQ(deferred->await(), 123);
 }
+
+INSTANTIATE_TEST_SUITE_P(DeferredTest, DeferredTest,
+    ::testing::Values(
+        std::make_shared<SingleThreadScheduler>(),
+        std::make_shared<WorkStealingScheduler>(1),
+        std::make_shared<WorkStealingScheduler>(2),
+        std::make_shared<WorkStealingScheduler>(4),
+        std::make_shared<WorkStealingScheduler>(8)
+    ),
+    [](const ::testing::TestParamInfo<DeferredTest::ParamType>& info) {
+        return info.param->toString();
+    }
+);
+
 
