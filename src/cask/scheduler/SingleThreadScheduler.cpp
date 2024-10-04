@@ -22,9 +22,9 @@ namespace cask::scheduler {
 SingleThreadScheduler::SingleThreadScheduler(
     std::optional<int> priority,
     std::optional<int> pinned_core,
-    std::function<void()> on_idle,
-    std::function<void()> on_resume,
-    std::function<std::vector<std::function<void()>>()> on_request_work)
+    const std::function<void()>& on_idle,
+    const std::function<void()>& on_resume,
+    const std::function<std::vector<std::function<void()>>()>& on_request_work)
     : on_idle(on_idle)
     , on_resume(on_resume)
     , on_request_work(on_request_work)

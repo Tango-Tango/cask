@@ -79,19 +79,19 @@ std::string WorkStealingScheduler::toString() const {
     return "WorkStealingScheduler_" + std::to_string(schedulers.size());
 }
 
-void WorkStealingScheduler::onThreadIdle(std::weak_ptr<WorkStealingScheduler> self_weak) {
+void WorkStealingScheduler::onThreadIdle(const std::weak_ptr<WorkStealingScheduler>& self_weak) {
     if (auto self = self_weak.lock()) {
         self->runningThreadCount.fetch_sub(1);
     }
 }
 
-void WorkStealingScheduler::onThreadResume(std::weak_ptr<WorkStealingScheduler> self_weak) {
+void WorkStealingScheduler::onThreadResume(const std::weak_ptr<WorkStealingScheduler>& self_weak) {
     if (auto self = self_weak.lock()) {
         self->runningThreadCount.fetch_add(1);
     }
 }
 
-std::vector<std::function<void()>> WorkStealingScheduler::onThreadRequestWork(std::weak_ptr<WorkStealingScheduler> self_weak) {
+std::vector<std::function<void()>> WorkStealingScheduler::onThreadRequestWork(const std::weak_ptr<WorkStealingScheduler>& self_weak) {
     auto current_thread_id = std::this_thread::get_id();
 
     if (auto self = self_weak.lock()) {

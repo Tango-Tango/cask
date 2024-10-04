@@ -31,9 +31,9 @@ public:
     explicit SingleThreadScheduler(
         std::optional<int> priority = std::nullopt,
         std::optional<int> pinned_core = std::nullopt,
-        std::function<void()> on_idle = [](){},
-        std::function<void()> on_resume = [](){},
-        std::function<std::vector<std::function<void()>>()> on_request_work = [](){ return std::vector<std::function<void()>>(); }
+        const std::function<void()>& on_idle = [](){},
+        const std::function<void()>& on_resume = [](){},
+        const std::function<std::vector<std::function<void()>>()>& on_request_work = [](){ return std::vector<std::function<void()>>(); }
     );
 
     /**

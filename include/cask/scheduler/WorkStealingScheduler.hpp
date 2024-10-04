@@ -37,9 +37,9 @@ private:
     std::vector<std::thread::id> threadIds;
     std::map<std::thread::id, std::shared_ptr<SingleThreadScheduler>> schedulers;
 
-    static void onThreadIdle(std::weak_ptr<WorkStealingScheduler> self_weak);
-    static void onThreadResume(std::weak_ptr<WorkStealingScheduler> self_weak);
-    static std::vector<std::function<void()>> onThreadRequestWork(std::weak_ptr<WorkStealingScheduler> self_weak);
+    static void onThreadIdle(const std::weak_ptr<WorkStealingScheduler>& self_weak);
+    static void onThreadResume(const std::weak_ptr<WorkStealingScheduler>& self_weak);
+    static std::vector<std::function<void()>> onThreadRequestWork(const std::weak_ptr<WorkStealingScheduler>& self_weak);
 };
 
 } // namespace cask::scheduler
