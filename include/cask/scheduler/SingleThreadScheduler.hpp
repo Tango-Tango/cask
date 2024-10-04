@@ -7,6 +7,7 @@
 #define _CASK_SINGLE_THREAD_SCHEDULER_H_
 
 #include <atomic>
+#include <condition_variable>
 #include <map>
 #include <mutex>
 #include <optional>
