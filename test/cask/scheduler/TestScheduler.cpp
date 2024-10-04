@@ -10,13 +10,11 @@
 #include "cask/Scheduler.hpp"
 #include "cask/scheduler/SingleThreadScheduler.hpp"
 #include "cask/scheduler/WorkStealingScheduler.hpp"
-#include "cask/scheduler/ThreadPoolScheduler.hpp"
 
 using cask::Deferred;
 using cask::Task;
 using cask::Scheduler;
 using cask::scheduler::SingleThreadScheduler;
-using cask::scheduler::ThreadPoolScheduler;
 using cask::scheduler::WorkStealingScheduler;
 
 const static std::chrono::milliseconds sleep_time(1);
@@ -225,11 +223,7 @@ INSTANTIATE_TEST_SUITE_P(Scheduler, SchedulerTest,
         std::make_shared<WorkStealingScheduler>(1),
         std::make_shared<WorkStealingScheduler>(2),
         std::make_shared<WorkStealingScheduler>(4),
-        std::make_shared<WorkStealingScheduler>(8),
-        std::make_shared<ThreadPoolScheduler>(1),
-        std::make_shared<ThreadPoolScheduler>(2),
-        std::make_shared<ThreadPoolScheduler>(4),
-        std::make_shared<ThreadPoolScheduler>(8)
+        std::make_shared<WorkStealingScheduler>(8)
     ),
     [](const ::testing::TestParamInfo<SchedulerTest::ParamType>& info) {
         return info.param->toString();

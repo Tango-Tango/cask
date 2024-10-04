@@ -6,11 +6,11 @@
 
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
-#include "cask/scheduler/ThreadPoolScheduler.hpp"
+#include "cask/scheduler/WorkStealingScheduler.hpp"
 #include "cask/scheduler/SingleThreadScheduler.hpp"
 
 using cask::Observable;
-using cask::scheduler::ThreadPoolScheduler;
+using cask::scheduler::WorkStealingScheduler;
 using cask::scheduler::SingleThreadScheduler;
 
 class ObservableMergeAllTest : public ::testing::TestWithParam<int> {
@@ -22,7 +22,7 @@ protected:
         if (num_threads <= 1) {
             sched = std::make_shared<SingleThreadScheduler>();
         } else {
-            sched = std::make_shared<ThreadPoolScheduler>(num_threads);
+            sched = std::make_shared<WorkStealingScheduler>(num_threads);
         }
     }
 };

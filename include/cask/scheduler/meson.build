@@ -1,5 +1,5 @@
 install_headers(
     'BenchScheduler.hpp',
     'SingleThreadScheduler.hpp',
-    'ThreadPoolScheduler.hpp',
+    'WorkStealingScheduler.hpp',
     subdir: 'cask/scheduler')

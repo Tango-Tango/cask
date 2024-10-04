@@ -7,7 +7,6 @@
 #include "cask/Task.hpp"
 #include "cask/None.hpp"
 #include "cask/scheduler/WorkStealingScheduler.hpp"
-#include "cask/scheduler/ThreadPoolScheduler.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
 #include <cstring>
 
@@ -17,7 +16,6 @@ using cask::Promise;
 using cask::Scheduler;
 using cask::Task;
 using cask::scheduler::SingleThreadScheduler;
-using cask::scheduler::ThreadPoolScheduler;
 using cask::scheduler::WorkStealingScheduler;
 
 class TaskTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
@@ -318,11 +316,7 @@ INSTANTIATE_TEST_SUITE_P(TaskTest, TaskTest,
         std::make_shared<WorkStealingScheduler>(1),
         std::make_shared<WorkStealingScheduler>(2),
         std::make_shared<WorkStealingScheduler>(4),
-        std::make_shared<WorkStealingScheduler>(8),
-        std::make_shared<ThreadPoolScheduler>(1),
-        std::make_shared<ThreadPoolScheduler>(2),
-        std::make_shared<ThreadPoolScheduler>(4),
-        std::make_shared<ThreadPoolScheduler>(8)
+        std::make_shared<WorkStealingScheduler>(8)
     ),
     [](const ::testing::TestParamInfo<TaskTest::ParamType>& info) {
         return info.param->toString();

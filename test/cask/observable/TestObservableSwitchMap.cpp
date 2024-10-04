@@ -10,7 +10,6 @@
 #include "cask/Scheduler.hpp"
 #include "cask/scheduler/SingleThreadScheduler.hpp"
 #include "cask/scheduler/WorkStealingScheduler.hpp"
-#include "cask/scheduler/ThreadPoolScheduler.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::Observable;
@@ -23,7 +22,6 @@ using cask::Ack;
 using cask::observable::SwitchMapObserver;
 using cask::scheduler::BenchScheduler;
 using cask::scheduler::SingleThreadScheduler;
-using cask::scheduler::ThreadPoolScheduler;
 using cask::scheduler::WorkStealingScheduler;
 
 class MockSwitchMapDownstreamObserver : public trompeloeil::mock_interface<Observer<float,std::string>> {
@@ -225,11 +223,7 @@ INSTANTIATE_TEST_SUITE_P(ObservableSwitchMap, ObservableSwitchMapTest,
         std::make_shared<WorkStealingScheduler>(1),
         std::make_shared<WorkStealingScheduler>(2),
         std::make_shared<WorkStealingScheduler>(4),
-        std::make_shared<WorkStealingScheduler>(8),
-        std::make_shared<ThreadPoolScheduler>(1),
-        std::make_shared<ThreadPoolScheduler>(2),
-        std::make_shared<ThreadPoolScheduler>(4),
-        std::make_shared<ThreadPoolScheduler>(8)
+        std::make_shared<WorkStealingScheduler>(8)
     ),
     [](const ::testing::TestParamInfo<ObservableSwitchMapTest::ParamType>& info) {
         return info.param->toString();
