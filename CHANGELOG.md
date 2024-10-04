@@ -3,6 +3,16 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 18.0
+
+- Add the `WorkStealingScheduler` as a more efficient and easier to maintain
+  implementation of a multi-threaded asynchronous scheduler.
+- Remove the `ThreadPoolScheduler`. Users should now use the `WorkStealingScheduler`.
+- Change `Scheduler::global()` so that it provides a `WorkStealingScheduler` rather
+  than a `ThreadPoolScheduler`.
+- Modify `SingleThreadScheduler` constructor parameters so that priority and core-pinning
+  are optional features and disabled-by-default.
+
 ## 17.1
 
 - Add the ability to set a queue overflow strategy on queue observers. The default
