@@ -5,29 +5,45 @@
 
 #include "gtest/gtest.h"
 #include "cask/mvar/MVarState.hpp"
+#include "cask/scheduler/WorkStealingScheduler.hpp"
+#include "cask/scheduler/ThreadPoolScheduler.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::None;
-using cask::Scheduler;
 using cask::mvar::MVarState;
+using cask::Scheduler;
+using cask::scheduler::SingleThreadScheduler;
+using cask::scheduler::ThreadPoolScheduler;
+using cask::scheduler::WorkStealingScheduler;
 
-TEST(MVarState, Empty) {
-    auto initialState = MVarState<int,std::string>(Scheduler::global());
+class MVarStateTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
+protected:
+
+    void SetUp() override {
+        sched = GetParam();
+    }
+
+    std::shared_ptr<Scheduler> sched;
+};
+
+TEST_P(MVarStateTest, Empty) {
+    auto initialState = MVarState<int,std::string>(sched);
 
     EXPECT_FALSE(initialState.valueOpt.has_value());
     EXPECT_TRUE(initialState.pendingPuts->is_empty());
     EXPECT_TRUE(initialState.pendingTakes->is_empty());
 }
 
-TEST(MVarState, Initialized) {
-    auto initialState = MVarState<int,std::string>(Scheduler::global(), 1);
+TEST_P(MVarStateTest, Initialized) {
+    auto initialState = MVarState<int,std::string>(sched, 1);
 
     EXPECT_TRUE(initialState.valueOpt.has_value());
     EXPECT_TRUE(initialState.pendingPuts->is_empty());
     EXPECT_TRUE(initialState.pendingTakes->is_empty());
 }
 
-TEST(MVarState, Put) {
-    auto initialState = MVarState<int,std::string>(Scheduler::global());
+TEST_P(MVarStateTest, Put) {
+    auto initialState = MVarState<int,std::string>(sched);
     auto result = initialState.put(1);
     const auto& state = std::get<0>(result);
 
@@ -36,8 +52,8 @@ TEST(MVarState, Put) {
     EXPECT_TRUE(state.pendingTakes->is_empty());
 }
 
-TEST(MVarState, PutTake) {
-    auto initialState = MVarState<int,std::string>(Scheduler::global());
+TEST_P(MVarStateTest, PutTake) {
+    auto initialState = MVarState<int,std::string>(sched);
     auto [putState, putTask] = initialState.put(1);
     auto [takeState, takeTask] = putState.take();
 
@@ -45,15 +61,15 @@ TEST(MVarState, PutTake) {
     EXPECT_TRUE(takeState.pendingPuts->is_empty());
     EXPECT_TRUE(takeState.pendingTakes->is_empty());
 
-    auto putDeferred = putTask.run(Scheduler::global());
-    auto takeDeferred = takeTask.run(Scheduler::global());
+    auto putDeferred = putTask.run(sched);
+    auto takeDeferred = takeTask.run(sched);
 
     EXPECT_EQ(putDeferred->await(), None());
     EXPECT_EQ(takeDeferred->await(), 1);
 }
 
-TEST(MVarState, TakePut) {
-    auto initialState = MVarState<int,std::string>(Scheduler::global());
+TEST_P(MVarStateTest, TakePut) {
+    auto initialState = MVarState<int,std::string>(sched);
     auto [takeState, takeTask] = initialState.take();
     auto [putState, putTask] = takeState.put(1);
     
@@ -61,15 +77,15 @@ TEST(MVarState, TakePut) {
     EXPECT_TRUE(putState.pendingPuts->is_empty());
     EXPECT_TRUE(putState.pendingTakes->is_empty());
 
-    auto putDeferred = putTask.run(Scheduler::global());
-    auto takeDeferred = takeTask.run(Scheduler::global());
+    auto putDeferred = putTask.run(sched);
+    auto takeDeferred = takeTask.run(sched);
 
     EXPECT_EQ(putDeferred->await(), None());
     EXPECT_EQ(takeDeferred->await(), 1);
 }
 
-TEST(MVarState, PutTakeTake) {
-    auto initialState = MVarState<int,std::string>(Scheduler::global());
+TEST_P(MVarStateTest, PutTakeTake) {
+    auto initialState = MVarState<int,std::string>(sched);
     auto [putState, putTask] = initialState.put(1);
     auto [takeState, takeTask] = putState.take();
     auto result = takeState.take();
@@ -79,15 +95,15 @@ TEST(MVarState, PutTakeTake) {
     EXPECT_TRUE(secondTakeState.pendingPuts->is_empty());
     EXPECT_FALSE(secondTakeState.pendingTakes->is_empty());
 
-    auto putDeferred = putTask.run(Scheduler::global());
-    auto takeDeferred = takeTask.run(Scheduler::global());
+    auto putDeferred = putTask.run(sched);
+    auto takeDeferred = takeTask.run(sched);
 
     EXPECT_EQ(putDeferred->await(), None());
     EXPECT_EQ(takeDeferred->await(), 1);
 }
 
-TEST(MVarState, PutTakeTakePut) {
-    auto initialState = MVarState<int,std::string>(Scheduler::global());
+TEST_P(MVarStateTest, PutTakeTakePut) {
+    auto initialState = MVarState<int,std::string>(sched);
     auto [putState, putTask] = initialState.put(1);
     auto [takeState, takeTask] = putState.take();
     auto [secondTakeState, secondTakeTask] = takeState.take();
@@ -97,10 +113,10 @@ TEST(MVarState, PutTakeTakePut) {
     EXPECT_TRUE(secondPutState.pendingPuts->is_empty());
     EXPECT_TRUE(secondPutState.pendingTakes->is_empty());
 
-    auto putDeferred = putTask.run(Scheduler::global());
-    auto secondPutDeferred = secondPutTask.run(Scheduler::global());
-    auto takeDeferred = takeTask.run(Scheduler::global());
-    auto secondTakeDeferred = secondTakeTask.run(Scheduler::global());
+    auto putDeferred = putTask.run(sched);
+    auto secondPutDeferred = secondPutTask.run(sched);
+    auto takeDeferred = takeTask.run(sched);
+    auto secondTakeDeferred = secondTakeTask.run(sched);
 
     EXPECT_EQ(putDeferred->await(), None());
     EXPECT_EQ(secondPutDeferred->await(), None());
@@ -108,8 +124,8 @@ TEST(MVarState, PutTakeTakePut) {
     EXPECT_EQ(secondTakeDeferred->await(), 2);
 }
 
-TEST(MVarState, PutPutTakeTake) {
-    auto initialState = MVarState<int,std::string>(Scheduler::global());
+TEST_P(MVarStateTest, PutPutTakeTake) {
+    auto initialState = MVarState<int,std::string>(sched);
     auto [putState, putTask] = initialState.put(1);
     auto [secondPutState, secondPutTask] = putState.put(2);
     auto [takeState, takeTask] = secondPutState.take();
@@ -119,10 +135,10 @@ TEST(MVarState, PutPutTakeTake) {
     EXPECT_TRUE(secondTakeState.pendingPuts->is_empty());
     EXPECT_TRUE(secondTakeState.pendingTakes->is_empty());
 
-    auto putDeferred = putTask.run(Scheduler::global());
-    auto secondPutDeferred = secondPutTask.run(Scheduler::global());
-    auto takeDeferred = takeTask.run(Scheduler::global());
-    auto secondTakeDeferred = secondTakeTask.run(Scheduler::global());
+    auto putDeferred = putTask.run(sched);
+    auto secondPutDeferred = secondPutTask.run(sched);
+    auto takeDeferred = takeTask.run(sched);
+    auto secondTakeDeferred = secondTakeTask.run(sched);
 
     EXPECT_EQ(putDeferred->await(), None());
     EXPECT_EQ(secondPutDeferred->await(), None());
@@ -130,8 +146,8 @@ TEST(MVarState, PutPutTakeTake) {
     EXPECT_EQ(secondTakeDeferred->await(), 2);
 }
 
-TEST(MVarState, TakeTakePutPut) {
-    auto initialState = MVarState<int,std::string>(Scheduler::global());
+TEST_P(MVarStateTest, TakeTakePutPut) {
+    auto initialState = MVarState<int,std::string>(sched);
     auto [takeState, takeTask] = initialState.take();
     auto [secondTakeState, secondTakeTask] = takeState.take();
     auto [putState, putTask] = secondTakeState.put(1);
@@ -141,13 +157,30 @@ TEST(MVarState, TakeTakePutPut) {
     EXPECT_TRUE(secondPutState.pendingPuts->is_empty());
     EXPECT_TRUE(secondPutState.pendingTakes->is_empty());
 
-    auto putDeferred = putTask.run(Scheduler::global());
-    auto secondPutDeferred = secondPutTask.run(Scheduler::global());
-    auto takeDeferred = takeTask.run(Scheduler::global());
-    auto secondTakeDeferred = secondTakeTask.run(Scheduler::global());
+    auto putDeferred = putTask.run(sched);
+    auto secondPutDeferred = secondPutTask.run(sched);
+    auto takeDeferred = takeTask.run(sched);
+    auto secondTakeDeferred = secondTakeTask.run(sched);
 
     EXPECT_EQ(putDeferred->await(), None());
     EXPECT_EQ(secondPutDeferred->await(), None());
     EXPECT_EQ(takeDeferred->await(), 1);
     EXPECT_EQ(secondTakeDeferred->await(), 2);
 }
+
+INSTANTIATE_TEST_SUITE_P(MVarStateTest, MVarStateTest,
+    ::testing::Values(
+        std::make_shared<SingleThreadScheduler>(),
+        std::make_shared<WorkStealingScheduler>(1),
+        std::make_shared<WorkStealingScheduler>(2),
+        std::make_shared<WorkStealingScheduler>(4),
+        std::make_shared<WorkStealingScheduler>(8),
+        std::make_shared<ThreadPoolScheduler>(1),
+        std::make_shared<ThreadPoolScheduler>(2),
+        std::make_shared<ThreadPoolScheduler>(4),
+        std::make_shared<ThreadPoolScheduler>(8)
+    ),
+    [](const ::testing::TestParamInfo<MVarStateTest::ParamType>& info) {
+        return info.param->toString();
+    }
+);

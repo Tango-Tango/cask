@@ -229,17 +229,16 @@ void SingleThreadScheduler::run() {
                 // in a work-starved environment.
 
                 // Compute a random sleep time between 0 and 100ms
-                auto random_sleep_time = std::chrono::milliseconds(std::abs(std::rand()) % 100);
+                auto next_sleep_time = std::chrono::milliseconds(std::abs(std::rand()) % 100);
 
                 // Compute the next timer sleep time
                 auto next_timer = timers.begin();
-                auto next_timer_time = next_timer->first;
-                auto next_sleep_time = std::chrono::milliseconds(next_timer_time - iterationStartTime);
-
-                // Choose the next sleep time as the minimum of the randomly selected time
-                // and hte next timer expiration time
-                next_sleep_time = std::min(next_sleep_time, random_sleep_time);
-                next_sleep_time = std::max(next_sleep_time, std::chrono::milliseconds(0));
+                if (next_timer != timers.end()) {
+                    auto next_timer_time = next_timer->first;
+                    auto next_timer_expires_in = std::chrono::milliseconds(next_timer_time - iterationStartTime);
+                    next_sleep_time = std::min(next_sleep_time, next_timer_expires_in);
+                    next_sleep_time = std::max(next_sleep_time, std::chrono::milliseconds(0));
+                }
 
                 // There is a possibility we've chosen to sleep for 0 milliseconds either randomly or because
                 // a timer needs to fire immediately. In that case we won't transition to idle and instead
