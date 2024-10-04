@@ -39,7 +39,7 @@ SingleThreadScheduler::SingleThreadScheduler(
     if (priority.has_value()) {
 #if __linux__
         auto which = PRIO_PROCESS;
-        setpriority(which, runThread.native_handle(), *prio);
+        setpriority(which, runThread.native_handle(), *priority);
 #elif __APPLE__
         auto which = PRIO_PROCESS;
         uint64_t run_thread_id = 0;
