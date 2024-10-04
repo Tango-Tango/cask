@@ -32,30 +32,29 @@ public:
     IMPLEMENT_MOCK0(onCancel);
 };
 
-void awaitIdle() {
-    const static std::chrono::milliseconds sleep_time(1);
-
-    int num_retries = 60000;
-    while(num_retries > 0) {
-        if(Scheduler::global()->isIdle()) {
-            return;
-        } else {
-            std::this_thread::sleep_for(sleep_time);
-            num_retries--;
-        }
-    }
-
-    FAIL() << "Expected scheduler to return to idle within 60 seconds.";
-}
-
 class ObservableSwitchMapTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
 protected:
-
     void SetUp() override {
         sched = GetParam();
     }
 
     std::shared_ptr<Scheduler> sched;
+
+    void awaitIdle() {
+        const static std::chrono::milliseconds sleep_time(1);
+
+        int num_retries = 60000;
+        while(num_retries > 0) {
+            if(sched->isIdle()) {
+                return;
+            } else {
+                std::this_thread::sleep_for(sleep_time);
+                num_retries--;
+            }
+        }
+
+        FAIL() << "Expected scheduler to return to idle within 60 seconds.";
+    }
 };
 
 

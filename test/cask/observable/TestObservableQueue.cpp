@@ -203,7 +203,7 @@ TEST(ObservableQueue, DownstreamStopBigQueue) {
 }
 
 TEST(ObservableQueue, DownstreamStopSmallQueue) {
-    auto sched = Scheduler::global();
+    auto sched = std::make_shared<SingleThreadScheduler>();
     auto downstream_queue = cask::Queue<int,cask::None>::empty(sched, 1);
     auto result = Observable<int, cask::None>::sequence(0, 1, 2, 3, 4, 5)
         ->queue(1)
