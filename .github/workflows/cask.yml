@@ -27,6 +27,9 @@ jobs:
       matrix:
         os: [ubuntu-20.04, ubuntu-22.04]
         target: [debug, release, release_no_atomics, release_always_async, release_forced_cede_disabled, clang, mips, arm]
+        exclude:
+          - os: ubuntu-20.04 # Exclude MIPS cross testing on 20.04 due to the old qemu implementation
+            target: mips
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
