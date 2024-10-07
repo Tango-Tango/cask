@@ -7,8 +7,7 @@
 #include "gtest/trompeloeil.hpp"
 #include "cask/Observable.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
-#include "cask/scheduler/SingleThreadScheduler.hpp"
-#include "cask/scheduler/WorkStealingScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::Observable;
 using cask::ObservableRef;
@@ -19,18 +18,8 @@ using cask::None;
 using cask::Ack;
 using cask::observable::GuaranteeObserver;
 using cask::scheduler::BenchScheduler;
-using cask::scheduler::SingleThreadScheduler;
-using cask::scheduler::WorkStealingScheduler;
 
-class ObservableGuaranteeTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
-protected:
-
-    void SetUp() override {
-        sched = GetParam();
-    }
-
-    std::shared_ptr<Scheduler> sched;
-};
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableGuaranteeTest);
 
 class MockGuaranteeDownstreamObserver : public trompeloeil::mock_interface<Observer<int,float>> {
 public:
@@ -190,17 +179,3 @@ TEST_P(ObservableGuaranteeTest, CancelOnce) {
 
     EXPECT_EQ(run_count, 1);
 }
-
-INSTANTIATE_TEST_SUITE_P(ObservableGuaranteeTest, ObservableGuaranteeTest,
-    ::testing::Values(
-        std::make_shared<SingleThreadScheduler>(),
-        std::make_shared<WorkStealingScheduler>(1),
-        std::make_shared<WorkStealingScheduler>(2),
-        std::make_shared<WorkStealingScheduler>(4),
-        std::make_shared<WorkStealingScheduler>(8)
-    ),
-    [](const ::testing::TestParamInfo<ObservableGuaranteeTest::ParamType>& info) {
-        return info.param->toString();
-    }
-);
-

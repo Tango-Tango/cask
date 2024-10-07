@@ -64,7 +64,7 @@ private:
     std::function<void()> on_resume;
     std::function<std::vector<std::function<void()>>()> on_request_work;
 
-    std::atomic_bool should_run;
+    bool should_run;
     bool idle;
     std::atomic_bool runner_running;
 
@@ -82,7 +82,7 @@ private:
     class CancelableTimer final : public Cancelable {
     public:
         CancelableTimer(
-            const std::shared_ptr<SingleThreadScheduler>& parent,
+            const std::weak_ptr<SingleThreadScheduler>& parent_weak,
             int64_t time_slot,
             int64_t id
         );
@@ -91,7 +91,7 @@ private:
         void onCancel(const std::function<void()>& callback) override;
         void onShutdown(const std::function<void()>&) override;
     private:
-        std::shared_ptr<SingleThreadScheduler> parent;
+        std::weak_ptr<SingleThreadScheduler> parent_weak;
         int64_t time_slot;
         int64_t id;
         std::vector<std::function<void()>> callbacks;

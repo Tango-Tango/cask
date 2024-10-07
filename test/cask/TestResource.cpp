@@ -6,25 +6,15 @@
 #include "gtest/gtest.h"
 #include "cask/Resource.hpp"
 #include "cask/Scheduler.hpp"
-#include "cask/scheduler/WorkStealingScheduler.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::Task;
 using cask::Resource;
 using cask::None;
 using cask::Scheduler;
-using cask::scheduler::SingleThreadScheduler;
-using cask::scheduler::WorkStealingScheduler;
 
-class ResourceTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
-protected:
-
-    void SetUp() override {
-        sched = GetParam();
-    }
-
-    std::shared_ptr<Scheduler> sched;
-};
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ResourceTest);
 
 TEST_P(ResourceTest,BasicUsage) {
     auto resource = Resource<int>::make(
@@ -245,17 +235,4 @@ TEST_P(ResourceTest, FlatMapAcquiresAndReleasesBoth) {
     EXPECT_EQ(calls, 4);
     EXPECT_EQ(openResourceCount, 0);
 }
-
-INSTANTIATE_TEST_SUITE_P(ResourceTest, ResourceTest,
-    ::testing::Values(
-        std::make_shared<SingleThreadScheduler>(),
-        std::make_shared<WorkStealingScheduler>(1),
-        std::make_shared<WorkStealingScheduler>(2),
-        std::make_shared<WorkStealingScheduler>(4),
-        std::make_shared<WorkStealingScheduler>(8)
-    ),
-    [](const ::testing::TestParamInfo<ResourceTest::ParamType>& info) {
-        return info.param->toString();
-    }
-);
 

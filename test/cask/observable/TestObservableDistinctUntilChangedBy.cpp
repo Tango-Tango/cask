@@ -6,25 +6,15 @@
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
-#include "cask/scheduler/WorkStealingScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::BufferRef;
 using cask::Observable;
 using cask::Scheduler;
 using cask::Task;
-using cask::scheduler::SingleThreadScheduler;
-using cask::scheduler::WorkStealingScheduler;
 using SomeData = std::tuple<std::string,int>;
 
-class ObservableDistinctUntilChangedByTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
-protected:
-
-    void SetUp() override {
-        sched = GetParam();
-    }
-
-    std::shared_ptr<Scheduler> sched;
-};
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableDistinctUntilChangedByTest);
 
 TEST_P(ObservableDistinctUntilChangedByTest, Empty) {
     auto result = Observable<SomeData>::empty()
@@ -89,16 +79,3 @@ TEST_P(ObservableDistinctUntilChangedByTest, SupressDuplicates) {
     EXPECT_EQ(std::get<0>(result[0]), "0");
     EXPECT_EQ(std::get<1>(result[0]), 1);
 }
-
-INSTANTIATE_TEST_SUITE_P(ObservableDistinctUntilChangedByTest, ObservableDistinctUntilChangedByTest,
-    ::testing::Values(
-        std::make_shared<SingleThreadScheduler>(),
-        std::make_shared<WorkStealingScheduler>(1),
-        std::make_shared<WorkStealingScheduler>(2),
-        std::make_shared<WorkStealingScheduler>(4),
-        std::make_shared<WorkStealingScheduler>(8)
-    ),
-    [](const ::testing::TestParamInfo<ObservableDistinctUntilChangedByTest::ParamType>& info) {
-        return info.param->toString();
-    }
-);

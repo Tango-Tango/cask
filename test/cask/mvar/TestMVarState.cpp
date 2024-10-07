@@ -5,24 +5,14 @@
 
 #include "gtest/gtest.h"
 #include "cask/mvar/MVarState.hpp"
-#include "cask/scheduler/WorkStealingScheduler.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::None;
 using cask::mvar::MVarState;
 using cask::Scheduler;
-using cask::scheduler::SingleThreadScheduler;
-using cask::scheduler::WorkStealingScheduler;
 
-class MVarStateTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
-protected:
-
-    void SetUp() override {
-        sched = GetParam();
-    }
-
-    std::shared_ptr<Scheduler> sched;
-};
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(MVarStateTest);
 
 TEST_P(MVarStateTest, Empty) {
     auto initialState = MVarState<int,std::string>(sched);
@@ -165,16 +155,3 @@ TEST_P(MVarStateTest, TakeTakePutPut) {
     EXPECT_EQ(takeDeferred->await(), 1);
     EXPECT_EQ(secondTakeDeferred->await(), 2);
 }
-
-INSTANTIATE_TEST_SUITE_P(MVarStateTest, MVarStateTest,
-    ::testing::Values(
-        std::make_shared<SingleThreadScheduler>(),
-        std::make_shared<WorkStealingScheduler>(1),
-        std::make_shared<WorkStealingScheduler>(2),
-        std::make_shared<WorkStealingScheduler>(4),
-        std::make_shared<WorkStealingScheduler>(8)
-    ),
-    [](const ::testing::TestParamInfo<MVarStateTest::ParamType>& info) {
-        return info.param->toString();
-    }
-);

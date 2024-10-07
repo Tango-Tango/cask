@@ -8,40 +8,13 @@
 #include "cask/Deferred.hpp"
 #include "cask/Task.hpp"
 #include "cask/Scheduler.hpp"
-#include "cask/scheduler/SingleThreadScheduler.hpp"
-#include "cask/scheduler/WorkStealingScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::Deferred;
 using cask::Task;
 using cask::Scheduler;
-using cask::scheduler::SingleThreadScheduler;
-using cask::scheduler::WorkStealingScheduler;
 
-const static std::chrono::milliseconds sleep_time(1);
-
-class SchedulerTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
-protected:
-
-    void SetUp() override {
-        sched = GetParam();
-    }
-
-    void awaitIdle() {
-        int num_retries = 1000;
-        while(num_retries > 0) {
-            if(sched->isIdle()) {
-                return;
-            } else {
-                std::this_thread::sleep_for(sleep_time);
-                num_retries--;
-            }
-        }
-
-        FAIL() << "Expected scheduler to return to idle within 1 second.";
-    }
-    
-    std::shared_ptr<Scheduler> sched;
-};
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(SchedulerTest);
 
 TEST_P(SchedulerTest, IdlesAtStart) {
     EXPECT_TRUE(sched->isIdle());
@@ -81,7 +54,7 @@ TEST_P(SchedulerTest, SubmitBulk) {
         if(num_executed.load() == num_tasks) {
             break;
         } else {
-            std::this_thread::sleep_for(sleep_time);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
             num_exec_retries--;
         }
     }
@@ -216,16 +189,3 @@ TEST_P(SchedulerTest, AwaitTaskOnScheduler) {
 
     EXPECT_EQ(result, 42);
 }
-
-INSTANTIATE_TEST_SUITE_P(Scheduler, SchedulerTest,
-    ::testing::Values(
-        std::make_shared<SingleThreadScheduler>(),
-        std::make_shared<WorkStealingScheduler>(1),
-        std::make_shared<WorkStealingScheduler>(2),
-        std::make_shared<WorkStealingScheduler>(4),
-        std::make_shared<WorkStealingScheduler>(8)
-    ),
-    [](const ::testing::TestParamInfo<SchedulerTest::ParamType>& info) {
-        return info.param->toString();
-    }
-);

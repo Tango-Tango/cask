@@ -34,8 +34,10 @@ SingleThreadScheduler::SingleThreadScheduler(
     , readyQueue()
     , timers()
 {
+    // Spawn the run thread
     std::thread runThread(std::bind(&SingleThreadScheduler::run, this));
 
+    // Set the thread priority if requested
     if (priority.has_value()) {
 #if __linux__
         auto which = PRIO_PROCESS;
@@ -52,6 +54,7 @@ SingleThreadScheduler::SingleThreadScheduler(
 #endif
     }
 
+    // Set the thread affinity if requested
     if (pinned_core.has_value()) {
 #if defined(__linux__) && defined(_GNU_SOURCE)
         auto handle = runThread.native_handle();
@@ -64,23 +67,22 @@ SingleThreadScheduler::SingleThreadScheduler(
 #endif
     }
 
+    // Detach the run thread and ensure it is running before returning
     runThreadId = runThread.get_id();
     runThread.detach();
-
-    // Wait for the run thread to start. Use a relaxed fence since we're
-    // just waiting for the thread to start and it's fine if the value
-    // takes some time to propagate.
-    while(!runner_running.load(std::memory_order_relaxed));
+    while(!runner_running.load(std::memory_order_acquire));
 }
 
 SingleThreadScheduler::~SingleThreadScheduler() {
-    should_run.store(false);
-    workAvailable.notify_all();
+    // Incidate that the run thread should shut down
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        should_run = false;
+        workAvailable.notify_all();
+    }
 
-    // Wait for the run thread to stop. Use a relaxed fence since we're
-    // just waiting for the thread to stop and it's fine if the value
-    // takes some time to propagate.
-    while(runner_running.load(std::memory_order_relaxed));
+    // Wait for the run thread to finish
+    while(runner_running.load(std::memory_order_acquire));
 }
 
 std::thread::id SingleThreadScheduler::run_thread_id() const {
@@ -138,7 +140,7 @@ CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std
     }
 
     auto cancelable = std::make_shared<CancelableTimer>(
-        this->shared_from_this(),
+        this->weak_from_this(),
         executionTick,
         id
     );
@@ -160,12 +162,10 @@ std::string SingleThreadScheduler::toString() const {
 void SingleThreadScheduler::run() {
     std::function<void()> task;
 
-    // Using relaxed fences here since the values of these flags
-    // can be stale so long as they eventually (within a few
-    // iterations) become the correct value.
+    // Indicate the run thread is running
+    runner_running.store(true, std::memory_order_release);
 
-    runner_running.store(true, std::memory_order_relaxed);
-    while(should_run.load(std::memory_order_relaxed)) {
+    while(true) {
         std::vector<std::function<void()>> batch;
         auto iterationStartTime = current_time_ms();
 
@@ -174,6 +174,11 @@ void SingleThreadScheduler::run() {
         // finally work stolen from other schedulers.
         {
             std::lock_guard<std::mutex> lock(mutex);
+
+            // While hold the lock check if we should even be
+            // running at all.
+            if (!should_run) break;
+
             std::vector<int64_t> expiredTimes;
 
             // Accumulate any expired tasks
@@ -214,13 +219,20 @@ void SingleThreadScheduler::run() {
             }
         }
 
-        // Execute the batch of tasks
+        // Execute the batch of tasks. This is done outside of the lock to avoid
+        // deadlocks and contention both with the running tasks which may be
+        // submitting work and with other schedulers that may attempt to steal
+        // work while we are busy.
         for(auto& task : batch) {
             task();
         }
 
         {
             std::unique_lock<std::mutex> lock(mutex);
+
+            // Once again check if we should even be running at all while
+            // holding the lock.
+            if (!should_run) break;
 
             if (readyQueue.empty()) {
                 // If we have no work to do, sleep until either the next timer is ready or
@@ -253,15 +265,17 @@ void SingleThreadScheduler::run() {
 
                     // Nap time!
                     workAvailable.wait_for(lock, next_sleep_time);
+
+                    // Once again we are now holding the lock. See if we were woken up
+                    // because we should be shutting down
+                    if (!should_run) break;
                 }
             }
         }
     }
 
-    // A relaxed fence is sufficient here since this is only used for
-    // synchronization with the destructor and it's fine if the value
-    // takes some amount of time to propagate.
-    runner_running.store(false, std::memory_order_relaxed);
+    // Indicate the run thread has shut down.
+    runner_running.store(false, std::memory_order_release);
 }
 
 int64_t SingleThreadScheduler::current_time_ms() {
@@ -269,10 +283,10 @@ int64_t SingleThreadScheduler::current_time_ms() {
 }
 
 SingleThreadScheduler::CancelableTimer::CancelableTimer(
-    const std::shared_ptr<SingleThreadScheduler>& parent,
+    const std::weak_ptr<SingleThreadScheduler>& parent_weak,
     int64_t time_slot,
     int64_t id
-)   : parent(parent)
+)   : parent_weak(parent_weak)
     , time_slot(time_slot)
     , id(id)
     , callbacks()
@@ -283,7 +297,7 @@ SingleThreadScheduler::CancelableTimer::CancelableTimer(
 void SingleThreadScheduler::CancelableTimer::cancel() {
     if(canceled) {
         return;
-    } else {
+    } else if(auto parent = parent_weak.lock()) {
         std::lock_guard<std::mutex> parent_guard(parent->mutex);
         std::lock_guard<std::mutex> self_guard(callback_mutex);
         auto tasks = parent->timers.find(time_slot);
@@ -327,7 +341,7 @@ void SingleThreadScheduler::CancelableTimer::onCancel(const std::function<void()
 void SingleThreadScheduler::CancelableTimer::onShutdown(const std::function<void()>& shutdownCallback) {
     bool found = false;
 
-    {
+    if (auto parent = parent_weak.lock()) {
         std::lock_guard<std::mutex> parent_guard(parent->mutex);
         std::lock_guard<std::mutex> self_guard(callback_mutex);
         auto tasks = parent->timers.find(time_slot);

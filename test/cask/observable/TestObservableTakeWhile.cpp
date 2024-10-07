@@ -6,24 +6,14 @@
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
-#include "cask/scheduler/WorkStealingScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::Observable;
 using cask::Scheduler;
 using cask::Task;
 using cask::None;
-using cask::scheduler::SingleThreadScheduler;
-using cask::scheduler::WorkStealingScheduler;
 
-class ObservableTakeWhileTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
-protected:
-
-    void SetUp() override {
-        sched = GetParam();
-    }
-
-    std::shared_ptr<Scheduler> sched;
-};
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableTakeWhileTest);
 
 TEST_P(ObservableTakeWhileTest, Error) {
     auto result = Observable<int,float>::raiseError(1.23)
@@ -136,16 +126,3 @@ TEST_P(ObservableTakeWhileTest, RunsErrorTask) {
     EXPECT_EQ(result, "broke");
     EXPECT_EQ(shutdown_counter, 1);
 }
-
-INSTANTIATE_TEST_SUITE_P(ObservableTakeWhileTest, ObservableTakeWhileTest,
-    ::testing::Values(
-        std::make_shared<SingleThreadScheduler>(),
-        std::make_shared<WorkStealingScheduler>(1),
-        std::make_shared<WorkStealingScheduler>(2),
-        std::make_shared<WorkStealingScheduler>(4),
-        std::make_shared<WorkStealingScheduler>(8)
-    ),
-    [](const ::testing::TestParamInfo<ObservableTakeWhileTest::ParamType>& info) {
-        return info.param->toString();
-    }
-);

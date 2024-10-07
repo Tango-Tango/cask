@@ -8,8 +8,7 @@
 #include "cask/Task.hpp"
 #include "cask/None.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
-#include "cask/scheduler/SingleThreadScheduler.hpp"
-#include "cask/scheduler/WorkStealingScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 #include <chrono>
 #include <thread>
 
@@ -20,18 +19,8 @@ using cask::Scheduler;
 using cask::Either;
 using cask::Task;
 using cask::scheduler::BenchScheduler;
-using cask::scheduler::SingleThreadScheduler;
-using cask::scheduler::WorkStealingScheduler;
 
-class DeferredTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
-protected:
-
-    void SetUp() override {
-        sched = GetParam();
-    }
-
-    std::shared_ptr<Scheduler> sched;
-};
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(DeferredTest);
 
 TEST(DeferredTest, Pure) {
     auto deferred = Deferred<int,float>::pure(123);
@@ -601,18 +590,3 @@ TEST(DeferredTest, FiberAwait) {
     EXPECT_EQ(*(fiber->getValue()), 123);
     EXPECT_EQ(deferred->await(), 123);
 }
-
-INSTANTIATE_TEST_SUITE_P(DeferredTest, DeferredTest,
-    ::testing::Values(
-        std::make_shared<SingleThreadScheduler>(),
-        std::make_shared<WorkStealingScheduler>(1),
-        std::make_shared<WorkStealingScheduler>(2),
-        std::make_shared<WorkStealingScheduler>(4),
-        std::make_shared<WorkStealingScheduler>(8)
-    ),
-    [](const ::testing::TestParamInfo<DeferredTest::ParamType>& info) {
-        return info.param->toString();
-    }
-);
-
-

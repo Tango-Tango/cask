@@ -8,9 +8,8 @@
 #include "gtest/trompeloeil.hpp"
 #include "cask/Observable.hpp"
 #include "cask/Scheduler.hpp"
-#include "cask/scheduler/SingleThreadScheduler.hpp"
-#include "cask/scheduler/WorkStealingScheduler.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::Observable;
 using cask::ObservableRef;
@@ -21,8 +20,6 @@ using cask::None;
 using cask::Ack;
 using cask::observable::SwitchMapObserver;
 using cask::scheduler::BenchScheduler;
-using cask::scheduler::SingleThreadScheduler;
-using cask::scheduler::WorkStealingScheduler;
 
 class MockSwitchMapDownstreamObserver : public trompeloeil::mock_interface<Observer<float,std::string>> {
 public:
@@ -32,31 +29,7 @@ public:
     IMPLEMENT_MOCK0(onCancel);
 };
 
-class ObservableSwitchMapTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
-protected:
-    void SetUp() override {
-        sched = GetParam();
-    }
-
-    std::shared_ptr<Scheduler> sched;
-
-    void awaitIdle() {
-        const static std::chrono::milliseconds sleep_time(1);
-
-        int num_retries = 60000;
-        while(num_retries > 0) {
-            if(sched->isIdle()) {
-                return;
-            } else {
-                std::this_thread::sleep_for(sleep_time);
-                num_retries--;
-            }
-        }
-
-        FAIL() << "Expected scheduler to return to idle within 60 seconds.";
-    }
-};
-
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableSwitchMapTest);
 
 TEST_P(ObservableSwitchMapTest, Empty) {
     auto result = Observable<int>::empty()
@@ -215,17 +188,3 @@ TEST(ObservableSwitchMap, CancelInnerObservable) {
 
     EXPECT_TRUE(fiber->isCanceled());
 }
-
-INSTANTIATE_TEST_SUITE_P(ObservableSwitchMap, ObservableSwitchMapTest,
-    ::testing::Values(
-        std::make_shared<SingleThreadScheduler>(),
-        std::make_shared<WorkStealingScheduler>(1),
-        std::make_shared<WorkStealingScheduler>(2),
-        std::make_shared<WorkStealingScheduler>(4),
-        std::make_shared<WorkStealingScheduler>(8)
-    ),
-    [](const ::testing::TestParamInfo<ObservableSwitchMapTest::ParamType>& info) {
-        return info.param->toString();
-    }
-);
-

@@ -7,25 +7,14 @@
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
 #include "cask/Scheduler.hpp"
-#include "cask/scheduler/SingleThreadScheduler.hpp"
-#include "cask/scheduler/WorkStealingScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::BufferRef;
 using cask::Observable;
 using cask::Scheduler;
 using cask::Task;
-using cask::scheduler::SingleThreadScheduler;
-using cask::scheduler::WorkStealingScheduler;
 
-class ObservableDistinctUntilChangedTest : public ::testing::TestWithParam<std::shared_ptr<Scheduler>> {
-protected:
-
-    void SetUp() override {
-        sched = GetParam();
-    }
-
-    std::shared_ptr<Scheduler> sched;
-};
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableDistinctUntilChangedTest);
 
 TEST_P(ObservableDistinctUntilChangedTest, Empty) {
     auto result = Observable<int>::empty()
@@ -131,16 +120,3 @@ TEST_P(ObservableDistinctUntilChangedTest, DoesntSuppressTogglingRepeats) {
     EXPECT_EQ(result[2], 0);
     EXPECT_EQ(result[3], 1);
 }
-
-INSTANTIATE_TEST_SUITE_P(ObservableDistinctUntilChangedTest, ObservableDistinctUntilChangedTest,
-    ::testing::Values(
-        std::make_shared<SingleThreadScheduler>(),
-        std::make_shared<WorkStealingScheduler>(1),
-        std::make_shared<WorkStealingScheduler>(2),
-        std::make_shared<WorkStealingScheduler>(4),
-        std::make_shared<WorkStealingScheduler>(8)
-    ),
-    [](const ::testing::TestParamInfo<ObservableDistinctUntilChangedTest::ParamType>& info) {
-        return info.param->toString();
-    }
-);
