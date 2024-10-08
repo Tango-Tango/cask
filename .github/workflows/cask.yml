@@ -20,12 +20,12 @@ on:
 
 jobs:
   build-linux:
-    name: Linux Build and Test
+    name: Linux
     if: github.actor != 'engineering-at-tangotango'
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-22.04]
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
         target: [debug, release, release_no_atomics, release_always_async, release_forced_cede_disabled, clang, mips, arm]
       fail-fast: false
 
@@ -39,9 +39,9 @@ jobs:
     - name: Update Apt Cache
       run: sudo apt-get update
     - name: Install Apt Development Dependencies
-      run: sudo apt-get install -y ninja-build build-essential python3-pip gcovr clang g++-arm-linux-gnueabihf g++-mipsel-linux-gnu qemu-user
+      run: sudo apt-get install -y ninja-build build-essential python3-pip python3-venv pipx gcovr clang g++-arm-linux-gnueabihf g++-mipsel-linux-gnu qemu-user
     - name: Install Python Development Dependencies
-      run: sudo python3 -m pip install meson==1.0.0
+      run: sudo pipx install meson==1.0.0
     - name: Generate the Build Environment
       run: ./regenerate_env.sh ${{ matrix.target }}
     - name: Compile
@@ -60,7 +60,7 @@ jobs:
       run: cat meson-logs/testlog.txt
   
   build-mac:
-    name: Mac Build and Test
+    name: MacOS
     if: github.actor != 'engineering-at-tangotango'
 
     strategy:
@@ -98,7 +98,7 @@ jobs:
       run: cat meson-logs/testlog.txt
 
   build-windows:
-    name: Windows Build and Test
+    name: Windows
     if: github.actor != 'engineering-at-tangotango'
 
     strategy:

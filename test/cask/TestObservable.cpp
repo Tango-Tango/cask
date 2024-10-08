@@ -6,16 +6,22 @@
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
+#include "cask/Scheduler.hpp"
+#include "SchedulerTestBench.hpp"
+
 #include <optional>
 
-using cask::Scheduler;
 using cask::Observable;
 using cask::ObservableRef;
 using cask::Task;
 using cask::None;
+using cask::Scheduler;
+using cask::scheduler::SingleThreadScheduler;
+using cask::scheduler::WorkStealingScheduler;
 
-TEST(Observable, Empty) {
-    auto sched = Scheduler::global();
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableTest);
+
+TEST_P(ObservableTest, Empty) {
     auto result = Observable<int>::empty()
         ->last()
         .run(sched)
@@ -24,8 +30,7 @@ TEST(Observable, Empty) {
     EXPECT_FALSE(result.has_value());
 }
 
-TEST(Observable, RaiseError) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableTest, RaiseError) {
     auto result = Observable<int, std::string>::raiseError("broke")
         ->last()
         .failed()
@@ -35,8 +40,7 @@ TEST(Observable, RaiseError) {
     EXPECT_EQ(result, "broke");
 }
 
-TEST(Observable, Eval) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableTest, Eval) {
     auto result = Observable<int, std::string>::eval([]() {
             return 123;
         })
@@ -48,8 +52,7 @@ TEST(Observable, Eval) {
     EXPECT_EQ(*result, 123);
 }
 
-TEST(Observable, EvalThrows) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableTest, EvalThrows) {
     auto result = Observable<int, std::string>::eval([]() -> int {
             throw std::string("error");
         })
@@ -61,8 +64,7 @@ TEST(Observable, EvalThrows) {
     EXPECT_EQ(result, "error");
 }
 
-TEST(Observable, Defer) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableTest, Defer) {
     auto result = Observable<int, std::string>::defer([]() {
             return Observable<int, std::string>::pure(123);
         })
@@ -74,8 +76,7 @@ TEST(Observable, Defer) {
     EXPECT_EQ(*result, 123);
 }
 
-TEST(Observable, DeferThrows) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableTest, DeferThrows) {
     auto result = Observable<int, std::string>::defer([]() {
             throw std::string("broke");
             return Observable<int, std::string>::pure(123);
@@ -88,8 +89,7 @@ TEST(Observable, DeferThrows) {
     EXPECT_EQ(result, "broke");
 }
 
-TEST(Observable, DeferRaisesError) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableTest, DeferRaisesError) {
     auto result = Observable<int, std::string>::defer([]() {
             return Observable<int, std::string>::raiseError("broke");
         })
@@ -101,8 +101,7 @@ TEST(Observable, DeferRaisesError) {
     EXPECT_EQ(result, "broke");
 }
 
-TEST(Observable, DeferTask) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableTest, DeferTask) {
     auto result = Observable<int, std::string>::deferTask([]() {
             return Task<int, std::string>::pure(123);
         })
@@ -114,8 +113,7 @@ TEST(Observable, DeferTask) {
     EXPECT_EQ(*result, 123);
 }
 
-TEST(Observable, DeferTaskThrows) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableTest, DeferTaskThrows) {
     auto result = Observable<int, std::string>::deferTask([]() {
             throw std::string("broke");
             return Task<int, std::string>::pure(123);
@@ -128,8 +126,7 @@ TEST(Observable, DeferTaskThrows) {
     EXPECT_EQ(result, "broke");
 }
 
-TEST(Observable, DeferTaskRaisesError) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableTest, DeferTaskRaisesError) {
     auto result = Observable<int, std::string>::deferTask([]() {
             return Task<int, std::string>::raiseError("broke");
         })
@@ -141,12 +138,12 @@ TEST(Observable, DeferTaskRaisesError) {
     EXPECT_EQ(result, "broke");
 }
 
-TEST(Observable, FromVector) {
+TEST_P(ObservableTest, FromVector) {
     std::vector<int> things = {1,2,3};
 
     auto result = Observable<int>::fromVector(things)
         ->take(3)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 3);
@@ -155,12 +152,12 @@ TEST(Observable, FromVector) {
     EXPECT_EQ(result[2], 3);
 }
 
-TEST(Observable, FromVectorEnds) {
+TEST_P(ObservableTest, FromVectorEnds) {
     std::vector<int> things = {1,2,3};
 
     auto result = Observable<int>::fromVector(things)
         ->take(10)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 3);
@@ -169,27 +166,27 @@ TEST(Observable, FromVectorEnds) {
     EXPECT_EQ(result[2], 3);
 }
 
-TEST(Observable, FromVectorEmpty) {
+TEST_P(ObservableTest, FromVectorEmpty) {
     std::vector<int> things;
 
     auto result = Observable<int>::fromVector(things)
         ->take(10)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 0);
 }
 
-TEST(Observable, CompletedEmpty) {
+TEST_P(ObservableTest, CompletedEmpty) {
     auto result = Observable<int>::empty()
         ->completed()
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_EQ(result, None());
 }
 
-TEST(Observable, CompletedNonEmpty) {
+TEST_P(ObservableTest, CompletedNonEmpty) {
     int counter = 0;
     auto result = Observable<int>::repeatTask(
             Task<int>::eval([&counter]() {
@@ -199,9 +196,10 @@ TEST(Observable, CompletedNonEmpty) {
         )
         ->takeWhile([](auto i) { return i < 3; })
         ->completed()
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_EQ(result, None());
     EXPECT_EQ(counter, 3);
 }
+

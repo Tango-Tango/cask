@@ -6,40 +6,42 @@
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::BufferRef;
 using cask::Observable;
 using cask::Scheduler;
 using cask::Task;
-
 using SomeData = std::tuple<std::string,int>;
 
-TEST(ObservableDistinctUntilChangedBy, Empty) {
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableDistinctUntilChangedByTest);
+
+TEST_P(ObservableDistinctUntilChangedByTest, Empty) {
     auto result = Observable<SomeData>::empty()
         ->distinctUntilChangedBy([](auto left, auto right) { return std::get<0>(left) == std::get<0>(right); })
         ->take(10)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 0);
 }
 
-TEST(ObservableDistinctUntilChangedBy, Error) {
+TEST_P(ObservableDistinctUntilChangedByTest, Error) {
     auto error = Observable<SomeData, std::string>::raiseError("broke")
         ->distinctUntilChangedBy([](auto left, auto right) { return std::get<0>(left) == std::get<0>(right); })
         ->take(10)
         .failed()
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_EQ(error, "broke");
 }
 
-TEST(ObservableDistinctUntilChangedBy, Cancel) {
+TEST_P(ObservableDistinctUntilChangedByTest, Cancel) {
     auto fiber = Observable<SomeData, std::string>::never()
         ->distinctUntilChangedBy([](auto left, auto right) { return std::get<0>(left) == std::get<0>(right); })
         ->take(10)
-        .run(Scheduler::global());
+        .run(sched);
 
     fiber->cancel();
 
@@ -49,13 +51,13 @@ TEST(ObservableDistinctUntilChangedBy, Cancel) {
     } catch(std::runtime_error&) {}
 }
 
-TEST(ObservableDistinctUntilChangedBy, SequentialNumbers) {
+TEST_P(ObservableDistinctUntilChangedByTest, SequentialNumbers) {
     auto result = Observable<SomeData>::sequence(
             SomeData("0", 0), SomeData("1", 0), SomeData("2", 0)
         )
         ->distinctUntilChangedBy([](auto left, auto right) { return std::get<0>(left) == std::get<0>(right); })
         ->take(10)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 3);
@@ -64,13 +66,13 @@ TEST(ObservableDistinctUntilChangedBy, SequentialNumbers) {
     EXPECT_EQ(std::get<0>(result[2]), "2");
 }
 
-TEST(ObservableDistinctUntilChangedBy, SupressDuplicates) {
+TEST_P(ObservableDistinctUntilChangedByTest, SupressDuplicates) {
     auto result = Observable<SomeData>::sequence(
             SomeData("0", 1), SomeData("0", 2), SomeData("0", 3)
         )
         ->distinctUntilChangedBy([](auto left, auto right) { return std::get<0>(left) == std::get<0>(right); })
         ->take(10)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 1);

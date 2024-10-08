@@ -4,12 +4,12 @@
 //          https://www.boost.org/LICENSE_1_0.txt)
 
 #include "cask/Scheduler.hpp"
-#include "cask/scheduler/ThreadPoolScheduler.hpp"
+#include "cask/scheduler/WorkStealingScheduler.hpp"
 
 namespace cask {
 
 std::shared_ptr<Scheduler> Scheduler::global() {
-    static std::shared_ptr<scheduler::ThreadPoolScheduler> sched = std::make_shared<scheduler::ThreadPoolScheduler>();
+    static std::shared_ptr<scheduler::WorkStealingScheduler> sched = std::make_shared<scheduler::WorkStealingScheduler>();
     return sched;
 }
 

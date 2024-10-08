@@ -4,9 +4,9 @@
 //          https://www.boost.org/LICENSE_1_0.txt)
 
 #include "cask/scheduler/SingleThreadScheduler.hpp"
-#include "cask/scheduler/SpinLock.hpp"
 #include <algorithm>
 #include <chrono>
+#include <iostream>
 
 #if __linux__
 #include <sys/resource.h>
@@ -19,146 +19,172 @@ using namespace std::chrono_literals;
 
 namespace cask::scheduler {
 
-SingleThreadScheduler::SingleThreadScheduler(int priority)
-    : should_run(true)
-    , idle(true)
-    , runner_running(false)
-    , dataInQueue()
-    , readyQueueSize(0)
-    , readyQueue()
-    , timers()
-    , last_execution_ms(current_time_ms())
+SingleThreadScheduler::SingleThreadScheduler(
+    std::optional<int> priority,
+    std::optional<int> pinned_core,
+    std::optional<std::size_t> batch_size,
+    const std::function<void()>& on_idle,
+    const std::function<void()>& on_resume,
+    const std::function<std::vector<std::function<void()>>(std::size_t requested_amount)>& on_request_work)
+    : control_data(std::make_shared<SchedulerControlData>(on_idle, on_resume, on_request_work))
 {
-    std::thread runThread(std::bind(&SingleThreadScheduler::run, this));
+    auto actual_batch_size = batch_size.value_or(DEFAULT_BATCH_SIZE);
 
+    // Spawn the run thread
+    std::thread run_thread(std::bind(&SingleThreadScheduler::run, actual_batch_size, control_data));
+
+    // Set the thread priority if requested
+    if (priority.has_value()) {
 #if __linux__
-    auto which = PRIO_PROCESS;
-    setpriority(which, runThread.native_handle(), priority);
+        auto which = PRIO_PROCESS;
+        setpriority(which, run_thread.native_handle(), *priority);
 #elif __APPLE__
-    auto which = PRIO_PROCESS;
-    uint64_t run_thread_id = 0;
+        auto which = PRIO_PROCESS;
+        uint64_t run_thread_id = 0;
 
-    pthread_threadid_np(runThread.native_handle(), &run_thread_id);
+        pthread_threadid_np(run_thread.native_handle(), &run_thread_id);
 
-    setpriority(which, run_thread_id, priority);
+        setpriority(which, run_thread_id, *priority);
+#else
+        std::cerr << "Setting thread priority is not supported on this platform." << std::endl;
 #endif
+    }
 
+    // Set the thread affinity if requested
+    if (pinned_core.has_value()) {
 #if defined(__linux__) && defined(_GNU_SOURCE)
-    auto handle = runThread.native_handle();
-
-    // NOLINTNEXTLINE(bugprone-narrowing-conversions)
-    int core_id = rand() % std::thread::hardware_concurrency();
-
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(core_id, &cpuset);
-    pthread_setaffinity_np(handle, sizeof(cpu_set_t), &cpuset);
+        auto handle = run_thread.native_handle();
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(*pinned_core, &cpuset);
+        pthread_setaffinity_np(handle, sizeof(cpu_set_t), &cpuset);
+#else
+        std::cerr << "Setting thread affinity is not supported on this platform." << std::endl;
 #endif
+    }
 
-    runThread.detach();
-
-    // Wait for the run thread to start. Use a relaxed fence since we're
-    // just waiting for the thread to start and it's fine if the value
-    // takes some time to propagate.
-    while(!runner_running.load(std::memory_order_relaxed));
+    // Detach the run thread and ensure it is running before returning
+    run_thread_id = run_thread.get_id();
+    run_thread.detach();
+    while(!control_data->thread_running.load(std::memory_order_acquire));
 }
 
 SingleThreadScheduler::~SingleThreadScheduler() {
-    should_run.store(false);
-    idlingThread.notify_one();
+    // Incidate that the run thread should shut down
+    {
+        std::lock_guard<std::mutex> lock(control_data->mutex);
+        control_data->should_run = false;
+        control_data->work_available.notify_all();
+    }
 
+    // Wait for the run thread to finish - unless the destructor
+    // is being called from the run thread itself.
+    if (std::this_thread::get_id() != run_thread_id) {
+        while(control_data->thread_running.load(std::memory_order_acquire));
+    }
+}
 
-    // Wait for the run thread to stop. Use a relaxed fence since we're
-    // just waiting for the thread to stop and it's fine if the value
-    // takes some time to propagate.
-    while(runner_running.load(std::memory_order_relaxed));
+std::thread::id SingleThreadScheduler::get_run_thread_id() const {
+    return run_thread_id;
+}
+
+std::vector<std::function<void()>> SingleThreadScheduler::steal(std::size_t batch_size) {
+    std::lock_guard<std::mutex> lock(control_data->mutex);
+
+    std::function<void()> task;
+    std::vector<std::function<void()>> batch;
+
+    auto batchSize = std::min(control_data->ready_queue.size(), batch_size);
+    batch.reserve(batchSize);
+
+    while(batch.size() < batchSize) {
+        task = control_data->ready_queue.front();
+        control_data->ready_queue.pop();
+        batch.emplace_back(task);
+    }
+
+    return batch;
 }
 
 void SingleThreadScheduler::submit(const std::function<void()>& task) {
-    {
-        SpinLockGuard guard(readyQueueLock);
-        readyQueue.emplace(task);
-
-        // Increment the ready queue size with relaxed memory ordering
-        // since the SpinLockGuard above provides the necessary release
-        // fence
-        readyQueueSize.fetch_add(1, std::memory_order_relaxed);
-    }
-    idlingThread.notify_one();
+    std::lock_guard<std::mutex> lock(control_data->mutex);
+    control_data->ready_queue.emplace(task);
+    control_data->work_available.notify_all();
 }
 
 void SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
-    {
-        SpinLockGuard guard(readyQueueLock);
-        for(auto& task: tasks) {
-            readyQueue.emplace(task);
-        }
-
-        // Increment the ready queue size with relaxed memory ordering
-        // since the SpinLockGuard above provides the necessary release
-        // fence
-        readyQueueSize.fetch_add(tasks.size(), std::memory_order_relaxed);
+    std::lock_guard<std::mutex> lock(control_data->mutex);
+    
+    for(auto& task: tasks) {
+        control_data->ready_queue.emplace(task);
     }
-    idlingThread.notify_one();
+
+    control_data->work_available.notify_all();
 }
 
 CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
+    std::lock_guard<std::mutex> lock(control_data->mutex);
+
     auto id = next_id++;
     auto executionTick = current_time_ms() + milliseconds;
 
-    {
-        SpinLockGuard guard(timerLock);
-        auto tasks = timers.find(executionTick);
-        auto entry = std::make_tuple(id, task);
-        
-        if(tasks == timers.end()) {
-            std::vector<TimerEntry> taskVector = {entry};
-            timers[executionTick] = taskVector;
-        } else {
-            tasks->second.push_back(entry);
-        }
+    auto tasks = control_data->timers.find(executionTick);
+    auto entry = std::make_tuple(id, task);
+    
+    if(tasks == control_data->timers.end()) {
+        std::vector<TimerEntry> taskVector = {entry};
+        control_data->timers[executionTick] = taskVector;
+    } else {
+        tasks->second.push_back(entry);
     }
 
     auto cancelable = std::make_shared<CancelableTimer>(
-        this->shared_from_this(),
+        this->control_data,
         executionTick,
         id
     );
 
-    idlingThread.notify_one();
+    control_data->work_available.notify_all();
 
     return cancelable;
 }
 
 bool SingleThreadScheduler::isIdle() const {
-    return idle && readyQueueSize.load() == 0;
+    std::lock_guard<std::mutex> lock(control_data->mutex);
+    return control_data->idle;
 }
 
-void SingleThreadScheduler::run() {
+std::string SingleThreadScheduler::toString() const {
+    return "SingleThreadScheduler";
+}
+
+void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_ptr<SchedulerControlData>& control_data) {
     std::function<void()> task;
 
-    auto dormant_sleep_time = std::chrono::milliseconds(1000);
-    auto sleep_time = dormant_sleep_time;
+    // Indicate the run thread is running
+    control_data->thread_running.store(true, std::memory_order_release);
 
-    // Using relaxed fences here since the values of these flags
-    // can be stale so long as they eventually (within a few
-    // iterations) become the correct value.
-
-    runner_running.store(true, std::memory_order_relaxed);
-    while(should_run.load(std::memory_order_relaxed)) {
+    while(true) {
+        std::vector<std::function<void()>> batch;
         auto iterationStartTime = current_time_ms();
-        std::vector<int64_t> expiredTimes;
-        std::vector<std::function<void()>> expiredTasks;
 
-        // Accumulate any expired tasks
-        {   
-            SpinLockGuard guard(timerLock);
-            for (auto& [timer_time, entries] : timers) {
+        // Grab the lock and accumulate a batch of work including any
+        // expired timers, tasks drained from the ready queue, and
+        // finally work stolen from other schedulers.
+        {
+            std::lock_guard<std::mutex> lock(control_data->mutex);
+
+            // While hold the lock check if we should even be
+            // running at all.
+            if (!control_data->should_run) break;
+
+            std::vector<int64_t> expiredTimes;
+
+            // Accumulate any expired tasks
+            for (auto& [timer_time, entries] : control_data->timers) {
                 if (timer_time <= iterationStartTime) {
-                    expiredTasks.reserve(expiredTasks.size() + entries.size());
-
                     for(auto& entry : entries) {
-                        expiredTasks.emplace_back(std::get<1>(entry));
+                        batch.emplace_back(std::get<1>(entry));
                     }
 
                     expiredTimes.push_back(timer_time);
@@ -169,89 +195,113 @@ void SingleThreadScheduler::run() {
 
             // Erase those timers from timer storage
             for (auto& timerTime : expiredTimes) {
-                timers.erase(timerTime);
+                control_data->timers.erase(timerTime);
             }
-        }
 
-        // Execute any expired timer tasks immediately
-        for(auto& timerTask : expiredTasks) {
-            timerTask();
-        }
-
-        // Drain a batch of tasks from the ready queue. We'll determine the batch
-        // size with relaxed memory ordering because even a stale value is fine
-        // since any stale values will be strictly less than the current value (this
-        // method is the only method that _decrements_ the value and it does so inside
-        // of a guard providing acquire/release fencing).
-        std::vector<std::function<void()>> batch;
-        auto queueSize = readyQueueSize.load(std::memory_order_relaxed);
-        auto batchSize = std::min(queueSize, std::size_t(128));
-
-        if (batchSize > 0) {
-            SpinLockGuard guard(readyQueueLock);
-            batch.reserve(batchSize);
+            // Fill the batch with ready tasks by draining the ready queue
+            auto batchSize = std::min(control_data->ready_queue.size(), std::size_t(batch_size));
             while(batch.size() < batchSize) {
-                task = readyQueue.front();
-                readyQueue.pop();
+                task = control_data->ready_queue.front();
+                control_data->ready_queue.pop();
                 batch.emplace_back(task);
             }
 
-            // Decrement the ready queue size with a relaxed fence
-            // since the SpinLockGuard above provides the necessary
-            // release fence
-            readyQueueSize.fetch_sub(batchSize, std::memory_order_relaxed);
+            // If we didn't find any work, request some from the parent scheduler
+            if (batch.empty()) {
+                batch = control_data->on_request_work(batch_size);
+            }
+
+            // If we are transitioning from idle to running, call the on_resume callback
+            if (control_data->idle && !batch.empty()) {
+                control_data->idle = false;
+                control_data->on_resume();
+            }
         }
 
-        // Execute the batch of tasks
+        // Execute the batch of tasks. This is done outside of the lock to avoid
+        // deadlocks and contention both with the running tasks which may be
+        // submitting work and with other schedulers that may attempt to steal
+        // work while we are busy.
         for(auto& task : batch) {
             task();
         }
 
-        // Compute the next sleep time based on the current time, the next timer expiration
-        // time, and the number of remaining tasks in the ready queue
-        if (readyQueueSize.load(std::memory_order_relaxed) > 0) {
-            sleep_time = std::chrono::milliseconds(0);
-        } else {
-            SpinLockGuard guard(timerLock);
-            if (timers.empty()) {
-                sleep_time = dormant_sleep_time;
-            } else {
-                auto next_timer = timers.begin();
-                auto next_timer_time = next_timer->first;
-                auto next_timer_sleep_time = std::chrono::milliseconds(next_timer_time - iterationStartTime);
+        {
+            std::unique_lock<std::mutex> lock(control_data->mutex);
 
-                next_timer_sleep_time = std::min(next_timer_sleep_time, dormant_sleep_time);
-                next_timer_sleep_time = std::max(next_timer_sleep_time, std::chrono::milliseconds(0));
+            // Once again check if we should even be running at all while
+            // holding the lock.
+            if (!control_data->should_run) break;
 
-                sleep_time = std::chrono::milliseconds(next_timer_sleep_time);
+            if (control_data->ready_queue.empty()) {
+                // If we have no work to do, sleep until either the next timer is ready or
+                // some random amount of time to wake up and look for work. This will avoid
+                // all of the schedulers looking for work "at the same time" when operating
+                // in a work-starved environment.
+
+                // Compute a random sleep time between 0 and 100ms
+                auto next_sleep_time = std::chrono::milliseconds(std::abs(std::rand()) % 100);
+
+                // Compute the next timer sleep time
+                auto next_timer = control_data->timers.begin();
+                if (next_timer != control_data->timers.end()) {
+                    auto next_timer_time = next_timer->first;
+                    auto next_timer_expires_in = std::chrono::milliseconds(next_timer_time - iterationStartTime);
+                    next_sleep_time = std::min(next_sleep_time, next_timer_expires_in);
+                    next_sleep_time = std::max(next_sleep_time, std::chrono::milliseconds(0));
+                }
+
+                // There is a possibility we've chosen to sleep for 0 milliseconds either randomly or because
+                // a timer needs to fire immediately. In that case we won't transition to idle and instead
+                // will immediately check for more work.
+
+                if (next_sleep_time > std::chrono::milliseconds::zero()) {
+                    // If we are transitioning to idle call the on_idle callback
+                    if (!control_data->idle) {
+                        control_data->idle = true;
+                        control_data->on_idle();
+                    }
+
+                    // Nap time!
+                    control_data->work_available.wait_for(lock, next_sleep_time);
+
+                    // Once again we are now holding the lock. See if we were woken up
+                    // because we should be shutting down
+                    if (!control_data->should_run) break;
+                }
             }
-        }
-
-        // Idle the run thread only if we've detect that we should sleep for
-        // some positive amount of time. This should be the _only_ time we
-        // give the kernel the opportunity to sleep our run thread.
-        if (sleep_time > std::chrono::milliseconds(0)) {
-            idle = true;
-            std::unique_lock<std::mutex> lock(idlingThreadMutex);
-            idlingThread.wait_for(lock, sleep_time);
         }
     }
 
-    // A relaxed fence is sufficient here since this is only used for
-    // synchronization with the destructor and it's fine if the value
-    // takes some amount of time to propagate.
-    runner_running.store(false, std::memory_order_relaxed);
+    // Indicate the run thread has shut down.
+    control_data->thread_running.store(false, std::memory_order_release);
 }
 
 int64_t SingleThreadScheduler::current_time_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
+SingleThreadScheduler::SchedulerControlData::SchedulerControlData(
+    const std::function<void()>& on_idle,
+    const std::function<void()>& on_resume,
+    const std::function<std::vector<std::function<void()>>(std::size_t)>& on_request_work
+)   : thread_running(false)
+    , mutex()
+    , work_available()
+    , should_run(true)
+    , idle(true)
+    , timers()
+    , ready_queue()
+    , on_idle(on_idle)
+    , on_resume(on_resume)
+    , on_request_work(on_request_work)
+{}
+
 SingleThreadScheduler::CancelableTimer::CancelableTimer(
-    const std::shared_ptr<SingleThreadScheduler>& parent,
+    const std::shared_ptr<SchedulerControlData>& control_data,
     int64_t time_slot,
     int64_t id
-)   : parent(parent)
+)   : control_data(control_data)
     , time_slot(time_slot)
     , id(id)
     , callbacks()
@@ -263,10 +313,10 @@ void SingleThreadScheduler::CancelableTimer::cancel() {
     if(canceled) {
         return;
     } else {
-        SpinLockGuard parent_guard(parent->timerLock);
+        std::lock_guard<std::mutex> control_guard(control_data->mutex);
         std::lock_guard<std::mutex> self_guard(callback_mutex);
-        auto tasks = parent->timers.find(time_slot);
-        if(tasks != parent->timers.end()) {
+        auto tasks = control_data->timers.find(time_slot);
+        if(tasks != control_data->timers.end()) {
             std::vector<TimerEntry> filteredEntries;
             auto entries = tasks->second;
 
@@ -280,9 +330,9 @@ void SingleThreadScheduler::CancelableTimer::cancel() {
             }
 
             if(filteredEntries.size() > 0) {
-                parent->timers[time_slot] = filteredEntries;
+                control_data->timers[time_slot] = filteredEntries;
             } else {
-                parent->timers.erase(time_slot);
+                control_data->timers.erase(time_slot);
             }
         }
     }
@@ -306,31 +356,29 @@ void SingleThreadScheduler::CancelableTimer::onCancel(const std::function<void()
 void SingleThreadScheduler::CancelableTimer::onShutdown(const std::function<void()>& shutdownCallback) {
     bool found = false;
 
-    {
-        SpinLockGuard parent_guard(parent->timerLock);
-        std::lock_guard<std::mutex> self_guard(callback_mutex);
-        auto tasks = parent->timers.find(time_slot);
+    std::lock_guard<std::mutex> control_guard(control_data->mutex);
+    std::lock_guard<std::mutex> self_guard(callback_mutex);
+    auto tasks = control_data->timers.find(time_slot);
 
-        if(tasks != parent->timers.end()) {
-            std::vector<TimerEntry> newEntries;
-            auto entries = tasks->second;
+    if(tasks != control_data->timers.end()) {
+        std::vector<TimerEntry> newEntries;
+        auto entries = tasks->second;
 
-            for(auto& entry : entries) {
-                auto entryId = std::get<0>(entry);
-                auto entryCallback = std::get<1>(entry);
-                if(entryId != id) {
-                    newEntries.emplace_back(entry);
-                } else {
-                    found = true;
-                    newEntries.emplace_back(entryId, [entryCallback, shutdownCallback]() {
-                        entryCallback();
-                        shutdownCallback();
-                    });
-                }
+        for(auto& entry : entries) {
+            auto entryId = std::get<0>(entry);
+            auto entryCallback = std::get<1>(entry);
+            if(entryId != id) {
+                newEntries.emplace_back(entry);
+            } else {
+                found = true;
+                newEntries.emplace_back(entryId, [entryCallback, shutdownCallback]() {
+                    entryCallback();
+                    shutdownCallback();
+                });
             }
-
-            parent->timers[time_slot] = newEntries;
         }
+
+        control_data->timers[time_slot] = newEntries;
     }
 
     if(!found) {

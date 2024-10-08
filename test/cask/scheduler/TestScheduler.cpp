@@ -5,41 +5,22 @@
 
 #include <atomic>
 #include "gtest/gtest.h"
-#include "cask/scheduler/SingleThreadScheduler.hpp"
+#include "cask/Deferred.hpp"
+#include "cask/Task.hpp"
+#include "cask/Scheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
-using cask::scheduler::SingleThreadScheduler;
+using cask::Deferred;
+using cask::Task;
+using cask::Scheduler;
 
-const static std::chrono::milliseconds sleep_time(1);
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(SchedulerTest);
 
-class SingleThreadSchedulerTest : public ::testing::Test {
-protected:
-
-    void SetUp() override {
-        sched = std::make_shared<SingleThreadScheduler>();
-    }
-
-    void awaitIdle() {
-        int num_retries = 1000;
-        while(num_retries > 0) {
-            if(sched->isIdle()) {
-                return;
-            } else {
-                std::this_thread::sleep_for(sleep_time);
-                num_retries--;
-            }
-        }
-
-        FAIL() << "Expected scheduler to return to idle within 1 second.";
-    }
-    
-    std::shared_ptr<SingleThreadScheduler> sched;
-};
-
-TEST_F(SingleThreadSchedulerTest, IdlesAtStart) {
+TEST_P(SchedulerTest, IdlesAtStart) {
     EXPECT_TRUE(sched->isIdle());
 }
 
-TEST_F(SingleThreadSchedulerTest, SubmitSingle) {
+TEST_P(SchedulerTest, SubmitSingle) {
     std::mutex mutex;
     mutex.lock();
 
@@ -52,7 +33,7 @@ TEST_F(SingleThreadSchedulerTest, SubmitSingle) {
     awaitIdle();
 }
 
-TEST_F(SingleThreadSchedulerTest, SubmitBulk) {
+TEST_P(SchedulerTest, SubmitBulk) {
     const static int num_tasks = 100;
     int num_exec_retries = 1000;
 
@@ -73,7 +54,7 @@ TEST_F(SingleThreadSchedulerTest, SubmitBulk) {
         if(num_executed.load() == num_tasks) {
             break;
         } else {
-            std::this_thread::sleep_for(sleep_time);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
             num_exec_retries--;
         }
     }
@@ -82,16 +63,16 @@ TEST_F(SingleThreadSchedulerTest, SubmitBulk) {
     awaitIdle();
 }
 
-TEST_F(SingleThreadSchedulerTest, SubmitAfter) {
+TEST_P(SchedulerTest, SubmitAfter) {
     std::mutex mutex;
     mutex.lock();
 
-    auto before = std::chrono::steady_clock::now();
+    auto before = std::chrono::high_resolution_clock::now();
     sched->submitAfter(25, [&mutex] {
         mutex.unlock();
     });
     mutex.lock();
-    auto after = std::chrono::steady_clock::now();
+    auto after = std::chrono::high_resolution_clock::now();
 
     auto delta = after - before;
     auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
@@ -101,7 +82,7 @@ TEST_F(SingleThreadSchedulerTest, SubmitAfter) {
     awaitIdle();
 }
 
-TEST_F(SingleThreadSchedulerTest, SubmitAfterCancel) {
+TEST_P(SchedulerTest, SubmitAfterCancel) {
     std::mutex mutex;
     mutex.lock();
 
@@ -122,7 +103,7 @@ TEST_F(SingleThreadSchedulerTest, SubmitAfterCancel) {
     awaitIdle();
 }
 
-TEST_F(SingleThreadSchedulerTest, RegistersCallbackAfterCancelled) {
+TEST_P(SchedulerTest, RegistersCallbackAfterCancelled) {
     std::mutex mutex;
     mutex.lock();
 
@@ -140,7 +121,7 @@ TEST_F(SingleThreadSchedulerTest, RegistersCallbackAfterCancelled) {
     awaitIdle();
 }
 
-TEST_F(SingleThreadSchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
+TEST_P(SchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
     bool shutdown = false;
     std::mutex shutdown_mutex;
 
@@ -166,7 +147,7 @@ TEST_F(SingleThreadSchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) 
     awaitIdle();
 }
 
-TEST_F(SingleThreadSchedulerTest, RunsShutdownImmediatelyCallbackIfTimerAlreadyFired) {
+TEST_P(SchedulerTest, RunsShutdownImmediatelyCallbackIfTimerAlreadyFired) {
     bool shutdown = false;
     std::mutex mutex;
     mutex.lock();
@@ -192,4 +173,19 @@ TEST_F(SingleThreadSchedulerTest, RunsShutdownImmediatelyCallbackIfTimerAlreadyF
     EXPECT_TRUE(shutdown);
     
     awaitIdle();
+}
+
+TEST_P(SchedulerTest, AwaitTaskOnScheduler) {
+    auto result = Task<int>::deferFiber([](auto sched) {
+        auto result = Task<int>::eval([] {
+                return 42;
+            })
+            .asyncBoundary()
+            .run(sched)
+            ->await();
+        
+        return Task<int>::pure(result).asyncBoundary().run(sched);
+    }).run(sched)->await();
+
+    EXPECT_EQ(result, 42);
 }

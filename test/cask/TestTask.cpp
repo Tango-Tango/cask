@@ -6,6 +6,8 @@
 #include "gtest/gtest.h"
 #include "cask/Task.hpp"
 #include "cask/None.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 #include <cstring>
 
 using cask::Deferred;
@@ -14,57 +16,51 @@ using cask::Promise;
 using cask::Scheduler;
 using cask::Task;
 
-TEST(Task, NoneAsync) {
-    auto sched = Scheduler::global();
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(TaskTest);
+
+TEST_P(TaskTest, NoneAsync) {
     auto task = Task<int,std::optional<int>>::none();
     auto result = task.run(sched)->await();
     EXPECT_EQ(result, None());
 }
 
-TEST(Task, PureAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, PureAsync) {
     auto task = Task<int,None>::pure(123);
     auto result = task.run(sched);
     EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, PureWithoutErrorType) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, PureWithoutErrorType) {
     auto task = Task<int>::pure(123);
     auto result = task.run(sched);
     EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, RaiseErrorAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, RaiseErrorAsync) {
     auto task = Task<None,int>::raiseError(123);
     auto result = task.failed().run(sched);
     EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, RaiseErrorWithoutErrorType) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, RaiseErrorWithoutErrorType) {
     auto task = Task<None, std::optional<int>>::raiseError(123);
     auto result = task.failed().run(sched);
     EXPECT_EQ(*(result->await()), 123);
 }
 
-TEST(Task, EvalAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, EvalAsync) {
     auto task = Task<int,None>::eval([](){return 123;});
     auto result = task.run(sched);
     EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, EvalWithoutErrorType) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, EvalWithoutErrorType) {
     auto task = Task<int>::eval([](){return 123;});
     auto result = task.run(sched);
     EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, DeferAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, DeferAsync) {
     auto task = Task<int,None>::deferAction([](auto){
         return Deferred<int,None>::pure(123);
     });
@@ -72,8 +68,7 @@ TEST(Task, DeferAsync) {
     EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, DeferWithoutErrorType) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, DeferWithoutErrorType) {
     auto task = Task<int>::deferAction([](auto){
         return Deferred<int>::pure(123);
     });
@@ -81,8 +76,7 @@ TEST(Task, DeferWithoutErrorType) {
     EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, DeferError) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, DeferError) {
     auto task = Task<None,int>::deferAction([](auto){
         return Deferred<None,int>::raiseError(123);
     });
@@ -90,8 +84,7 @@ TEST(Task, DeferError) {
     EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, PureMapAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, PureMapAsync) {
     auto task = Task<int,None>::pure(123).map<float>([](auto&& value){
         return value * 1.5;
     });
@@ -99,8 +92,7 @@ TEST(Task, PureMapAsync) {
     EXPECT_EQ(result->await(), 184.5);
 }
 
-TEST(Task, PureMapThrowsError) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, PureMapThrowsError) {
     auto task = Task<int,None>::pure(123).map<float>([](auto value){
         throw None();
         return value * 1.5;
@@ -109,8 +101,7 @@ TEST(Task, PureMapThrowsError) {
     EXPECT_EQ(result->await(), None());
 }
 
-TEST(Task, ErrorMapAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, ErrorMapAsync) {
     auto task = Task<int,None>::raiseError(None()).map<float>([](auto value){
         return value * 1.5;
     });
@@ -118,8 +109,7 @@ TEST(Task, ErrorMapAsync) {
     EXPECT_EQ(result->await(), None());
 }
 
-TEST(Task, EvalMapAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, EvalMapAsync) {
     auto task = Task<int,None>::eval([](){return 123;}).map<float>([](auto value){
         return value * 1.5;
     });
@@ -127,8 +117,7 @@ TEST(Task, EvalMapAsync) {
     EXPECT_EQ(result->await(), 184.5);
 }
 
-TEST(Task, DeferMapAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, DeferMapAsync) {
     auto task = Task<int,None>::deferAction([](auto){
             return Deferred<int,None>::pure(123);
         })
@@ -140,8 +129,7 @@ TEST(Task, DeferMapAsync) {
     EXPECT_EQ(result->await(), 184.5);
 }
 
-TEST(Task, PureFlatMapAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, PureFlatMapAsync) {
     auto task = Task<int,None>::pure(123).flatMap<float>([](auto value) {
         return Task<float,None>::pure(value * 1.5);
     });
@@ -149,8 +137,7 @@ TEST(Task, PureFlatMapAsync) {
     EXPECT_EQ(result->await(), 184.5);
 }
 
-TEST(Task, PureFlatMapError) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, PureFlatMapError) {
     auto task = Task<int,None>::pure(123).flatMap<float>([](auto) {
         return Task<float,None>::raiseError(None());
     });
@@ -158,8 +145,7 @@ TEST(Task, PureFlatMapError) {
     EXPECT_EQ(result->await(), None());
 }
 
-TEST(Task, PureFlatMapThrowsError) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, PureFlatMapThrowsError) {
     auto task = Task<int,None>::pure(123).flatMap<float>([](auto value) {
         throw None();
         return Task<float,None>::pure(value * 1.5);
@@ -168,8 +154,7 @@ TEST(Task, PureFlatMapThrowsError) {
     EXPECT_EQ(result->await(), None());
 }
 
-TEST(Task, EvalFlatMap) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, EvalFlatMap) {
     auto task = Task<int,None>::eval([](){return 123;}).flatMap<float>([](auto value) {
         return Task<float,None>::pure(value * 1.5);
     });
@@ -177,8 +162,7 @@ TEST(Task, EvalFlatMap) {
     EXPECT_EQ(result->await(), 184.5);
 }
 
-TEST(Task, ErrorFlatMap) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, ErrorFlatMap) {
     auto task = Task<int,None>::raiseError(None())
         .flatMap<float>([](auto value) {
             return Task<float,None>::pure(value * 1.5);
@@ -187,57 +171,49 @@ TEST(Task, ErrorFlatMap) {
     EXPECT_EQ(result->await(), None());
 }
 
-TEST(Task, MaterializeValueAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, MaterializeValueAsync) {
     auto task = Task<int,std::string>::pure(123).materialize();
     auto result = task.run(sched)->await();
     EXPECT_EQ(result.get_left(), 123);
 }
 
-TEST(Task, MaterializeErrorAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, MaterializeErrorAsync) {
     auto task = Task<int,std::string>::raiseError("broke").materialize();
     auto result = task.run(sched)->await();
     EXPECT_EQ(result.get_right(), "broke");
 }
 
-TEST(Task, DematerializeValueAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, DematerializeValueAsync) {
     auto task = Task<int,std::string>::pure(123).materialize().dematerialize<int>();
     auto result = task.run(sched)->await();
     EXPECT_EQ(result, 123);
 }
 
-TEST(Task, DematerializeErrorAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, DematerializeErrorAsync) {
     auto task = Task<int,std::string>::raiseError("broke").materialize().dematerialize<int>();
     auto result = task.failed().run(sched)->await();
     EXPECT_EQ(result, "broke");
 }
 
-TEST(Task, PureDelayAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, PureDelayAsync) {
     auto task = Task<int,None>::pure(123).delay(1);
     auto result = task.run(sched);
     EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, EvalDelayAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, EvalDelayAsync) {
     auto task = Task<int,None>::eval([](){return 123;}).delay(1);
     auto result = task.run(sched);
     EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, PureRestartUntil) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, PureRestartUntil) {
     auto task = Task<int,None>::pure(123).restartUntil([](auto){return true;});
     auto result = task.run(sched);
     EXPECT_EQ(result->await(), 123);
 }
 
-TEST(Task, EvalRestartUntilAsync) {
-    auto sched = Scheduler::global();
+TEST_P(TaskTest, EvalRestartUntilAsync) {
     auto value = 0;
 
     auto task = Task<int,None>::eval([&value]() {
@@ -252,9 +228,7 @@ TEST(Task, EvalRestartUntilAsync) {
     EXPECT_EQ(value, 10);
 }
 
-TEST(Task, RecurseWithoutExploding) {
-    auto sched = Scheduler::global();
-
+TEST_P(TaskTest, RecurseWithoutExploding) {
     std::function<Task<int>(const int&)> recurse = [&recurse](auto counter) {
         return Task<int>::defer([counter, &recurse]() {
             char yuge[8192];
@@ -273,27 +247,27 @@ TEST(Task, RecurseWithoutExploding) {
     EXPECT_EQ(result, 0);
 }
 
-TEST(Task, OnErrorSuccess) {
+TEST_P(TaskTest, OnErrorSuccess) {
     int calls = 0;
     auto result = Task<int,None>::pure(123)
     .onError([&calls](auto) {
         calls++;
     })
-    .run(Scheduler::global())
+    .run(sched)
     ->await();
 
     EXPECT_EQ(result, 123);
     EXPECT_EQ(calls, 0);
 }
 
-TEST(Task, OnErrorNormal) {
+TEST_P(TaskTest, OnErrorNormal) {
     int calls = 0;
     auto result = Task<int,None>::raiseError(None())
     .onError([&calls](auto) {
         calls++;
     })
     .failed()
-    .run(Scheduler::global())
+    .run(sched)
     ->await();
 
     EXPECT_EQ(result, None());
@@ -301,7 +275,7 @@ TEST(Task, OnErrorNormal) {
 }
 
 
-TEST(Task, OnErrorThrows) {
+TEST_P(TaskTest, OnErrorThrows) {
     int calls = 0;
     auto result = Task<int,float>::raiseError(1.5f)
     .onError([&calls](auto) {
@@ -309,18 +283,18 @@ TEST(Task, OnErrorThrows) {
         throw 2.5f;
     })
     .failed()
-    .run(Scheduler::global())
+    .run(sched)
     ->await();
 
     EXPECT_EQ(result, 2.5f);
     EXPECT_EQ(calls, 1);
 }
 
-TEST(Task, MapError) {
+TEST_P(TaskTest, MapError) {
     auto result = Task<int,int>::raiseError(123)
     .mapError<float>([](auto input) { return input *1.5f; })
     .failed()
-    .run(Scheduler::global())
+    .run(sched)
     ->await();
 
     EXPECT_EQ(result, 184.5);

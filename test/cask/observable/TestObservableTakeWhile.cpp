@@ -6,38 +6,41 @@
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::Observable;
 using cask::Scheduler;
 using cask::Task;
 using cask::None;
 
-TEST(ObservableTakeWhile, Error) {
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableTakeWhileTest);
+
+TEST_P(ObservableTakeWhileTest, Error) {
     auto result = Observable<int,float>::raiseError(1.23)
         ->takeWhile([](auto) {
             return true;
         })
         ->last()
         .failed()
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_EQ(result, 1.23f);
 }
 
-TEST(ObservableTakeWhile, Empty) {
+TEST_P(ObservableTakeWhileTest, Empty) {
     auto result = Observable<int>::empty()
         ->takeWhile([](auto) {
             return true;
         })
         ->last()
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_FALSE(result.has_value());
 }
 
-TEST(ObservableTakeWhile, Infinite) {
+TEST_P(ObservableTakeWhileTest, Infinite) {
     int counter = 0;
     auto result = Observable<int>::repeatTask(Task<int>::eval([&counter] {
             counter++;
@@ -47,7 +50,7 @@ TEST(ObservableTakeWhile, Infinite) {
             return value < 10;
         })
         ->take(100)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 9);
@@ -56,20 +59,20 @@ TEST(ObservableTakeWhile, Infinite) {
     }
 }
 
-TEST(ObservableTakeWhile, Finite) {
+TEST_P(ObservableTakeWhileTest, Finite) {
     auto result = Observable<int>::pure(123)
         ->takeWhile([](auto) {
             return true;
         })
         ->take(100)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 1);
     EXPECT_EQ(result[0], 123);
 }
 
-TEST(ObservableTakeWhile, CompletesOnlyOnce) {
+TEST_P(ObservableTakeWhileTest, CompletesOnlyOnce) {
     auto result = Observable<int>::deferTask([]{
             return Task<int>::pure(123);
         })
@@ -77,13 +80,13 @@ TEST(ObservableTakeWhile, CompletesOnlyOnce) {
             return false;
         })
         ->last()
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_FALSE(result.has_value());
 }
 
-TEST(ObservableTakeWhile, RunsCompletionTask) {
+TEST_P(ObservableTakeWhileTest, RunsCompletionTask) {
     auto shutdown_counter = 0;
 
     auto result = Observable<int>::pure(123)
@@ -96,14 +99,14 @@ TEST(ObservableTakeWhile, RunsCompletionTask) {
 
         }))
         ->take(100)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_EQ(result.size(), 0);
     EXPECT_EQ(shutdown_counter, 1);
 }
 
-TEST(ObservableTakeWhile, RunsErrorTask) {
+TEST_P(ObservableTakeWhileTest, RunsErrorTask) {
     auto shutdown_counter = 0;
 
     auto result = Observable<int,std::string>::raiseError("broke")
@@ -117,7 +120,7 @@ TEST(ObservableTakeWhile, RunsErrorTask) {
         }))
         ->take(100)
         .failed()
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_EQ(result, "broke");

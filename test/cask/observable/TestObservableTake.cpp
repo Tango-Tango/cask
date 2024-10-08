@@ -7,6 +7,7 @@
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::None;
 using cask::Observable;
@@ -14,80 +15,82 @@ using cask::Scheduler;
 using cask::Task;
 using cask::scheduler::BenchScheduler;
 
-TEST(ObservableTake, ErrorTakeNothing) {
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableTakeTest);
+
+TEST_P(ObservableTakeTest, ErrorTakeNothing) {
     auto result = Observable<int,float>::raiseError(1.23)
         ->take(0)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_TRUE(result.empty());
 }
 
-TEST(ObservableTake, ErrorTakeOne) {
+TEST_P(ObservableTakeTest, ErrorTakeOne) {
     auto result = Observable<int,float>::raiseError(1.23)
         ->take(1)
         .failed()
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_EQ(result, 1.23f);
 }
 
-TEST(ObservableTake, PureTakeNothing) {
+TEST_P(ObservableTakeTest, PureTakeNothing) {
     auto result = Observable<int>::pure(123)
         ->take(0)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_TRUE(result.empty());
 }
 
-TEST(ObservableTake, PureTakeOne) {
+TEST_P(ObservableTakeTest, PureTakeOne) {
     auto result = Observable<int>::pure(123)
         ->take(1)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 1);
     EXPECT_EQ(result[0], 123);
 }
 
-TEST(ObservableTake, PureTakeMultiple) {
+TEST_P(ObservableTakeTest, PureTakeMultiple) {
     auto result = Observable<int>::pure(123)
         ->take(2)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 1);
     EXPECT_EQ(result[0], 123);
 }
 
-TEST(ObservableTake, VectorTakeNothing) {
+TEST_P(ObservableTakeTest, VectorTakeNothing) {
     std::vector<int> values = {1,2,3,4,5};
     auto result = Observable<int>::fromVector(values)
         ->take(0)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_TRUE(result.empty());
 }
 
-TEST(ObservableTake, VectorTakeOne) {
+TEST_P(ObservableTakeTest, VectorTakeOne) {
     std::vector<int> values = {1,2,3,4,5};
     auto result = Observable<int>::fromVector(values)
         ->take(1)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 1);
     EXPECT_EQ(result[0], 1);
 }
 
-TEST(ObservableTake, VectorTakeMulti) {
+TEST_P(ObservableTakeTest, VectorTakeMulti) {
     std::vector<int> values = {1,2,3,4,5};
     auto result = Observable<int>::fromVector(values)
         ->take(3)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 3);
@@ -97,11 +100,11 @@ TEST(ObservableTake, VectorTakeMulti) {
 }
 
 
-TEST(ObservableTake, VectorTakeAll) {
+TEST_P(ObservableTakeTest, VectorTakeAll) {
     std::vector<int> values = {1,2,3,4,5};
     auto result = Observable<int>::fromVector(values)
         ->take(5)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 5);
@@ -112,11 +115,11 @@ TEST(ObservableTake, VectorTakeAll) {
     EXPECT_EQ(result[4], 5);
 }
 
-TEST(ObservableTake, VectorTakeMoreThanAll) {
+TEST_P(ObservableTakeTest, VectorTakeMoreThanAll) {
     std::vector<int> values = {1,2,3,4,5};
     auto result = Observable<int>::fromVector(values)
         ->take(6)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 5);
@@ -127,7 +130,7 @@ TEST(ObservableTake, VectorTakeMoreThanAll) {
     EXPECT_EQ(result[4], 5);
 }
 
-TEST(ObservableTake, VectorTakeMergedNone) {
+TEST_P(ObservableTakeTest, VectorTakeMergedNone) {
     std::vector<int> first_values = {1,2,3,4,5};
     std::vector<int> second_values = {6,7,8,9,10};
     std::vector<int> third_values = {11,12,13,14,15};
@@ -136,13 +139,13 @@ TEST(ObservableTake, VectorTakeMergedNone) {
     auto result = Observable<std::vector<int>>::fromVector(all_values)
         ->template flatMap<int>([](auto vector) { return Observable<int>::fromVector(vector); })
         ->take(0)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 0);
 }
 
-TEST(ObservableTake, VectorTakeMergedMulti) {
+TEST_P(ObservableTakeTest, VectorTakeMergedMulti) {
     std::vector<int> first_values = {1,2,3,4,5};
     std::vector<int> second_values = {6,7,8,9,10};
     std::vector<int> third_values = {11,12,13,14,15};
@@ -151,7 +154,7 @@ TEST(ObservableTake, VectorTakeMergedMulti) {
     auto result = Observable<std::vector<int>>::fromVector(all_values)
         ->template flatMap<int>([](auto vector) { return Observable<int>::fromVector(vector); })
         ->take(6)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 6);
@@ -163,7 +166,7 @@ TEST(ObservableTake, VectorTakeMergedMulti) {
     EXPECT_EQ(result[5], 6);
 }
 
-TEST(ObservableTake, VectorTakeMergedAll) {
+TEST_P(ObservableTakeTest, VectorTakeMergedAll) {
     std::vector<int> first_values = {1,2,3,4,5};
     std::vector<int> second_values = {6,7,8,9,10};
     std::vector<int> third_values = {11,12,13,14,15};
@@ -172,7 +175,7 @@ TEST(ObservableTake, VectorTakeMergedAll) {
     auto result = Observable<std::vector<int>>::fromVector(all_values)
         ->template flatMap<int>([](auto vector) { return Observable<int>::fromVector(vector); })
         ->take(15)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 15);
@@ -181,7 +184,7 @@ TEST(ObservableTake, VectorTakeMergedAll) {
     }
 }
 
-TEST(ObservableTake, VectorTakeMergedMoreThanAll) {
+TEST_P(ObservableTakeTest, VectorTakeMergedMoreThanAll) {
     std::vector<int> first_values = {1,2,3,4,5};
     std::vector<int> second_values = {6,7,8,9,10};
     std::vector<int> third_values = {11,12,13,14,15};
@@ -190,7 +193,7 @@ TEST(ObservableTake, VectorTakeMergedMoreThanAll) {
     auto result = Observable<std::vector<int>>::fromVector(all_values)
         ->template flatMap<int>([](auto vector) { return Observable<int>::fromVector(vector); })
         ->take(16)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 15);
@@ -199,7 +202,7 @@ TEST(ObservableTake, VectorTakeMergedMoreThanAll) {
     }
 }
 
-TEST(ObservableTake, CompletesGuaranteedEffects) {
+TEST_P(ObservableTakeTest, CompletesGuaranteedEffects) {
     bool completed = false;
     std::vector<int> values = {1,2,3,4,5};
     auto result = Observable<int>::fromVector(values)
@@ -210,7 +213,7 @@ TEST(ObservableTake, CompletesGuaranteedEffects) {
             }).delay(100)
         )
         ->take(1)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_EQ(result.size(), 1);
@@ -218,7 +221,7 @@ TEST(ObservableTake, CompletesGuaranteedEffects) {
 }
 
 
-TEST(ObservableTake, RunsCancelCallbacks) {
+TEST(ObservableTakeTest, RunsCancelCallbacks) {
     auto sched = std::make_shared<BenchScheduler>();
     int run_count = 0;
     auto task = Task<None,None>::eval([&run_count]() {

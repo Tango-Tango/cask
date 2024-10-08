@@ -6,38 +6,42 @@
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
+#include "cask/Scheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::BufferRef;
 using cask::Observable;
 using cask::Scheduler;
 using cask::Task;
 
-TEST(ObservableDistinctUntilChanged, Empty) {
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableDistinctUntilChangedTest);
+
+TEST_P(ObservableDistinctUntilChangedTest, Empty) {
     auto result = Observable<int>::empty()
         ->distinctUntilChanged()
         ->take(10)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 0);
 }
 
-TEST(ObservableDistinctUntilChanged, Error) {
+TEST_P(ObservableDistinctUntilChangedTest, Error) {
     auto error = Observable<int, std::string>::raiseError("broke")
         ->distinctUntilChanged()
         ->take(10)
         .failed()
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_EQ(error, "broke");
 }
 
-TEST(ObservableDistinctUntilChanged, Cancel) {
+TEST_P(ObservableDistinctUntilChangedTest, Cancel) {
     auto fiber = Observable<int, std::string>::never()
         ->distinctUntilChanged()
         ->take(10)
-        .run(Scheduler::global());
+        .run(sched);
 
     fiber->cancel();
 
@@ -47,11 +51,11 @@ TEST(ObservableDistinctUntilChanged, Cancel) {
     } catch(std::runtime_error&) {}
 }
 
-TEST(ObservableDistinctUntilChanged, SequentialNumbers) {
+TEST_P(ObservableDistinctUntilChangedTest, SequentialNumbers) {
     auto result = Observable<int>::sequence(0, 1, 2, 3, 4)
         ->distinctUntilChanged()
         ->take(10)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 5);
@@ -62,22 +66,22 @@ TEST(ObservableDistinctUntilChanged, SequentialNumbers) {
     EXPECT_EQ(result[4], 4);
 }
 
-TEST(ObservableDistinctUntilChanged, SuppressesAllDuplicates) {
+TEST_P(ObservableDistinctUntilChangedTest, SuppressesAllDuplicates) {
     auto result = Observable<int>::sequence(1, 1, 1, 1, 1)
         ->distinctUntilChanged()
         ->take(10)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 1);
     EXPECT_EQ(result[0], 1);
 }
 
-TEST(ObservableDistinctUntilChanged, SuppressesRepeatedDuplicates) {
+TEST_P(ObservableDistinctUntilChangedTest, SuppressesRepeatedDuplicates) {
     auto result = Observable<int>::sequence(0, 0, 1, 1, 2, 2, 3, 3, 4, 4)
         ->distinctUntilChanged()
         ->take(10)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 5);
@@ -88,11 +92,11 @@ TEST(ObservableDistinctUntilChanged, SuppressesRepeatedDuplicates) {
     EXPECT_EQ(result[4], 4);
 }
 
-TEST(ObservableDistinctUntilChanged, DoesntSuppressToggling) {
+TEST_P(ObservableDistinctUntilChangedTest, DoesntSuppressToggling) {
     auto result = Observable<int>::sequence(0, 1, 0, 1, 1)
         ->distinctUntilChanged()
         ->take(10)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 4);
@@ -103,11 +107,11 @@ TEST(ObservableDistinctUntilChanged, DoesntSuppressToggling) {
 }
 
 
-TEST(ObservableDistinctUntilChanged, DoesntSuppressTogglingRepeats) {
+TEST_P(ObservableDistinctUntilChangedTest, DoesntSuppressTogglingRepeats) {
     auto result = Observable<int>::sequence(0, 0, 1, 1, 0, 0, 1, 1)
         ->distinctUntilChanged()
         ->take(10)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 4);

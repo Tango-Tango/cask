@@ -6,17 +6,21 @@
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::BufferRef;
 using cask::Observable;
 using cask::Scheduler;
 using cask::Task;
 
-TEST(ObservableAppendAll, SingleValues) {
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableAppendAllTest);
+
+TEST_P(ObservableAppendAllTest, SingleValues) {
     auto result = Observable<int>::pure(123)
         ->appendAll(Observable<int>::pure(456))
         ->take(3)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 2);
@@ -24,72 +28,72 @@ TEST(ObservableAppendAll, SingleValues) {
     EXPECT_EQ(result[1], 456);
 }
 
-TEST(ObservableAppendAll, UpstreamEmpty) {
+TEST_P(ObservableAppendAllTest, UpstreamEmpty) {
     auto result = Observable<int>::empty()
         ->appendAll(Observable<int>::pure(456))
         ->take(3)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 1);
     EXPECT_EQ(result[0], 456);
 }
 
-TEST(ObservableAppendAll, DownstreamEmpty) {
+TEST_P(ObservableAppendAllTest, DownstreamEmpty) {
     auto result = Observable<int>::pure(123)
         ->appendAll(Observable<int>::empty())
         ->take(3)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 1);
     EXPECT_EQ(result[0], 123);
 }
 
-TEST(ObservableAppendAll, BothEmpty) {
+TEST_P(ObservableAppendAllTest, BothEmpty) {
     auto result = Observable<int>::empty()
         ->appendAll(Observable<int>::empty())
         ->take(3)
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     ASSERT_EQ(result.size(), 0);
 }
 
-TEST(ObservableAppendAll, BothErrors) {
+TEST_P(ObservableAppendAllTest, BothErrors) {
     auto result = Observable<int, std::string>::raiseError("upstream")
         ->appendAll(Observable<int, std::string>::raiseError("downstream"))
         ->completed()
         .failed()
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_EQ(result, "upstream");
 }
 
-TEST(ObservableAppendAll, UpstreamError) {
+TEST_P(ObservableAppendAllTest, UpstreamError) {
     auto result = Observable<int, std::string>::raiseError("upstream")
         ->appendAll(Observable<int, std::string>::pure(456))
         ->completed()
         .failed()
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_EQ(result, "upstream");
 }
 
-TEST(ObservableAppendAll, DownstreamError) {
+TEST_P(ObservableAppendAllTest, DownstreamError) {
     auto result = Observable<int, std::string>::pure(123)
         ->appendAll(Observable<int, std::string>::raiseError("downstream"))
         ->completed()
         .failed()
-        .run(Scheduler::global())
+        .run(sched)
         ->await();
 
     EXPECT_EQ(result, "downstream");
 }
 
-TEST(ObservableAppendAll, UpstreamCancel) {
+TEST_P(ObservableAppendAllTest, UpstreamCancel) {
     int counter = 0;
 
     auto deferred = Observable<int>::fromTask(Task<int>::never())
@@ -97,7 +101,7 @@ TEST(ObservableAppendAll, UpstreamCancel) {
         ->foreach([&counter](auto) {
             counter++;
         })
-        .run(Scheduler::global());
+        .run(sched);
 
     deferred->cancel();
 
@@ -109,7 +113,7 @@ TEST(ObservableAppendAll, UpstreamCancel) {
     }
 }
 
-TEST(ObservableAppendAll, DownstreamCancel) {
+TEST_P(ObservableAppendAllTest, DownstreamCancel) {
     int counter = 0;
 
     auto deferred = Observable<int>::empty()
@@ -117,7 +121,7 @@ TEST(ObservableAppendAll, DownstreamCancel) {
         ->foreach([&counter](auto) {
             counter++;
         })
-        .run(Scheduler::global());
+        .run(sched);
 
     deferred->cancel();
     

@@ -7,7 +7,9 @@
 #include "gtest/gtest.h"
 #include "gtest/trompeloeil.hpp"
 #include "cask/Observable.hpp"
+#include "cask/Scheduler.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "SchedulerTestBench.hpp"
 
 using cask::Observable;
 using cask::ObservableRef;
@@ -27,24 +29,9 @@ public:
     IMPLEMENT_MOCK0(onCancel);
 };
 
-void awaitIdle() {
-    const static std::chrono::milliseconds sleep_time(1);
+INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableSwitchMapTest);
 
-    int num_retries = 60000;
-    while(num_retries > 0) {
-        if(Scheduler::global()->isIdle()) {
-            return;
-        } else {
-            std::this_thread::sleep_for(sleep_time);
-            num_retries--;
-        }
-    }
-
-    FAIL() << "Expected scheduler to return to idle within 60 seconds.";
-}
-
-TEST(ObservableSwitchMap, Empty) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, Empty) {
     auto result = Observable<int>::empty()
         ->switchMap<float>([](auto value) {
             return Observable<float>::pure(value * 1.5);
@@ -57,8 +44,7 @@ TEST(ObservableSwitchMap, Empty) {
     awaitIdle();
 }
 
-TEST(ObservableSwitchMap, Pure) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, Pure) {
     auto result = Observable<int>::pure(123)
         ->switchMap<float>([](auto value) {
             return Observable<float>::pure(value * 1.5);
@@ -72,8 +58,7 @@ TEST(ObservableSwitchMap, Pure) {
     awaitIdle();
 }
 
-TEST(ObservableSwitchMap, UpstreamError) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, UpstreamError) {
     auto result = Observable<int,std::string>::raiseError("broke")
         ->switchMap<float>([](auto value) {
             return Observable<float,std::string>::pure(value * 1.5);
@@ -87,8 +72,7 @@ TEST(ObservableSwitchMap, UpstreamError) {
     awaitIdle();
 }
 
-TEST(ObservableSwitchMap, ProducesError) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, ProducesError) {
     auto result = Observable<int,std::string>::pure(123)
         ->switchMap<float>([](auto) {
             return Observable<float,std::string>::raiseError("broke");
@@ -102,8 +86,7 @@ TEST(ObservableSwitchMap, ProducesError) {
     awaitIdle();
 }
 
-TEST(ObservableSwitchMap, ErrorStopsInfiniteUpstream) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, ErrorStopsInfiniteUpstream) {
     int counter = 0;
     auto result = Observable<int,std::string>::repeatTask(Task<int,std::string>::pure(123).delay(1))
         ->switchMap<float>([&counter](auto) {
@@ -120,8 +103,7 @@ TEST(ObservableSwitchMap, ErrorStopsInfiniteUpstream) {
     awaitIdle();
 }
 
-TEST(ObservableSwitchMap, CancelStopsInfiniteUpstream) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, CancelStopsInfiniteUpstream) {
     auto deferred = Observable<int,std::string>::repeatTask(
             Task<int,std::string>::pure(123).delay(10)
         )
@@ -141,8 +123,7 @@ TEST(ObservableSwitchMap, CancelStopsInfiniteUpstream) {
     awaitIdle();
 }
 
-TEST(ObservableSwitchMap, StopsUpstreamOnDownstreamComplete) {
-    auto sched = Scheduler::global();
+TEST_P(ObservableSwitchMapTest, StopsUpstreamOnDownstreamComplete) {
     int counter = 0;
     auto result = Observable<int,std::string>::repeatTask(Task<int,std::string>::pure(123).delay(1))
         ->switchMap<float>([&counter](auto) {

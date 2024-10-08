@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "Cancelable.hpp"
@@ -66,6 +67,13 @@ public:
      * @return true if the scheduler is idle.
      */
     virtual bool isIdle() const = 0;
+
+    /**
+     * Obtain a string representation of the scheduler.
+     * 
+     * @return The string representation of the scheduler.
+     */
+    virtual std::string toString() const = 0;
 
     virtual ~Scheduler() = default;
 };
