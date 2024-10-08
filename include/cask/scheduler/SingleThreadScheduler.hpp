@@ -30,7 +30,7 @@ public:
     /**
      * Construct a single threaded scheduler.
      */
-    explicit SingleThreadScheduler(
+    SingleThreadScheduler(
         std::optional<int> priority = std::nullopt,
         std::optional<int> pinned_core = std::nullopt,
         const std::function<void()>& on_idle = [](){},
