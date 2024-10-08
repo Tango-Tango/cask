@@ -66,13 +66,7 @@ CancelableRef WorkStealingScheduler::submitAfter(int64_t milliseconds, const std
 }
 
 bool WorkStealingScheduler::isIdle() const {
-    for(auto& [_, scheduler] : schedulers) {
-        if (!scheduler->isIdle()) {
-            return false;
-        }
-    }
-
-    return true;
+    return running_thread_count.load(std::memory_order_relaxed) == 0;
 }
 
 std::string WorkStealingScheduler::toString() const {
@@ -81,13 +75,13 @@ std::string WorkStealingScheduler::toString() const {
 
 void WorkStealingScheduler::onThreadIdle(const std::weak_ptr<WorkStealingScheduler>& self_weak) {
     if (auto self = self_weak.lock()) {
-        self->running_thread_count.fetch_sub(1);
+        self->running_thread_count.fetch_sub(1, std::memory_order_relaxed);
     }
 }
 
 void WorkStealingScheduler::onThreadResume(const std::weak_ptr<WorkStealingScheduler>& self_weak) {
     if (auto self = self_weak.lock()) {
-        self->running_thread_count.fetch_add(1);
+        self->running_thread_count.fetch_add(1, std::memory_order_relaxed);
     }
 }
 
