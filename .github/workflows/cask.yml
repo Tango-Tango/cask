@@ -20,16 +20,13 @@ on:
 
 jobs:
   build-linux:
-    name: Linux Build and Test
+    name: Linux
     if: github.actor != 'engineering-at-tangotango'
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-22.04]
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
         target: [debug, release, release_no_atomics, release_always_async, release_forced_cede_disabled, clang, mips, arm]
-        exclude:
-          - os: ubuntu-20.04 # Exclude MIPS cross testing on 20.04 due to the old qemu implementation
-            target: mips
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
@@ -63,12 +60,12 @@ jobs:
       run: cat meson-logs/testlog.txt
   
   build-mac:
-    name: Mac Build and Test
+    name: MacOS
     if: github.actor != 'engineering-at-tangotango'
 
     strategy:
       matrix:
-        os: [macos-12]
+        os: [macos-12, macos-13]
         target: [clang]
       fail-fast: false
 
@@ -101,7 +98,7 @@ jobs:
       run: cat meson-logs/testlog.txt
 
   build-windows:
-    name: Windows Build and Test
+    name: Windows
     if: github.actor != 'engineering-at-tangotango'
 
     strategy:
