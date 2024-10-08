@@ -10,7 +10,7 @@
 namespace cask::scheduler {
 
 WorkStealingScheduler::WorkStealingScheduler(unsigned int poolSize, std::optional<int> priority)
-    : runningThreadCount(0)
+    : running_thread_count(0)
 {
     assert(poolSize > 0 && "Pool size must be greater than 0");
     auto idle_callback = std::bind(&WorkStealingScheduler::onThreadIdle, this->weak_from_this());
@@ -21,7 +21,7 @@ WorkStealingScheduler::WorkStealingScheduler(unsigned int poolSize, std::optiona
         auto sched = std::make_shared<SingleThreadScheduler>(priority, std::nullopt, idle_callback, resume_callback, request_work_callback);
         auto thread_id = sched->get_run_thread_id();
 
-        threadIds.push_back(thread_id);
+        thread_ids.push_back(thread_id);
         schedulers[thread_id] = sched;
     }
 }
@@ -33,8 +33,8 @@ void WorkStealingScheduler::submit(const std::function<void()>& task) {
     if (scheduler_lookup != schedulers.end()) {
         scheduler_lookup->second->submit(task);
     } else {
-        auto random_index = std::rand() % threadIds.size();
-        auto random_thread_id = threadIds[random_index];
+        auto random_index = std::rand() % thread_ids.size();
+        auto random_thread_id = thread_ids[random_index];
         schedulers[random_thread_id]->submit(task);
     }
 }
@@ -46,8 +46,8 @@ void WorkStealingScheduler::submitBulk(const std::vector<std::function<void()>>&
     if (scheduler_lookup != schedulers.end()) {
         scheduler_lookup->second->submitBulk(tasks);
     } else {
-        auto random_index = std::rand() % threadIds.size();
-        auto random_thread_id = threadIds[random_index];
+        auto random_index = std::rand() % thread_ids.size();
+        auto random_thread_id = thread_ids[random_index];
         schedulers[random_thread_id]->submitBulk(tasks);
     }
 }
@@ -59,8 +59,8 @@ CancelableRef WorkStealingScheduler::submitAfter(int64_t milliseconds, const std
     if (scheduler_lookup != schedulers.end()) {
         return scheduler_lookup->second->submitAfter(milliseconds, task);
     } else {
-        auto random_index = std::rand() % threadIds.size();
-        auto random_thread_id = threadIds[random_index];
+        auto random_index = std::rand() % thread_ids.size();
+        auto random_thread_id = thread_ids[random_index];
         return schedulers[random_thread_id]->submitAfter(milliseconds, task);
     }
 }
@@ -81,13 +81,13 @@ std::string WorkStealingScheduler::toString() const {
 
 void WorkStealingScheduler::onThreadIdle(const std::weak_ptr<WorkStealingScheduler>& self_weak) {
     if (auto self = self_weak.lock()) {
-        self->runningThreadCount.fetch_sub(1);
+        self->running_thread_count.fetch_sub(1);
     }
 }
 
 void WorkStealingScheduler::onThreadResume(const std::weak_ptr<WorkStealingScheduler>& self_weak) {
     if (auto self = self_weak.lock()) {
-        self->runningThreadCount.fetch_add(1);
+        self->running_thread_count.fetch_add(1);
     }
 }
 
@@ -97,12 +97,12 @@ std::vector<std::function<void()>> WorkStealingScheduler::onThreadRequestWork(co
     if (auto self = self_weak.lock()) {
         // Select a random starting point for work stealing as a simple way to balance work
         // and avoid lock contention
-        auto random_start_index = std::size_t(std::abs(std::rand())) % self->threadIds.size();
+        auto random_start_index = std::size_t(std::abs(std::rand())) % self->thread_ids.size();
         auto i = random_start_index;
 
         while (true) {
             // Try and find a scheduler to steal work from
-            auto thread_id = self->threadIds[i];
+            auto thread_id = self->thread_ids[i];
 
             // Skip the current thread (the scheduler thread) to avoid attempting to
             // steal work from the scheduler requesting the work in the first place
@@ -125,7 +125,7 @@ std::vector<std::function<void()>> WorkStealingScheduler::onThreadRequestWork(co
 
             // Move to the next thread - giving up if we've already
             // checked all threads
-            i = (i + 1) % self->threadIds.size();
+            i = (i + 1) % self->thread_ids.size();
             if (i == random_start_index) {
                 break;
             }

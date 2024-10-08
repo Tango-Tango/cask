@@ -33,8 +33,8 @@ public:
     std::string toString() const override;
 
 private:
-    std::atomic_size_t runningThreadCount;
-    std::vector<std::thread::id> threadIds;
+    std::atomic_size_t running_thread_count;
+    std::vector<std::thread::id> thread_ids;
     std::map<std::thread::id, std::shared_ptr<SingleThreadScheduler>> schedulers;
 
     static void onThreadIdle(const std::weak_ptr<WorkStealingScheduler>& self_weak);
