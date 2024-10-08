@@ -18,6 +18,8 @@
 #include "../Scheduler.hpp"
 
 namespace cask::scheduler {
+
+
     
 /**
  * The single thread scheduler only utilizes a single thread for processing
@@ -45,7 +47,7 @@ public:
     /**
      * Determine the run thread's ID
      */
-    std::thread::id run_thread_id() const;
+    std::thread::id get_run_thread_id() const;
 
     /**
      * Steal some work from this scheduler's ready queue.
@@ -60,29 +62,31 @@ public:
 private:
     using TimerEntry = std::tuple<int64_t, std::function<void()>>;
 
-    std::function<void()> on_idle;
-    std::function<void()> on_resume;
-    std::function<std::vector<std::function<void()>>()> on_request_work;
+    struct SchedulerControlData {
+        SchedulerControlData(
+            const std::function<void()>& on_idle,
+            const std::function<void()>& on_resume,
+            const std::function<std::vector<std::function<void()>>()>& on_request_work);
 
-    bool should_run;
-    bool idle;
-    std::atomic_bool runner_running;
+        std::atomic_bool thread_running;
 
-    mutable std::mutex mutex;
-    mutable std::condition_variable workAvailable;
-    
-    std::queue<std::function<void()>> readyQueue;
-    std::map<int64_t,std::vector<TimerEntry>> timers;
-    std::int64_t next_id;
-    std::thread::id runThreadId;
+        std::mutex mutex;
+        std::condition_variable work_available;
 
-    void run();
-    static int64_t current_time_ms();
+        bool should_run;
+        bool idle;
+        std::map<int64_t,std::vector<TimerEntry>> timers;
+        std::queue<std::function<void()>> ready_queue;
+
+        std::function<void()> on_idle;
+        std::function<void()> on_resume;
+        std::function<std::vector<std::function<void()>>()> on_request_work;
+    };
 
     class CancelableTimer final : public Cancelable {
     public:
         CancelableTimer(
-            const std::weak_ptr<SingleThreadScheduler>& parent_weak,
+            const std::shared_ptr<SchedulerControlData>& control_data,
             int64_t time_slot,
             int64_t id
         );
@@ -91,7 +95,7 @@ private:
         void onCancel(const std::function<void()>& callback) override;
         void onShutdown(const std::function<void()>&) override;
     private:
-        std::weak_ptr<SingleThreadScheduler> parent_weak;
+        std::shared_ptr<SchedulerControlData> control_data;
         int64_t time_slot;
         int64_t id;
         std::vector<std::function<void()>> callbacks;
@@ -99,6 +103,12 @@ private:
         bool canceled;
     };
 
+    std::int64_t next_id;
+    std::thread::id run_thread_id;
+    std::shared_ptr<SchedulerControlData> control_data;
+
+    static void run(const std::shared_ptr<SchedulerControlData>& control_data);
+    static int64_t current_time_ms();
 };
 
 } // namespace cask::scheduler

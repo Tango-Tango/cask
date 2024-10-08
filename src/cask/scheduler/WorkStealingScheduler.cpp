@@ -19,7 +19,7 @@ WorkStealingScheduler::WorkStealingScheduler(unsigned int poolSize, std::optiona
 
     for(unsigned int i = 0; i < poolSize; i++) {
         auto sched = std::make_shared<SingleThreadScheduler>(priority, std::nullopt, idle_callback, resume_callback, request_work_callback);
-        auto thread_id = sched->run_thread_id();
+        auto thread_id = sched->get_run_thread_id();
 
         threadIds.push_back(thread_id);
         schedulers[thread_id] = sched;
