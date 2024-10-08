@@ -9,16 +9,19 @@
 
 namespace cask::scheduler {
 
-WorkStealingScheduler::WorkStealingScheduler(unsigned int poolSize, std::optional<int> priority)
+WorkStealingScheduler::WorkStealingScheduler(
+    unsigned int poolSize,
+    std::optional<int> priority,
+    std::optional<std::size_t> batch_size)
     : running_thread_count(0)
 {
     assert(poolSize > 0 && "Pool size must be greater than 0");
     auto idle_callback = std::bind(&WorkStealingScheduler::onThreadIdle, this->weak_from_this());
     auto resume_callback = std::bind(&WorkStealingScheduler::onThreadResume, this->weak_from_this());
-    auto request_work_callback = std::bind(&WorkStealingScheduler::onThreadRequestWork, this->weak_from_this());
+    auto request_work_callback = std::bind(&WorkStealingScheduler::onThreadRequestWork, this->weak_from_this(), std::placeholders::_1);
 
     for(unsigned int i = 0; i < poolSize; i++) {
-        auto sched = std::make_shared<SingleThreadScheduler>(priority, std::nullopt, idle_callback, resume_callback, request_work_callback);
+        auto sched = std::make_shared<SingleThreadScheduler>(priority, std::nullopt, batch_size, idle_callback, resume_callback, request_work_callback);
         auto thread_id = sched->get_run_thread_id();
 
         thread_ids.push_back(thread_id);
@@ -85,7 +88,7 @@ void WorkStealingScheduler::onThreadResume(const std::weak_ptr<WorkStealingSched
     }
 }
 
-std::vector<std::function<void()>> WorkStealingScheduler::onThreadRequestWork(const std::weak_ptr<WorkStealingScheduler>& self_weak) {
+std::vector<std::function<void()>> WorkStealingScheduler::onThreadRequestWork(const std::weak_ptr<WorkStealingScheduler>& self_weak, std::size_t amount_requested) {
     auto current_thread_id = std::this_thread::get_id();
 
     if (auto self = self_weak.lock()) {
@@ -109,7 +112,7 @@ std::vector<std::function<void()>> WorkStealingScheduler::onThreadRequestWork(co
                 }
 
                 // Try and steal some work
-                auto batch = scheduler_lookup->second->steal(128);
+                auto batch = scheduler_lookup->second->steal(amount_requested);
 
                 // If a batch was stolen, submit it to the idle scheduler
                 if (batch.size() > 0) {

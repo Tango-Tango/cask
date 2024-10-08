@@ -23,7 +23,8 @@ class WorkStealingScheduler final : public Scheduler, public std::enable_shared_
 public:
     explicit WorkStealingScheduler(
         unsigned int poolSize = std::thread::hardware_concurrency(),
-        std::optional<int> priority = std::nullopt
+        std::optional<int> priority = std::nullopt,
+        std::optional<std::size_t> batch_size = std::nullopt
     );
 
     void submit(const std::function<void()>& task) override;
@@ -39,7 +40,7 @@ private:
 
     static void onThreadIdle(const std::weak_ptr<WorkStealingScheduler>& self_weak);
     static void onThreadResume(const std::weak_ptr<WorkStealingScheduler>& self_weak);
-    static std::vector<std::function<void()>> onThreadRequestWork(const std::weak_ptr<WorkStealingScheduler>& self_weak);
+    static std::vector<std::function<void()>> onThreadRequestWork(const std::weak_ptr<WorkStealingScheduler>& self_weak, std::size_t amount_requested);
 };
 
 } // namespace cask::scheduler

@@ -19,7 +19,7 @@
 
 namespace cask::scheduler {
 
-
+constexpr std::size_t DEFAULT_BATCH_SIZE = 128;
     
 /**
  * The single thread scheduler only utilizes a single thread for processing
@@ -33,9 +33,10 @@ public:
     SingleThreadScheduler(
         std::optional<int> priority = std::nullopt,
         std::optional<int> pinned_core = std::nullopt,
+        std::optional<std::size_t> batch_size = std::nullopt,
         const std::function<void()>& on_idle = [](){},
         const std::function<void()>& on_resume = [](){},
-        const std::function<std::vector<std::function<void()>>()>& on_request_work = [](){ return std::vector<std::function<void()>>(); }
+        const std::function<std::vector<std::function<void()>>(std::size_t)>& on_request_work = [](auto){ return std::vector<std::function<void()>>(); }
     );
 
     /**
@@ -66,7 +67,7 @@ private:
         SchedulerControlData(
             const std::function<void()>& on_idle,
             const std::function<void()>& on_resume,
-            const std::function<std::vector<std::function<void()>>()>& on_request_work);
+            const std::function<std::vector<std::function<void()>>(std::size_t)>& on_request_work);
 
         std::atomic_bool thread_running;
 
@@ -80,7 +81,7 @@ private:
 
         std::function<void()> on_idle;
         std::function<void()> on_resume;
-        std::function<std::vector<std::function<void()>>()> on_request_work;
+        std::function<std::vector<std::function<void()>>(std::size_t)> on_request_work;
     };
 
     class CancelableTimer final : public Cancelable {
@@ -107,7 +108,7 @@ private:
     std::thread::id run_thread_id;
     std::shared_ptr<SchedulerControlData> control_data;
 
-    static void run(const std::shared_ptr<SchedulerControlData>& control_data);
+    static void run(const std::size_t batch_size, const std::shared_ptr<SchedulerControlData>& control_data);
     static int64_t current_time_ms();
 };
 

@@ -22,13 +22,16 @@ namespace cask::scheduler {
 SingleThreadScheduler::SingleThreadScheduler(
     std::optional<int> priority,
     std::optional<int> pinned_core,
+    std::optional<std::size_t> batch_size,
     const std::function<void()>& on_idle,
     const std::function<void()>& on_resume,
-    const std::function<std::vector<std::function<void()>>()>& on_request_work)
+    const std::function<std::vector<std::function<void()>>(std::size_t requested_amount)>& on_request_work)
     : control_data(std::make_shared<SchedulerControlData>(on_idle, on_resume, on_request_work))
 {
+    auto actual_batch_size = batch_size.value_or(DEFAULT_BATCH_SIZE);
+
     // Spawn the run thread
-    std::thread run_thread(std::bind(&SingleThreadScheduler::run, control_data));
+    std::thread run_thread(std::bind(&SingleThreadScheduler::run, actual_batch_size, control_data));
 
     // Set the thread priority if requested
     if (priority.has_value()) {
@@ -155,7 +158,7 @@ std::string SingleThreadScheduler::toString() const {
     return "SingleThreadScheduler";
 }
 
-void SingleThreadScheduler::run(const std::shared_ptr<SchedulerControlData>& control_data) {
+void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_ptr<SchedulerControlData>& control_data) {
     std::function<void()> task;
 
     // Indicate the run thread is running
@@ -196,7 +199,7 @@ void SingleThreadScheduler::run(const std::shared_ptr<SchedulerControlData>& con
             }
 
             // Fill the batch with ready tasks by draining the ready queue
-            auto batchSize = std::min(control_data->ready_queue.size(), std::size_t(128));
+            auto batchSize = std::min(control_data->ready_queue.size(), std::size_t(batch_size));
             while(batch.size() < batchSize) {
                 task = control_data->ready_queue.front();
                 control_data->ready_queue.pop();
@@ -205,7 +208,7 @@ void SingleThreadScheduler::run(const std::shared_ptr<SchedulerControlData>& con
 
             // If we didn't find any work, request some from the parent scheduler
             if (batch.empty()) {
-                batch = control_data->on_request_work();
+                batch = control_data->on_request_work(batch_size);
             }
 
             // If we are transitioning from idle to running, call the on_resume callback
@@ -281,7 +284,7 @@ int64_t SingleThreadScheduler::current_time_ms() {
 SingleThreadScheduler::SchedulerControlData::SchedulerControlData(
     const std::function<void()>& on_idle,
     const std::function<void()>& on_resume,
-    const std::function<std::vector<std::function<void()>>()>& on_request_work
+    const std::function<std::vector<std::function<void()>>(std::size_t)>& on_request_work
 )   : thread_running(false)
     , mutex()
     , work_available()
