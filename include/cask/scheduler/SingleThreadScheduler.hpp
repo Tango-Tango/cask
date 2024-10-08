@@ -30,7 +30,7 @@ public:
     /**
      * Construct a single threaded scheduler.
      */
-    SingleThreadScheduler(
+    explicit SingleThreadScheduler(
         std::optional<int> priority = std::nullopt,
         std::optional<int> pinned_core = std::nullopt,
         std::optional<std::size_t> batch_size = std::nullopt,
