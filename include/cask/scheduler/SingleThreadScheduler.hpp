@@ -61,7 +61,10 @@ public:
     bool isIdle() const override;
     std::string toString() const override;
 private:
-    using TimerEntry = std::tuple<int64_t, std::function<void()>>;
+    using TimerTimeMs = int64_t;
+    using TimerId = int64_t;
+
+    class CancelableTimer;
 
     struct SchedulerControlData {
         SchedulerControlData(
@@ -76,7 +79,7 @@ private:
 
         bool should_run;
         bool idle;
-        std::map<int64_t,std::vector<TimerEntry>> timers;
+        std::map<TimerTimeMs,std::vector<std::shared_ptr<CancelableTimer>>> timers;
         std::queue<std::function<void()>> ready_queue;
 
         std::function<void()> on_idle;
@@ -84,27 +87,31 @@ private:
         std::function<std::vector<std::function<void()>>(std::size_t)> on_request_work;
     };
 
-    class CancelableTimer final : public Cancelable {
+    class CancelableTimer final : public Cancelable, std::enable_shared_from_this<CancelableTimer> {
     public:
         CancelableTimer(
             const std::shared_ptr<SchedulerControlData>& control_data,
-            int64_t time_slot,
-            int64_t id
+            TimerTimeMs time_slot,
+            TimerId id
         );
 
+        void fire();
         void cancel() override;
         void onCancel(const std::function<void()>& callback) override;
         void onShutdown(const std::function<void()>&) override;
     private:
+
         std::shared_ptr<SchedulerControlData> control_data;
-        int64_t time_slot;
-        int64_t id;
-        std::vector<std::function<void()>> callbacks;
-        std::mutex callback_mutex;
+        TimerTimeMs time_slot;
+        TimerId id;
+        std::vector<std::function<void()>> shutdown_callbacks;
+        std::vector<std::function<void()>> cancel_callbacks;
+        std::mutex timer_mutex;
         bool canceled;
+        bool shutdown;
     };
 
-    std::int64_t next_id;
+    TimerId next_id;
     std::thread::id run_thread_id;
     std::shared_ptr<SchedulerControlData> control_data;
 

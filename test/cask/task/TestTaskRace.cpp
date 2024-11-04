@@ -73,13 +73,14 @@ TEST(TaskRace, TaskStressTest) {
     auto sched = std::make_shared<WorkStealingScheduler>();
 
     while (iterations > 0) {
-        auto task1 = Task<std::size_t,std::string>::pure(SIZE_T_MAX).delay(0);
+        iterations--;
+        auto task1 = Task<std::size_t,std::string>::pure(SIZE_MAX).delay(0);
         auto task2 = Task<std::size_t,std::string>::raiseError("Error").asyncBoundary();
         auto race = task1.raceWith(task2).materialize();
         auto result = race.run(sched)->await();
 
         if (result.is_left()) {
-            EXPECT_EQ(result.get_left(), SIZE_T_MAX);
+            EXPECT_EQ(result.get_left(), SIZE_MAX);
         } else {
             EXPECT_EQ(result.get_right(), "Error");
         }

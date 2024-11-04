@@ -19,6 +19,16 @@ namespace cask::fiber {
 
 enum FiberState { READY, RUNNING, WAITING, DELAYED, RACING, COMPLETED, CANCELED };
 
+#define PRINT_STATE(state) \
+    (state == READY ? "READY" : \
+    (state == RUNNING ? "RUNNING" : \
+    (state == WAITING ? "WAITING" : \
+    (state == DELAYED ? "DELAYED" : \
+    (state == RACING ? "RACING" : \
+    (state == COMPLETED ? "COMPLETED" : \
+    (state == CANCELED ? "CANCELED" : "UNKNOWN")))))))
+
+
 template <class T, class E>
 class FiberImpl final : public Fiber<T,E> {
 public:
@@ -50,6 +60,7 @@ private:
     void asyncSuccess(const Erased& value);
     void asyncCancel();
     void delayFinished();
+    void delayCanceled();
     bool racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& racer);
 
     void reschedule(const std::shared_ptr<Scheduler>& sched);
@@ -79,6 +90,7 @@ private:
     std::mutex racing_fibers_mutex;
     std::vector<std::function<void(Fiber<T,E>*)>> callbacks;
     std::atomic_bool attempting_cancel;
+    std::optional<FiberValue> race_result;
     std::map<int, std::shared_ptr<Fiber<Erased,Erased>>> racing_fibers;
 };
 
@@ -228,85 +240,172 @@ bool FiberImpl<T,E>::isCanceled() {
 
 template <class T, class E>
 void FiberImpl<T,E>::asyncError(const Erased& error) {
-    FiberState expected = WAITING;
-    if(state.compare_exchange_strong(expected, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
-        value.setError(error);
-        waitingOn = nullptr;
+    while (true) {
+        FiberState current_state = state.load(std::memory_order_relaxed);
 
-        if(!finishIteration()) {
-            state.store(READY, std::memory_order_release);
+        if (current_state == WAITING && state.compare_exchange_weak(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
+            break;
+        } else if (current_state == RUNNING) {
+            continue;
+        } else if (current_state == CANCELED || current_state == COMPLETED) {
+            waitingOn = nullptr;
+            return;
+        } else {
+            std::string message = "Fiber is in invalid state to process asyncError: ";
+            throw std::runtime_error(message + PRINT_STATE(current_state));
         }
+    }
+
+    value.setError(error);
+    waitingOn = nullptr;
+
+    if(!finishIteration()) {
+        state.store(READY, std::memory_order_release);
     }
 }
 
 template <class T, class E>
 void FiberImpl<T,E>::asyncSuccess(const Erased& new_value) {
-    FiberState expected = WAITING;
-    if(state.compare_exchange_strong(expected, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
-        value.setValue(new_value);
-        waitingOn = nullptr;
+    while (true) {
+        FiberState current_state = state.load(std::memory_order_relaxed);
 
-        if(!finishIteration()) {
-            state.store(READY, std::memory_order_release);
+        if (current_state == WAITING && state.compare_exchange_weak(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
+            break;
+        } else if (current_state == RUNNING) {
+            continue;
+        } else if (current_state == CANCELED || current_state == COMPLETED) {
+            waitingOn = nullptr;
+            return;
+        } else {
+            std::string message = "Fiber is in invalid state to process asyncSuccess: ";
+            throw std::runtime_error(message + PRINT_STATE(current_state));
         }
+    }
+
+    value.setValue(new_value);
+    waitingOn = nullptr;
+
+    if(!finishIteration()) {
+        state.store(READY, std::memory_order_release);
     }
 }
 
 template <class T, class E>
 void FiberImpl<T,E>::asyncCancel() {
-    FiberState expected = WAITING;
-    if(state.compare_exchange_strong(expected, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
-        value.setCanceled();
-        waitingOn = nullptr;
+    while (true) {
+        FiberState current_state = state.load(std::memory_order_relaxed);
 
-        if(!finishIteration()) {
-            state.store(READY, std::memory_order_release);
+        if (current_state == WAITING && state.compare_exchange_weak(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
+            break;
+        } else if (current_state == RUNNING) {
+            continue;
+        } else if (current_state == CANCELED || current_state == COMPLETED) {
+            waitingOn = nullptr;
+            return;
+        } else {
+            std::string message = "Fiber is in invalid state to process asyncCancel: ";
+            throw std::runtime_error(message + PRINT_STATE(current_state));
         }
+    }
+
+    value.setCanceled();
+    waitingOn = nullptr;
+
+    if(!finishIteration()) {
+        state.store(READY, std::memory_order_release);
     }
 }
 
 template <class T, class E>
 void FiberImpl<T,E>::delayFinished() {
-    FiberState expected = DELAYED;
-    if(state.compare_exchange_strong(expected, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
-        delayedBy = nullptr;
-        if(!finishIteration()) {
-            state.store(READY, std::memory_order_release);
+    while (true) {
+        FiberState current_state = state.load(std::memory_order_relaxed);
+
+        if (current_state == DELAYED && state.compare_exchange_weak(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
+            break;
+        } else if (current_state == RUNNING) {
+            continue;
+        } else if (current_state == CANCELED || current_state == COMPLETED) {
+            return;
+        } else {
+            std::string message = "Fiber is in invalid state to process delayFinished: ";
+            throw std::runtime_error(message + PRINT_STATE(current_state));
         }
+    }
+
+    if(!finishIteration()) {
+        state.store(READY, std::memory_order_release);
+    }
+}
+
+template <class T, class E>
+void FiberImpl<T,E>::delayCanceled() {
+    while (true) {
+        FiberState current_state = state.load(std::memory_order_relaxed);
+
+        if (current_state == DELAYED && state.compare_exchange_weak(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
+            break;
+        } else if (current_state == RUNNING) {
+            continue;
+        } else if (current_state == CANCELED || current_state == COMPLETED) {
+            return;
+        } else {
+            std::string message = "Fiber is in invalid state to process delayCanceled: ";
+            throw std::runtime_error(message + PRINT_STATE(current_state));
+        }
+    }
+
+    value.setCanceled();
+    if(!finishIteration()) {
+        state.store(READY, std::memory_order_release);
     }
 }
 
 template <class T, class E>
 bool FiberImpl<T,E>::racerFinished(const std::shared_ptr<Fiber<Erased,Erased>>& racer) {
-    bool no_more_fibers = false;
+    bool last_racer = false;
+    std::vector<FiberRef<Erased,Erased>> racers_to_cancel;
 
     {
         std::lock_guard<std::mutex> guard(racing_fibers_mutex);
-        racing_fibers.erase(racer->getId());
-        no_more_fibers = racing_fibers.empty();
-    }
 
-    FiberState expected = RACING;
-    if(state.compare_exchange_strong(expected, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
-        if(!value.isCanceled()) value = racer->getRawValue();
+        // Lookup the racer and remove it from the list bailing
+        // if the callback is from some unknown racer.
+        auto entry = racing_fibers.find(racer->getId());
+        if (entry == racing_fibers.end()) {
+            return false;
+        }
+        racing_fibers.erase(entry);
 
-        std::vector<FiberRef<Erased,Erased>> local_racers;
+        // Record the result if this is the first racer to complete. We'll
+        // also fire off a cancel signal to all other outstanding racers in
+        // an effort to get them to finish up.
+        if (!race_result.has_value()) {
+            race_result.emplace(racer->getRawValue());
 
-        {
-            std::lock_guard<std::mutex> guard(racing_fibers_mutex);
-            for(const auto& entry: racing_fibers) {
-                const auto& fiber = std::get<1>(entry);
-                local_racers.emplace_back(fiber);
+            for (auto& fiber : racing_fibers) {
+                racers_to_cancel.emplace_back(std::get<1>(fiber));
             }
         }
 
-        for(auto& fiber : local_racers) {
-            fiber->cancel();
-        }
-
+        // Check if this is the last racer identified by being the
+        // racer that cleared out the racing_fibers list
+        last_racer = racing_fibers.empty();
     }
 
-    if(no_more_fibers) {
+    // Cancel any other racers as-needed
+    for (auto& fiber : racers_to_cancel) {
+        fiber->cancel();
+    }
+
+    // If this was the last racer, then its time to finish up
+    // by setting up the value and resuming the monitor fiber
+    if (last_racer) {
+        if (!value.isCanceled()) {
+            value = race_result.value();
+        }
+
+        state.store(RUNNING, std::memory_order_release);
         if(!finishIteration()) {
             state.store(READY, std::memory_order_release);
         }
@@ -433,6 +532,17 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
                     }
                 }
             });
+
+            delayedBy->onCancel([self_weak = this->weak_from_this(), sched_weak = std::weak_ptr<Scheduler>(sched)] {
+                if(auto self = self_weak.lock()) {
+                    if(auto sched = sched_weak.lock()) {
+                        auto casted_self = std::static_pointer_cast<FiberImpl<T,E>>(self);
+                        casted_self->delayCanceled();
+                        casted_self->resume(sched);
+                    }
+                }
+            });
+
             state.store(DELAYED, std::memory_order_release);
         } else {
             state.store(READY, std::memory_order_release);
@@ -449,8 +559,12 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
 
             {
                 std::lock_guard<std::mutex> guard(racing_fibers_mutex);
+                race_result.reset();
+                racing_fibers.clear();
+
                 for(auto& racer: *data) {
                     auto fiber = std::make_shared<FiberImpl<Erased,Erased>>(racer);
+                    fiber->last_used_scheduler = sched;
                     fiber->onFiberShutdown([
                         self_weak = this->weak_from_this(),
                         fiber_weak = std::weak_ptr<FiberImpl<Erased,Erased>>(fiber),
@@ -466,6 +580,7 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
                             }
                         }
                     });
+
                     racing_fibers[fiber->getId()] = fiber;
                     local_racing_fibers.emplace_back(fiber);
                 }
@@ -528,9 +643,12 @@ void FiberImpl<T,E>::cancel() {
                 break;
             }
         } else if (auto sched = last_used_scheduler.lock()) {
-            sched->submit([self = this->shared_from_this()] {
-                self->cancel();
+            sched->submit([self_weak = this->weak_from_this()] {
+                if(auto self = self_weak.lock()) {
+                    self->cancel();
+                }
             });
+            
             return;
         }
     }
@@ -542,8 +660,9 @@ void FiberImpl<T,E>::cancel() {
         waitingOn->cancel();
         return;
     } else if(current_state == DELAYED) {
+        state.store(DELAYED, std::memory_order_release);
         delayedBy->cancel();
-        delayedBy = nullptr;
+        return;
     } else if(current_state == RACING) {
         state.store(RACING, std::memory_order_release);
 

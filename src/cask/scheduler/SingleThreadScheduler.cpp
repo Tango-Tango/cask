@@ -125,28 +125,29 @@ void SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>&
 CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
     std::lock_guard<std::mutex> lock(control_data->mutex);
 
-    auto id = next_id++;
-    auto executionTick = current_time_ms() + milliseconds;
+    TimerId id = next_id++;
+    TimerTimeMs executionTick = current_time_ms() + milliseconds;
 
-    auto tasks = control_data->timers.find(executionTick);
-    auto entry = std::make_tuple(id, task);
-    
-    if(tasks == control_data->timers.end()) {
-        std::vector<TimerEntry> taskVector = {entry};
-        control_data->timers[executionTick] = taskVector;
-    } else {
-        tasks->second.push_back(entry);
-    }
-
-    auto cancelable = std::make_shared<CancelableTimer>(
-        this->control_data,
+    auto timer = std::make_shared<CancelableTimer>(
+        control_data,
         executionTick,
         id
     );
 
+    timer->onShutdown(task);
+
+    auto timers = control_data->timers.find(executionTick);
+    
+    if(timers == control_data->timers.end()) {
+        std::vector<std::shared_ptr<CancelableTimer>> taskVector = {timer};
+        control_data->timers[executionTick] = taskVector;
+    } else {
+        timers->second.push_back(timer);
+    }
+
     control_data->work_available.notify_all();
 
-    return cancelable;
+    return timer;
 }
 
 bool SingleThreadScheduler::isIdle() const {
@@ -166,6 +167,7 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
 
     while(true) {
         std::vector<std::function<void()>> batch;
+        std::vector<std::shared_ptr<CancelableTimer>> expiredTimers;
         auto iterationStartTime = current_time_ms();
 
         // Grab the lock and accumulate a batch of work including any
@@ -181,10 +183,10 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
             std::vector<int64_t> expiredTimes;
 
             // Accumulate any expired tasks
-            for (auto& [timer_time, entries] : control_data->timers) {
+            for (auto& [timer_time, timers] : control_data->timers) {
                 if (timer_time <= iterationStartTime) {
-                    for(auto& entry : entries) {
-                        batch.emplace_back(std::get<1>(entry));
+                    for(auto& timer : timers) {
+                        expiredTimers.push_back(timer);
                     }
 
                     expiredTimes.push_back(timer_time);
@@ -200,6 +202,14 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
 
             // Fill the batch with ready tasks by draining the ready queue
             auto batchSize = std::min(control_data->ready_queue.size(), std::size_t(batch_size));
+
+            // Adjust the batch size based on the number of expired timers
+            if (batchSize > expiredTimers.size()) {
+                batchSize -= expiredTimers.size();
+            } else {
+                batchSize = 0;
+            }
+
             while(batch.size() < batchSize) {
                 task = control_data->ready_queue.front();
                 control_data->ready_queue.pop();
@@ -217,6 +227,12 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
                 control_data->on_resume();
             }
         }
+
+        // Fire all the timers
+        for (auto& timer : expiredTimers) {
+            timer->fire();
+        }
+        expiredTimers.clear();
 
         // Execute the batch of tasks. This is done outside of the lock to avoid
         // deadlocks and contention both with the running tasks which may be
@@ -304,85 +320,102 @@ SingleThreadScheduler::CancelableTimer::CancelableTimer(
 )   : control_data(control_data)
     , time_slot(time_slot)
     , id(id)
-    , callbacks()
-    , callback_mutex()
+    , shutdown_callbacks()
+    , cancel_callbacks()
+    , timer_mutex()
     , canceled(false)
+    , shutdown(false)
 {}
 
+
+void SingleThreadScheduler::CancelableTimer::fire() {
+    std::vector<std::function<void()>> callbacks_to_run;
+
+    {
+        std::lock_guard<std::mutex> self_guard(timer_mutex);
+        if (!shutdown && !canceled) {
+            shutdown = true;
+            std::swap(shutdown_callbacks, callbacks_to_run);
+        }
+    }
+
+    for(auto& cb : callbacks_to_run) {
+        cb();
+    }
+}
+
 void SingleThreadScheduler::CancelableTimer::cancel() {
-    if(canceled) {
-        return;
-    } else {
+    std::vector<std::function<void()>> callbacks_to_run;
+
+    {
         std::lock_guard<std::mutex> control_guard(control_data->mutex);
-        std::lock_guard<std::mutex> self_guard(callback_mutex);
-        auto tasks = control_data->timers.find(time_slot);
-        if(tasks != control_data->timers.end()) {
-            std::vector<TimerEntry> filteredEntries;
-            auto entries = tasks->second;
+        std::lock_guard<std::mutex> self_guard(timer_mutex);
 
-            for(auto& entry : entries) {
-                auto entry_id = std::get<0>(entry);
-                if(entry_id != id) {
-                    filteredEntries.emplace_back(entry);
-                } else {
-                    canceled = true;
+        if (!shutdown && !canceled) {
+            auto tasks = control_data->timers.find(time_slot);
+            if(tasks != control_data->timers.end()) {
+                std::vector<std::shared_ptr<CancelableTimer>> filteredTimers;
+                auto timers = tasks->second;
+
+                for(auto& timer : timers) {
+                    if(timer->id != id) {
+                        filteredTimers.emplace_back(timer);
+                    } else {
+                        canceled = true;
+                    }
                 }
-            }
 
-            if(filteredEntries.size() > 0) {
-                control_data->timers[time_slot] = filteredEntries;
-            } else {
-                control_data->timers.erase(time_slot);
+                if(filteredTimers.size() > 0) {
+                    control_data->timers[time_slot] = filteredTimers;
+                } else {
+                    control_data->timers.erase(time_slot);
+                }
+
+                if (canceled) {
+                    std::swap(cancel_callbacks, callbacks_to_run);
+                }
             }
         }
     }
 
-    if(canceled) {
-        for(auto& cb : callbacks) {
-            cb();
-        }
+    for(auto& cb : callbacks_to_run) {
+        cb();
     }
 }
 
 void SingleThreadScheduler::CancelableTimer::onCancel(const std::function<void()>& callback) {
-    if(canceled) {
+    bool run_callback_now = false;
+
+    {
+        std::lock_guard<std::mutex> guard(timer_mutex);
+
+        if(canceled) {
+            run_callback_now = true;
+        } else {
+            cancel_callbacks.emplace_back(callback);
+        }
+    }
+
+    if (run_callback_now) {
         callback();
-    } else {
-        std::lock_guard<std::mutex> guard(callback_mutex);
-        callbacks.emplace_back(callback);
     }
 }
 
-void SingleThreadScheduler::CancelableTimer::onShutdown(const std::function<void()>& shutdownCallback) {
-    bool found = false;
+void SingleThreadScheduler::CancelableTimer::onShutdown(const std::function<void()>& callback) {
+    bool run_callback_now = false;
 
-    std::lock_guard<std::mutex> control_guard(control_data->mutex);
-    std::lock_guard<std::mutex> self_guard(callback_mutex);
-    auto tasks = control_data->timers.find(time_slot);
+    {
+        std::lock_guard<std::mutex> guard(timer_mutex);
 
-    if(tasks != control_data->timers.end()) {
-        std::vector<TimerEntry> newEntries;
-        auto entries = tasks->second;
-
-        for(auto& entry : entries) {
-            auto entryId = std::get<0>(entry);
-            auto entryCallback = std::get<1>(entry);
-            if(entryId != id) {
-                newEntries.emplace_back(entry);
-            } else {
-                found = true;
-                newEntries.emplace_back(entryId, [entryCallback, shutdownCallback]() {
-                    entryCallback();
-                    shutdownCallback();
-                });
-            }
+        if(shutdown) {
+            run_callback_now = true;
+        } else {
+            shutdown_callbacks.emplace_back(callback);
         }
-
-        control_data->timers[time_slot] = newEntries;
     }
 
-    if(!found) {
-        shutdownCallback();
+    if (run_callback_now) {
+        callback();
     }
 }
 
