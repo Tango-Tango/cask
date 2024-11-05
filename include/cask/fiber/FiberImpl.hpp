@@ -326,12 +326,15 @@ void FiberImpl<T,E>::delayFinished() {
         } else if (current_state == RUNNING) {
             continue;
         } else if (current_state == CANCELED || current_state == COMPLETED) {
+            delayedBy = nullptr;
             return;
         } else {
             std::string message = "Fiber is in invalid state to process delayFinished: ";
             throw std::runtime_error(message + PRINT_STATE(current_state));
         }
     }
+
+    delayedBy = nullptr;
 
     if(!finishIteration()) {
         state.store(READY, std::memory_order_release);
@@ -348,6 +351,7 @@ void FiberImpl<T,E>::delayCanceled() {
         } else if (current_state == RUNNING) {
             continue;
         } else if (current_state == CANCELED || current_state == COMPLETED) {
+            delayedBy = nullptr;
             return;
         } else {
             std::string message = "Fiber is in invalid state to process delayCanceled: ";
@@ -356,6 +360,8 @@ void FiberImpl<T,E>::delayCanceled() {
     }
 
     value.setCanceled();
+    delayedBy = nullptr;
+    
     if(!finishIteration()) {
         state.store(READY, std::memory_order_release);
     }
@@ -656,12 +662,14 @@ void FiberImpl<T,E>::cancel() {
     value.setCanceled();
 
     if(current_state == WAITING) {
+        auto localWaitingOn = waitingOn;
         state.store(WAITING, std::memory_order_release);
-        waitingOn->cancel();
+        localWaitingOn->cancel();
         return;
     } else if(current_state == DELAYED) {
+        auto localDelayedBy = delayedBy;
         state.store(DELAYED, std::memory_order_release);
-        delayedBy->cancel();
+        localDelayedBy->cancel();
         return;
     } else if(current_state == RACING) {
         state.store(RACING, std::memory_order_release);
