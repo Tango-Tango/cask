@@ -245,7 +245,7 @@ void FiberImpl<T,E>::asyncError(const Erased& error) {
 
         if (current_state == WAITING && state.compare_exchange_weak(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
             break;
-        } else if (current_state == RUNNING) {
+        } else if (current_state == RUNNING || current_state == WAITING) {
             continue;
         } else if (current_state == CANCELED || current_state == COMPLETED) {
             waitingOn = nullptr;
@@ -271,7 +271,7 @@ void FiberImpl<T,E>::asyncSuccess(const Erased& new_value) {
 
         if (current_state == WAITING && state.compare_exchange_weak(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
             break;
-        } else if (current_state == RUNNING) {
+        } else if (current_state == RUNNING || current_state == WAITING) {
             continue;
         } else if (current_state == CANCELED || current_state == COMPLETED) {
             waitingOn = nullptr;
@@ -297,7 +297,7 @@ void FiberImpl<T,E>::asyncCancel() {
 
         if (current_state == WAITING && state.compare_exchange_weak(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
             break;
-        } else if (current_state == RUNNING) {
+        } else if (current_state == RUNNING || current_state == WAITING) {
             continue;
         } else if (current_state == CANCELED || current_state == COMPLETED) {
             waitingOn = nullptr;
@@ -323,7 +323,7 @@ void FiberImpl<T,E>::delayFinished() {
 
         if (current_state == DELAYED && state.compare_exchange_weak(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
             break;
-        } else if (current_state == RUNNING) {
+        } else if (current_state == RUNNING || current_state == DELAYED) {
             continue;
         } else if (current_state == CANCELED || current_state == COMPLETED) {
             delayedBy = nullptr;
@@ -348,7 +348,7 @@ void FiberImpl<T,E>::delayCanceled() {
 
         if (current_state == DELAYED && state.compare_exchange_weak(current_state, RUNNING, std::memory_order_acquire, std::memory_order_relaxed)) {
             break;
-        } else if (current_state == RUNNING) {
+        } else if (current_state == RUNNING || current_state == DELAYED) {
             continue;
         } else if (current_state == CANCELED || current_state == COMPLETED) {
             delayedBy = nullptr;
