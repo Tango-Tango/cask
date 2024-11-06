@@ -6,10 +6,12 @@
 #include "gtest/gtest.h"
 #include "cask/Task.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "cask/scheduler/WorkStealingScheduler.hpp"
 
 using cask::None;
 using cask::Task;
 using cask::scheduler::BenchScheduler;
+using cask::scheduler::WorkStealingScheduler;
 
 TEST(TaskRace, LeftValue) {
     auto sched = std::make_shared<BenchScheduler>();
@@ -64,4 +66,23 @@ TEST(TaskRace, Cancelled) {
         deferred->await();
         FAIL() << "Expected method to throw.";
     } catch(std::runtime_error&) {}
+}
+
+TEST(TaskRace, TaskStressTest) {
+    auto iterations = 10000;
+    auto sched = std::make_shared<WorkStealingScheduler>();
+
+    while (iterations > 0) {
+        iterations--;
+        auto task1 = Task<std::size_t,std::string>::pure(SIZE_MAX).delay(0);
+        auto task2 = Task<std::size_t,std::string>::raiseError("Error").asyncBoundary();
+        auto race = task1.raceWith(task2).materialize();
+        auto result = race.run(sched)->await();
+
+        if (result.is_left()) {
+            EXPECT_EQ(result.get_left(), SIZE_MAX);
+        } else {
+            EXPECT_EQ(result.get_right(), "Error");
+        }
+    }
 }
