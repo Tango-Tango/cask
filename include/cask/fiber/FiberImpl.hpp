@@ -19,15 +19,15 @@ namespace cask::fiber {
 
 enum FiberState { READY, RUNNING, WAITING, DELAYED, RACING, COMPLETED, CANCELED };
 
-#define PRINT_STATE(state) \
-    (state == READY ? "READY" : \
-    (state == RUNNING ? "RUNNING" : \
-    (state == WAITING ? "WAITING" : \
-    (state == DELAYED ? "DELAYED" : \
-    (state == RACING ? "RACING" : \
-    (state == COMPLETED ? "COMPLETED" : \
-    (state == CANCELED ? "CANCELED" : "UNKNOWN")))))))
-
+constexpr const char * print_state(const FiberState& state) {
+    return state == READY ? "READY" :
+           state == RUNNING ? "RUNNING" :
+           state == WAITING ? "WAITING" :
+           state == DELAYED ? "DELAYED" :
+           state == RACING ? "RACING" :
+           state == COMPLETED ? "COMPLETED" :
+           state == CANCELED ? "CANCELED" : "UNKNOWN";
+}
 
 template <class T, class E>
 class FiberImpl final : public Fiber<T,E> {
@@ -252,7 +252,7 @@ void FiberImpl<T,E>::asyncError(const Erased& error) {
             return;
         } else {
             std::string message = "Fiber is in invalid state to process asyncError: ";
-            throw std::runtime_error(message + PRINT_STATE(current_state));
+            throw std::runtime_error(message + print_state(current_state));
         }
     }
 
@@ -278,7 +278,7 @@ void FiberImpl<T,E>::asyncSuccess(const Erased& new_value) {
             return;
         } else {
             std::string message = "Fiber is in invalid state to process asyncSuccess: ";
-            throw std::runtime_error(message + PRINT_STATE(current_state));
+            throw std::runtime_error(message + print_state(current_state));
         }
     }
 
@@ -304,7 +304,7 @@ void FiberImpl<T,E>::asyncCancel() {
             return;
         } else {
             std::string message = "Fiber is in invalid state to process asyncCancel: ";
-            throw std::runtime_error(message + PRINT_STATE(current_state));
+            throw std::runtime_error(message + print_state(current_state));
         }
     }
 
@@ -330,7 +330,7 @@ void FiberImpl<T,E>::delayFinished() {
             return;
         } else {
             std::string message = "Fiber is in invalid state to process delayFinished: ";
-            throw std::runtime_error(message + PRINT_STATE(current_state));
+            throw std::runtime_error(message + print_state(current_state));
         }
     }
 
@@ -355,7 +355,7 @@ void FiberImpl<T,E>::delayCanceled() {
             return;
         } else {
             std::string message = "Fiber is in invalid state to process delayCanceled: ";
-            throw std::runtime_error(message + PRINT_STATE(current_state));
+            throw std::runtime_error(message + print_state(current_state));
         }
     }
 
