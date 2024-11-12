@@ -25,6 +25,7 @@ public:
     std::optional<T> head() const override;
     ListRef<T> tail() const override;
     ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) const override;
+    ListRef<T> filter(const std::function<bool(const T&)>& predicate) const override;
     void foreach(const std::function<void(const T&)>& predicate) const override;
 };
 
@@ -71,6 +72,11 @@ ListRef<T> Nil<T>::tail() const {
 
 template <class T>
 ListRef<T> Nil<T>::dropWhile(const std::function<bool(const T&)>&) const {
+    return this->shared_from_this();
+}
+
+template <class T>
+ListRef<T> Nil<T>::filter(const std::function<bool(const T&)>&) const {
     return this->shared_from_this();
 }
 

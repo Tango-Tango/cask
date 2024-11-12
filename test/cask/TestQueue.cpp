@@ -5,7 +5,9 @@
 
 #include "gtest/gtest.h"
 #include "cask/Queue.hpp"
+#include "cask/Observable.hpp"
 #include "cask/scheduler/BenchScheduler.hpp"
+#include "cask/scheduler/WorkStealingScheduler.hpp"
 
 using cask::DeferredRef;
 using cask::Task;
@@ -13,6 +15,7 @@ using cask::Queue;
 using cask::Scheduler;
 using cask::None;
 using cask::scheduler::BenchScheduler;
+using cask::scheduler::WorkStealingScheduler;
 
 TEST(Queue, Empty) {
     auto sched = std::make_shared<BenchScheduler>();
@@ -313,4 +316,19 @@ TEST(Queue, ResetClearsValues) {
     sched->run_ready_tasks();
 
     EXPECT_FALSE(queue->tryTake().has_value());
+}
+
+TEST(Queue, StressTest) {
+    auto sched = std::make_shared<WorkStealingScheduler>(4);
+
+    auto queue = Queue<int, std::string>::empty(sched, 128);
+    auto take_task = queue->take().timeout(0, "timeout").materialize();
+    auto queueTakeObserver = cask::Observable<cask::Either<int,std::string>, std::string>::repeatTask(take_task)
+                   ->takeWhile([i = 0](auto&) mutable {
+                        return ++i < 10000;
+                   })
+                   ->last()
+                   .run(sched);
+
+    queueTakeObserver->await();
 }

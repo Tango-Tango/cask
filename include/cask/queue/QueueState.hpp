@@ -30,14 +30,19 @@ public:
 
     template <class Arg>
     std::tuple<QueueState<T,E>,bool,std::function<void()>> tryPut(Arg&& value) const  {
-        auto filteredTakes = pendingTakes->dropWhile([](auto promise) {
-            return promise->isCancelled();
+        auto filteredTakes = pendingTakes->filter([](auto promise) {
+            return !promise->isCancelled();
+        });
+
+        auto filteredPuts = pendingPuts->filter([](auto pending) {
+            auto promise = std::get<0>(pending);
+            return !promise->isCancelled();
         });
 
         if(!filteredTakes->is_empty()) {
             auto takePromise = *(filteredTakes->head());
             return std::make_tuple(
-                QueueState(sched, max_size, values, pendingPuts, filteredTakes->tail()),
+                QueueState(sched, max_size, values, filteredPuts, filteredTakes->tail()),
                 true,
                 [takePromise = std::move(takePromise), value = std::forward<Arg>(value)] {
                     takePromise->success(std::forward<Arg>(value));
@@ -45,13 +50,13 @@ public:
             );
         } else if(values->size() < max_size) {
             return std::make_tuple(
-                QueueState(sched, max_size, values->append(std::forward<Arg>(value)), pendingPuts, filteredTakes),
+                QueueState(sched, max_size, values->append(std::forward<Arg>(value)), filteredPuts, filteredTakes),
                 true,
                 []{}
             );
         } else {
             return std::make_tuple(
-                QueueState(sched, max_size, values, pendingPuts, filteredTakes),
+                QueueState(sched, max_size, values, filteredPuts, filteredTakes),
                 false,
                 []{}
             );
@@ -79,14 +84,18 @@ public:
     }
 
     std::tuple<QueueState<T,E>,std::optional<T>,std::function<void()>> tryTake() const  {
-        auto filteredPuts = pendingPuts->dropWhile([](auto pending) {
+        auto filteredPuts = pendingPuts->filter([](auto pending) {
             auto promise = std::get<0>(pending);
-            return promise->isCancelled();
+            return !promise->isCancelled();
+        });
+
+        auto filteredTakes = pendingTakes->filter([](auto promise) {
+            return !promise->isCancelled();
         });
 
         if(!values->is_empty()) {
             return std::make_tuple(
-                QueueState(sched, max_size, values->tail(), filteredPuts, pendingTakes),
+                QueueState(sched, max_size, values->tail(), filteredPuts, filteredTakes),
                 values->head(),
                 []{}
             );
@@ -95,7 +104,7 @@ public:
             auto putPromise = std::get<0>(pending);
             auto value = std::get<1>(pending);
             return std::make_tuple(
-                QueueState(sched, max_size, values, filteredPuts->tail(), pendingTakes),
+                QueueState(sched, max_size, values, filteredPuts->tail(), filteredTakes),
                 std::optional<T>(value),
                 [putPromise] {
                     putPromise->success(None());
@@ -103,7 +112,7 @@ public:
             );
         } else {
             return std::make_tuple(
-                QueueState(sched, max_size, values, filteredPuts, pendingTakes),
+                QueueState(sched, max_size, values, filteredPuts, filteredTakes),
                 std::optional<T>(),
                 []{}
             );
@@ -124,7 +133,7 @@ public:
         } else {
             auto promise = Promise<T,E>::create(sched);
             return std::make_tuple(
-                QueueState(nextState.sched, nextState.max_size, nextState.values, nextState.pendingPuts, pendingTakes->append(promise)),
+                QueueState(nextState.sched, nextState.max_size, nextState.values, nextState.pendingPuts, nextState.pendingTakes->append(promise)),
                 Task<T,E>::forPromise(promise)
             );
         }
