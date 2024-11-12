@@ -98,6 +98,23 @@ TEST(List, DropWhileMatchesEverything) {
     EXPECT_EQ(list->size(), 0);
 }
 
+TEST(List, Filter) {
+    auto list = List<int>::empty()
+        ->append(1)
+        ->append(2)
+        ->append(3)
+        ->append(4)
+        ->append(5)
+        ->filter([](auto value) { return value % 2 == 1; });
+    
+    EXPECT_FALSE(list->is_empty());
+    EXPECT_EQ(list->size(), 3);
+    EXPECT_EQ(*(list->head()), 1);
+    EXPECT_EQ(*(list->tail()->head()), 3);
+    EXPECT_EQ(*(list->tail()->tail()->head()), 5);
+    EXPECT_TRUE(list->tail()->tail()->tail()->is_empty());
+}
+
 TEST(List, Foreach) {
     int sum = 0;
 

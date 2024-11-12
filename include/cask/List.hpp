@@ -96,6 +96,17 @@ public:
     virtual ListRef<T> dropWhile(const std::function<bool(const T&)>& predicate) const = 0;
 
     /**
+     * Remove all elements from the list which do not match the given
+     * predicate.
+     * 
+     * @param predicate The function to evaluate and retain items
+     *                  for which it returns true.
+     * @return A list with elements matching the predicate
+     *         dropped.
+     */ 
+    virtual ListRef<T> filter(const std::function<bool(const T&)>& predicate) const = 0;
+
+    /**
      * Execute the given predicate function for each element in the list.
      * 
      * @param predicate The function to evaluate for each element of the list.
