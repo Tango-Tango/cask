@@ -65,7 +65,7 @@ MergeObserver<T,E>::MergeObserver(const std::shared_ptr<Observer<T,E>>& downstre
 template <class T, class E>
 Task<Ack,None> MergeObserver<T,E>::onNext(ObservableConstRef<T,E>&& upstream) {
     return synchronize().template use<Ack>([upstream](auto self) {
-        if (self->awaiting_cancel || self->stopped) {
+        if (self == nullptr || self->awaiting_cancel || self->stopped) {
             return Task<Ack,None>::pure(Stop);
         } else {
             auto id = self->next_id++;
@@ -89,7 +89,7 @@ Task<Ack,None> MergeObserver<T,E>::onNext(ObservableConstRef<T,E>&& upstream) {
 template <class T, class E>
 Task<Ack,None> MergeObserver<T,E>::onNext(T&& value, uint64_t) {
     return synchronize().template use<Ack>([value](auto self) mutable {
-        if (self->awaiting_cancel || self->stopped) {
+        if (self == nullptr || self->awaiting_cancel || self->stopped) {
                 return Task<Ack,None>::pure(Stop);
         } else {
             return self->downstream->onNext(std::forward<T>(value))
@@ -106,17 +106,25 @@ Task<Ack,None> MergeObserver<T,E>::onNext(T&& value, uint64_t) {
 template <class T, class E>
 Task<None,None> MergeObserver<T,E>::onError(E&& error) {
     return synchronize().template use<None>([error = std::forward<E>(error)](auto self) {
-        self->cached_error = error;
-        return self->errorShutdown();
+        if (self == nullptr) {
+            return Task<None,None>::none();
+        } else {
+            self->cached_error = error;
+            return self->errorShutdown();
+        }
     });
 }
 
 template <class T, class E>
 Task<None,None> MergeObserver<T,E>::onError(E&& error, uint64_t id) {
     return synchronize().template use<None>([id, error = std::forward<E>(error)](auto self) {
-        self->running_fibers.erase(id);
-        self->cached_error = error;
-        return self->errorShutdown();
+        if (self == nullptr) {
+            return Task<None,None>::none();
+        } else {
+            self->running_fibers.erase(id);
+            self->cached_error = error;
+            return self->errorShutdown();
+        }
     });
 }
 
@@ -124,12 +132,17 @@ template <class T, class E>
 Task<None,None> MergeObserver<T,E>::onComplete() {
     return synchronize()
         .template use<PromiseRef<None,None>>([](auto self) {
-            self->upstream_completed = true;
-
-            if (self->running_fibers.empty()) {
-                return self->completeDownstream();
+            if (self == nullptr) {
+                auto promise = Promise<None,None>::create(self->sched);
+                promise->success(None());
+                return Task<PromiseRef<None,None>,None>::pure(promise);
             } else {
-                return Task<PromiseRef<None,None>,None>::pure(self->completed_promise);
+                self->upstream_completed = true;
+                if (self->running_fibers.empty()) {
+                    return self->completeDownstream();
+                } else {
+                    return Task<PromiseRef<None,None>,None>::pure(self->completed_promise);
+                }
             }
         })
         .template flatMap<None>([](auto promise) {
@@ -140,12 +153,15 @@ Task<None,None> MergeObserver<T,E>::onComplete() {
 template <class T, class E>
 Task<None,None> MergeObserver<T,E>::onComplete(uint64_t id) {
     return synchronize().template use<None>([id](auto self) {
-        self->running_fibers.erase(id);
-
-        if (self->running_fibers.empty() && self->upstream_completed) {
-            return self->completeDownstream().template map<None>([](auto){ return None(); });
-        } else {
+        if (self == nullptr) {
             return Task<None,None>::none();
+        } else {
+            self->running_fibers.erase(id);
+            if (self->running_fibers.empty() && self->upstream_completed) {
+                return self->completeDownstream().template map<None>([](auto){ return None(); });
+            } else {
+                return Task<None,None>::none();
+            }
         }
     });
 }
@@ -153,15 +169,23 @@ Task<None,None> MergeObserver<T,E>::onComplete(uint64_t id) {
 template <class T, class E>
 Task<None,None> MergeObserver<T,E>::onCancel() {
     return synchronize().template use<None>([](auto self) {
-        return self->errorShutdown();
+        if (self == nullptr) {
+            return Task<None,None>::none();
+        } else {
+            return self->errorShutdown();
+        }
     });
 }
 
 template <class T, class E>
 Task<None,None> MergeObserver<T,E>::onCancel(uint64_t id) {
     return synchronize().template use<None>([id](auto self) {
-        self->running_fibers.erase(id);
-        return self->errorShutdown();
+        if (self == nullptr) {
+            return Task<None,None>::none();
+        } else {
+            self->running_fibers.erase(id);
+            return self->errorShutdown();
+        }
     });
 }
 
@@ -188,8 +212,6 @@ void MergeObserver<T,E>::cancelFibers() {
 
 template <class T, class E>
 Task<None,None> MergeObserver<T,E>::errorShutdown() {
-    auto self = this->shared_from_this();
-
     if (running_fibers.empty()) {
         if (cached_error.has_value()) {
             return errorDownstream();
@@ -257,8 +279,12 @@ Resource<std::shared_ptr<MergeObserver<T,E>>,None> MergeObserver<T,E>::synchroni
     );
 
     return sync_resource.template map<std::shared_ptr<MergeObserver<T,E>>>(
-        [self = this->shared_from_this()](const None&) {
-            return self;
+        [self_weak = this->weak_from_this()](const None&) {
+            if (auto self = self_weak.lock()) {
+                return self;
+            } else {
+                return std::shared_ptr<MergeObserver<T,E>>();
+            }
         }
     );
 }
