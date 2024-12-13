@@ -79,7 +79,7 @@ jobs:
     - name: Install Brew Development Dependencies
       run: brew install ninja
     - name: Install Python Development Dependencies
-      run: sudo python3 -m pip install meson==1.0.0
+      run: sudo pipx install meson==1.0.0
     - name: Generate the Build Environment
       run: ./regenerate_env.sh ${{ matrix.target }}
     - name: Compile
