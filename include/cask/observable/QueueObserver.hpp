@@ -76,7 +76,6 @@ QueueObserver<T,E>::QueueObserver(
 
 template <class T, class E>
 Task<Ack,None> QueueObserver<T,E>::onNext(T&& value) {
-    auto self = this->shared_from_this();
     auto self_weak = this->weak_from_this();
     auto event = std::make_shared<NextEvent>(std::forward<T>(value));
     auto syncPutResult = queue->tryPut(event);
@@ -89,8 +88,12 @@ Task<Ack,None> QueueObserver<T,E>::onNext(T&& value) {
         return queue->put(event)
             .onCancelRaiseError(None())
             .template flatMapBoth<Ack,None>(
-                [self](auto) {
-                    return self->upstreamResult();
+                [self_weak](auto) {
+                    if (auto self = self_weak.lock()) {
+                        return self->upstreamResult();
+                    } else {
+                        return Task<Ack,None>::pure(Stop);
+                    }
                 },
                 [](auto) {
                     return Task<Ack,None>::pure(Stop);
@@ -104,14 +107,18 @@ Task<None,None> QueueObserver<T,E>::onError(E&& error) {
     if (downstream_fiber == nullptr) {
         return downstream->onError(std::forward<E>(error));
     } else {
-        auto self = this->shared_from_this();
+        auto self_weak = this->weak_from_this();
         auto event = std::make_shared<ErrorEvent>(std::forward<E>(error));
 
         return queue->put(event)
             .onCancelRaiseError(None())
             .template flatMapBoth<None,None>(
-                [self](auto) {
-                    return Task<None,None>::forPromise(self->downstream_shutdown_complete);
+                [self_weak](auto) {
+                    if (auto self = self_weak.lock()) {
+                        return Task<None,None>::forPromise(self->downstream_shutdown_complete);
+                    } else {
+                        return Task<None,None>::none();
+                    }
                 },
                 [](auto) {
                     return Task<None,None>::none();
@@ -125,14 +132,18 @@ Task<None,None> QueueObserver<T,E>::onComplete() {
     if (downstream_fiber == nullptr) {
         return downstream->onComplete();
     } else {
-        auto self = this->shared_from_this();
+        auto self_weak = this->weak_from_this();
         auto event = std::make_shared<CompleteEvent>();
 
         return queue->put(event)
             .onCancelRaiseError(None())
             .template flatMapBoth<None,None>(
-                [self](auto) {
-                    return Task<None,None>::forPromise(self->downstream_shutdown_complete);
+                [self_weak](auto) {
+                    if (auto self = self_weak.lock()) {
+                        return Task<None,None>::forPromise(self->downstream_shutdown_complete);
+                    } else {
+                        return Task<None,None>::none();
+                    }
                 },
                 [](auto) {
                     return Task<None,None>::none();
@@ -147,14 +158,18 @@ Task<None,None> QueueObserver<T,E>::onCancel() {
     if (downstream_fiber == nullptr) {
         return downstream->onCancel();
     } else {
-        auto self = this->shared_from_this();
+        auto self_weak = this->weak_from_this();
         auto event = std::make_shared<CancelEvent>();
 
         return queue->put(event)
             .onCancelRaiseError(None())
             .template flatMapBoth<None,None>(
-                [self](auto) {
-                    return Task<None,None>::forPromise(self->downstream_shutdown_complete);
+                [self_weak](auto) {
+                    if (auto self = self_weak.lock()) {
+                        return Task<None,None>::forPromise(self->downstream_shutdown_complete);
+                    } else {
+                        return Task<None,None>::none();
+                    }
                 },
                 [](auto) {
                     return Task<None,None>::none();
@@ -165,34 +180,42 @@ Task<None,None> QueueObserver<T,E>::onCancel() {
 
 template <class T, class E>
 Task<None,None> QueueObserver<T,E>::onEvent(const std::shared_ptr<QueueEvent>& event) {
-    auto self = this->shared_from_this();
+    auto self_weak = this->weak_from_this();
 
     if (auto next = std::dynamic_pointer_cast<NextEvent>(event)) {
         return downstream->onNext(std::forward<T>(next->value))
-            .template map<None>([self](auto ack) {
+            .template map<None>([self_weak](auto ack) {
                 if (ack == Stop) {
-                    self->stopped = true;
-                    self->downstream_fiber->cancel();
+                    if (auto self = self_weak.lock()) {
+                        self->stopped = true;
+                        self->downstream_fiber->cancel();
+                    }
                 }
 
                 return None();
             });
     } else if (auto error = std::dynamic_pointer_cast<ErrorEvent>(event)) {
         return downstream->onError(std::forward<E>(error->error))
-            .template map<None>([self](auto) {
-                self->downstream_fiber->cancel();
+            .template map<None>([self_weak](auto) {
+                if (auto self = self_weak.lock()) {
+                    self->downstream_fiber->cancel();
+                }
                 return None();
             });
     } else if (auto completed = std::dynamic_pointer_cast<CompleteEvent>(event)) {
         return downstream->onComplete()
-            .template map<None>([self](auto) {
-                self->downstream_fiber->cancel();
+            .template map<None>([self_weak](auto) {
+                if (auto self = self_weak.lock()) {
+                    self->downstream_fiber->cancel();
+                }
                 return None();
             });
     } else {
         return downstream->onCancel()
-            .template map<None>([self](auto) {
-                self->downstream_fiber->cancel();
+            .template map<None>([self_weak](auto) {
+                if (auto self = self_weak.lock()) {
+                    self->downstream_fiber->cancel();
+                }
                 return None();
             });
     }
@@ -201,19 +224,25 @@ Task<None,None> QueueObserver<T,E>::onEvent(const std::shared_ptr<QueueEvent>& e
 template <class T, class E>
 void QueueObserver<T,E>::initDownstreamFiber() {
     if (downstream_fiber == nullptr) {
-        auto self = this->shared_from_this();
+        auto self_weak = this->weak_from_this();
 
         downstream_fiber = Observable<std::shared_ptr<QueueEvent>,None>::repeatTask(queue->take())
-            ->template mapTask<None>([self](auto event){
-                return self->onEvent(event);
+            ->template mapTask<None>([self_weak](auto event){
+                if (auto self = self_weak.lock()) {
+                    return self->onEvent(event);
+                } else {
+                    return Task<None,None>::none();
+                }
             })
             ->completed()
             .run(sched);
 
-        downstream_fiber->onFiberShutdown([self](auto) {
-            self->downstream_shutdown_complete->success(None());
-            self->downstream_fiber = nullptr;
-            self->queue->reset();
+        downstream_fiber->onFiberShutdown([self_weak](auto) {
+            if (auto self = self_weak.lock()) {
+                self->downstream_shutdown_complete->success(None());
+                self->downstream_fiber = nullptr;
+                self->queue->reset();
+            }
         });
     }
 }
