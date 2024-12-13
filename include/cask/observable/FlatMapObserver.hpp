@@ -49,23 +49,47 @@ FlatMapObserver<TI,TO,E>::FlatMapObserver(
 
 template <class TI, class TO, class E>
 Task<Ack,None> FlatMapObserver<TI,TO,E>::onNext(TI&& value) {
-    auto self = this->shared_from_this();
-    auto next_observable = self->predicate(std::forward<TI>(value));
+    auto self_weak = this->weak_from_this();
+    auto next_observable = this->predicate(std::forward<TI>(value));
 
-    return Task<None,None>::deferFiber([self, next_observable](auto sched) {
+    return Task<None,None>::deferFiber([self_weak, next_observable](auto sched) {
             return next_observable->subscribeHandlers(
                 sched,
-                [self] (auto&& value) { return self->onNextInternal(std::forward<TO>(value)); },
-                [self] (auto&& error) { return self->onErrorInternal(std::forward<E>(error)); },
-                [self] { return self->onCompleteInternal(); },
-                [self] { return self->onCancelInternal(); }
+                [self_weak] (auto&& value) { 
+                    if (auto self = self_weak.lock()) {
+                        return self->onNextInternal(std::forward<TO>(value));
+                    } else {
+                        return Task<Ack,None>::pure(Stop);
+                    }
+                },
+                [self_weak] (auto&& error) {
+                    if (auto self = self_weak.lock()) {
+                        return self->onErrorInternal(std::forward<E>(error));
+                    } else {
+                        return Task<None,None>::none();
+                    }
+                },
+                [self_weak] {
+                    if (auto self = self_weak.lock()) {
+                        return self->onCompleteInternal();
+                    } else {
+                        return Task<None,None>::none();
+                    }
+                },
+                [self_weak] {
+                    if (auto self = self_weak.lock()) {
+                        return self->onCancelInternal();
+                    } else {
+                        return Task<None,None>::none();
+                    }
+                }
             );
         })
-        .template map<Ack>([self](auto) {
-            if (self->stopped) {
-                return Stop;
+        .template map<Ack>([self_weak](auto) {
+            if (auto self = self_weak.lock()) {
+                return self->stopped ? Stop : Continue;
             } else {
-                return Continue;
+                return Stop;
             }
         });
 }
@@ -87,14 +111,18 @@ Task<None,None> FlatMapObserver<TI,TO,E>::onCancel() {
 
 template <class TI, class TO, class E>
 Task<Ack,None> FlatMapObserver<TI,TO,E>::onNextInternal(TO&& value) {
-    auto self = this->shared_from_this();
+    auto self_weak = this->weak_from_this();
     return downstream->onNext(std::move(value))
-        .template map<Ack>([self](auto ack) {
-            if (ack == Stop) {
-                self->stopped = true;
-            }
+        .template map<Ack>([self_weak](auto ack) {
+            if (auto self = self_weak.lock()) {
+                if (ack == Stop) {
+                    self->stopped = true;
+                }
 
-            return ack;
+                return ack;
+            } else {
+                return Stop;
+            }
         });
 }
 
