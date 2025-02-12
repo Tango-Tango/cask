@@ -112,6 +112,8 @@ BenchScheduler::BenchCancelableTimer::BenchCancelableTimer(
 {}
 
 void BenchScheduler::BenchCancelableTimer::cancel() {
+    std::vector<std::function<void()>> callbacks_to_run;
+
     if(canceled) {
         return;
     } else {
@@ -124,6 +126,7 @@ void BenchScheduler::BenchCancelableTimer::cancel() {
             if(entry_id != id) {
                 filteredEntries.emplace_back(entry);
             } else {
+                std::swap(callbacks, callbacks_to_run);
                 canceled = true;
             }
         }
@@ -131,10 +134,8 @@ void BenchScheduler::BenchCancelableTimer::cancel() {
         parent->timers = filteredEntries;
     }
 
-    if(canceled) {
-        for(auto& cb : callbacks) {
-            cb();
-        }
+    for(auto& cb : callbacks_to_run) {
+        cb();
     }
 }
 

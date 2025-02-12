@@ -133,14 +133,17 @@ void Promise<T,E>::error(const E& error) {
 
 template <class T, class E>
 void Promise<T,E>::complete(const Either<T,E>& value) {
-    bool runCallbacks = false;
+    std::vector<std::function<void(Either<T,E>)>> complete_callbacks_to_run;
+    std::vector<std::function<void(Either<T,E>, bool)>> either_callbacks_to_run;
 
     {
         while(lock.test_and_set(std::memory_order_acquire));
 
         if(!resultOpt.has_value() && !canceled) {
             resultOpt = value;
-            runCallbacks = true;
+            std::swap(completeCallbacks, complete_callbacks_to_run);
+            std::swap(eitherCallbacks, either_callbacks_to_run);
+            cancelCallbacks.clear();
         } else {
             if(resultOpt.has_value()) {
                 if(resultOpt->is_left()) {
@@ -156,36 +159,32 @@ void Promise<T,E>::complete(const Either<T,E>& value) {
         lock.clear(std::memory_order_release);
     }
 
-    if(runCallbacks) {
-        for(auto& callback : completeCallbacks) {
-            sched->submit(std::bind(callback, *resultOpt));
-        }
+    for(auto& callback : complete_callbacks_to_run) {
+        sched->submit(std::bind(callback, *resultOpt));
+    }
 
-        for(auto& callback : eitherCallbacks) {
-            sched->submit(std::bind(callback, *resultOpt, false));
-        }
+    for(auto& callback : either_callbacks_to_run) {
+        sched->submit(std::bind(callback, *resultOpt, false));
     }
 }
 
 template <class T, class E>
 void Promise<T,E>::cancel() {
-    bool runCallbacks = false;
+    std::vector<std::function<void()>> cancel_callbacks_to_run;
 
     {
         while(lock.test_and_set(std::memory_order_acquire));
         if(!resultOpt.has_value() && !canceled) {
             canceled = true;
-            runCallbacks = true;
+            std::swap(cancelCallbacks, cancel_callbacks_to_run);
+            completeCallbacks.clear();
+            eitherCallbacks.clear();
         }
         lock.clear(std::memory_order_release);
     }
 
-    if(runCallbacks) {
-        // Cancel callbacks are run schronously to try
-        // and expedite the process of cancelling.
-        for(auto& callback : cancelCallbacks) {
-            callback();
-        }
+    for(auto& callback : cancel_callbacks_to_run) {
+        callback();
     }
 }
 

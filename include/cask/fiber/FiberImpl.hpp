@@ -623,9 +623,7 @@ bool FiberImpl<T,E>::finishIteration() {
 
         {
             std::lock_guard<std::mutex> guard(callback_mutex);
-            for(auto& callback: callbacks) {
-                local_callbacks.emplace_back(callback);
-            }
+            std::swap(callbacks, local_callbacks);
         }
 
         for(auto& callback: local_callbacks) {
