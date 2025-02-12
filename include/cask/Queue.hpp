@@ -24,7 +24,7 @@ using QueueRef = std::shared_ptr<Queue<T,E>>;
  * items with `put` and a consume process takes items with `take`.
  */
 template <class T, class E = std::any>
-class Queue {
+class Queue : public std::enable_shared_from_this<Queue<T,E>> {
 public:
     /**
      * Create an empty queue.
@@ -47,12 +47,16 @@ public:
      */
     template <class Arg>
     Task<None,E> put(Arg&& value)  {
-        return stateRef->template modify<Task<None,E>>([value = std::forward<Arg>(value)](const auto& state) {
-                return state.put(value);
-            })
-            .template flatMap<None>([](auto&& task) {
-                return std::forward<Task<None,E>>(task);
-            });
+        return Task<None,E>::defer([self_weak = this->weak_from_this(), value = std::forward<Arg>(value)] {
+            if(auto self = self_weak.lock()) {
+                std::lock_guard guard(self->mutex);
+                auto &&[nextState, task] = self->state.put(value);
+                self->state = nextState;
+                return task;
+            } else {
+                throw std::runtime_error("Queue has been destroyed");
+            }
+        });
     }
 
      /**
@@ -65,24 +69,19 @@ public:
      */
     template <class Arg>
     bool tryPut(Arg&& value) {
-        using IntermediateResult = std::tuple<bool,std::function<void()>>;
+        std::function<void()> thunk;
+        bool completed = false;
 
-        auto result_opt = stateRef->template modify<IntermediateResult>([value = std::forward<Arg>(value)](const auto& state) {
-            auto&& [nextState, completed, thunk] = state.tryPut(value);
-            return std::make_tuple(std::move(nextState), std::make_tuple(std::move(completed), std::move(thunk)));
-        })
-        .template map<bool>([](IntermediateResult&& result) {
-            auto&& [completed, thunk] = result;
-            thunk();
-            return completed;
-        })
-        .runSync();
-
-        if(result_opt && result_opt->is_left()) {
-            return result_opt->get_left();
-        } else {
-            return false;
+        {
+            std::lock_guard guard(mutex);
+            auto&& [nextState, given_completed, given_thunk] = state.tryPut(std::forward<Arg>(value));
+            state = nextState;
+            completed = given_completed;
+            thunk = std::move(given_thunk);
         }
+
+        thunk();
+        return completed;
     }
 
     /**
@@ -93,12 +92,17 @@ public:
      * @return A task that completes when a value has been taken.
      */
     Task<T,E> take()  {
-        return stateRef->template modify<Task<T,E>>([](const auto& state) {
-                return state.take();
-            })
-            .template flatMap<T>([](auto&& task) {
-                return std::forward<Task<T,E>>(task);
-            });
+        return Task<T,E>::defer([self_weak = this->weak_from_this()] {
+            if(auto self = self_weak.lock()) {
+                std::lock_guard guard(self->mutex);
+                auto&& [nextState, task] = self->state.take();
+                self->state = nextState;
+
+                return task;
+            } else {
+                throw std::runtime_error("Queue has been destroyed");
+            }
+        });
     }
 
     /**
@@ -108,24 +112,20 @@ public:
      * @return A value or nothing.
      */
     std::optional<T> tryTake()  {
-        using IntermediateResult = std::tuple<std::optional<T>,std::function<void()>>;
+        std::function<void()> thunk;
+        std::optional<T> valueOpt;
 
-        auto result_opt = stateRef->template modify<IntermediateResult>([](const auto& state) {
-            auto&& [nextState, valueOpt, thunk] = state.tryTake();
-            return std::make_tuple(std::move(nextState), std::make_tuple(std::move(valueOpt), std::move(thunk)));
-        })
-        .template map<std::optional<T>>([](IntermediateResult&& result) {
-            auto&& [valueOpt, thunk] = result;
-            thunk();
-            return valueOpt;
-        })
-        .runSync();
+        {
+            std::lock_guard guard(mutex);
 
-        if(result_opt && result_opt->is_left()) {
-            return result_opt->get_left();
-        } else {
-            return std::optional<T>();
+            auto&& [nextState, given_value, given_thunk] = state.tryTake();
+            state = nextState;
+            valueOpt = given_value;
+            thunk = std::move(given_thunk);
         }
+
+        thunk();
+        return valueOpt;
     }
 
     /**
@@ -133,25 +133,26 @@ public:
      * are in the queue they are dropped. If there are any pending
      * puts or takes then they are canceled.
      */
-    void reset()  {
-        using IntermediateResult = std::function<void()>;
+    void reset() {
+        std::function<void()> thunk;
 
-        stateRef->template modify<IntermediateResult>([](const auto& state) {
-            return state.reset();
-        })
-        .template map<None>([](auto&& thunk) {
-            thunk();
-            return None();
-        })
-        .runSync();
+        {
+            std::lock_guard guard(mutex);
+            auto&& [nextState, given_thunk] = state.reset();
+            thunk = std::move(given_thunk);
+            state = std::move(nextState);
+        }
+
+        thunk();
     }
 
     Queue(const std::shared_ptr<Scheduler>& sched, uint32_t max_size)
-        : stateRef(Ref<queue::QueueState<T,E>,E>::create(sched, max_size))
+        : state(sched, max_size)
     {}
 
 private:
-    std::shared_ptr<Ref<queue::QueueState<T,E>,E>> stateRef;
+    std::mutex mutex;
+    queue::QueueState<T,E> state;
 };
 
 } // namespace cask

@@ -45,7 +45,7 @@ public:
                 QueueState(sched, max_size, values, filteredPuts, filteredTakes->tail()),
                 true,
                 [takePromise = std::move(takePromise), value = std::forward<Arg>(value)] {
-                    takePromise->success(std::forward<Arg>(value));
+                    takePromise->success(value);
                 }
             );
         } else if(values->size() < max_size) {

@@ -115,6 +115,8 @@ TEST(ObservableQueue, ValueThenNever) {
     fiber->cancel();
     sched->run_ready_tasks();
     EXPECT_TRUE(fiber->isCanceled());
+    EXPECT_FALSE(fiber->getValue().has_value());
+    EXPECT_FALSE(fiber->getError().has_value());
 }
 
 TEST(ObservableQueue, ValuesLargerThanQueue) {
