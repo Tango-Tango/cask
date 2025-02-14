@@ -14,7 +14,6 @@ install_headers(
     'Either.hpp',
     'Erased.hpp',
     'Fiber.hpp',
-    'List.hpp',
     'MVar.hpp',
     'None.hpp',
     'Observable.hpp',
@@ -30,9 +29,6 @@ install_headers(
 
 subdir('deferred')
 subdir('fiber')
-subdir('list')
-subdir('mvar')
 subdir('observable')
 subdir('pool')
-subdir('queue')
 subdir('scheduler')

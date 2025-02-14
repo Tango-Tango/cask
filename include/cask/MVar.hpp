@@ -6,9 +6,7 @@
 #ifndef _CASK_MVAR_H_
 #define _CASK_MVAR_H_
 
-#include "Task.hpp"
-#include "Ref.hpp"
-#include "mvar/MVarState.hpp"
+#include "cask/Queue.hpp"
 
 namespace cask {
 
@@ -107,75 +105,48 @@ private:
     explicit MVar(const std::shared_ptr<Scheduler>& sched);
     explicit MVar(const std::shared_ptr<Scheduler>& sched, const T& initialValue);
 
-    std::shared_ptr<Ref<mvar::MVarState<T,E>,E>> stateRef;
+    QueueRef<T,E> queue;
 };
 
 template <class T, class E>
-MVarRef<T,E> MVar<T,E>::empty(const std::shared_ptr<Scheduler>& sched) {
-    return std::shared_ptr<MVar<T,E>>(new MVar<T,E>(sched));
+MVarRef<T,E> MVar<T,E>::empty(const std::shared_ptr<Scheduler>& sched)
+{
+    auto mvar = new MVar<T,E>(sched);
+    return std::shared_ptr<MVar<T,E>>(mvar);
 }
 
 template <class T, class E>
-MVarRef<T,E> MVar<T,E>::create(const std::shared_ptr<Scheduler>& sched, const T& initialValue) {
-    return std::shared_ptr<MVar<T,E>>(new MVar<T,E>(sched, initialValue));
+MVarRef<T,E> MVar<T,E>::create(const std::shared_ptr<Scheduler>& sched, const T& initialValue)
+{
+    auto mvar = new MVar<T,E>(sched, initialValue);
+    return std::shared_ptr<MVar<T,E>>(mvar);
 }
 
 template <class T, class E>
 MVar<T,E>::MVar(const std::shared_ptr<Scheduler>& sched)
-    : stateRef(Ref<mvar::MVarState<T,E>,E>::create(mvar::MVarState<T,E>(sched)))
+    : queue(Queue<T,E>::empty(sched, 1))
 {}
 
 template <class T, class E>
 MVar<T,E>::MVar(const std::shared_ptr<Scheduler>& sched, const T& value)
-    : stateRef(Ref<mvar::MVarState<T,E>,E>::create(mvar::MVarState<T,E>(sched, value)))
-{}
+    : queue(Queue<T,E>::empty(sched, 1))
+{
+    queue->tryPut(value);
+}
 
 template <class T, class E>
 Task<None,E> MVar<T,E>::put(const T& value) {
-    return stateRef->template modify<Task<None,E>>([value](auto state) {
-            return state.put(value);
-        })
-        .template flatMap<None>([](auto task) {
-            return task;
-        });
+    return queue->put(value);
 }
 
 template <class T, class E>
 bool MVar<T,E>::tryPut(const T& value) {
-    using IntermediateResult = std::tuple<bool,std::function<void()>>;
-
-    auto result_opt = stateRef->template modify<IntermediateResult>([value](auto state) {
-        auto result = state.tryPut(value);
-        auto nextState = std::get<0>(result);
-        auto completed = std::get<1>(result);
-        auto thunk = std::get<2>(result);
-        return std::make_tuple(nextState, std::make_tuple(completed, thunk));
-    })
-    .template map<bool>([](IntermediateResult result) {
-        auto completed = std::get<0>(result);
-        auto thunk = std::get<1>(result);
-        thunk();
-        return completed;
-    })
-    .runSync();
-
-    // The operation above is guaranteed to run synchronously and without error
-    // so  we just need to unwrap the result here.
-    if(result_opt && result_opt->is_left()) {
-        return result_opt->get_left();
-    } else {
-        return false;
-    }
+    return queue->tryPut(value);
 }
 
 template <class T, class E>
 Task<T,E> MVar<T,E>::take() {
-    return stateRef->template modify<Task<T,E>>([](auto state) {
-            return state.take();
-        })
-        .template flatMap<T>([](auto task) {
-            return task;
-        });
+    return queue->take();
 }
 
 template <class T, class E>

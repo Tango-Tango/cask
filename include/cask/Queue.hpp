@@ -7,8 +7,9 @@
 #define _CASK_QUEUE_H_
 
 #include "Task.hpp"
-#include "Ref.hpp"
-#include "queue/QueueState.hpp"
+#include <mutex>
+#include <optional>
+#include <vector>
 
 namespace cask {
 
@@ -24,7 +25,7 @@ using QueueRef = std::shared_ptr<Queue<T,E>>;
  * items with `put` and a consume process takes items with `take`.
  */
 template <class T, class E = std::any>
-class Queue {
+class Queue : public std::enable_shared_from_this<Queue<T,E>> {
 public:
     /**
      * Create an empty queue.
@@ -47,12 +48,31 @@ public:
      */
     template <class Arg>
     Task<None,E> put(Arg&& value)  {
-        return stateRef->template modify<Task<None,E>>([value = std::forward<Arg>(value)](const auto& state) {
-                return state.put(value);
-            })
-            .template flatMap<None>([](auto&& task) {
-                return std::forward<Task<None,E>>(task);
-            });
+        return Task<None,E>::defer([self_weak = this->weak_from_this(), value = std::forward<Arg>(value)]() {
+            if (auto self = self_weak.lock()) {
+                std::lock_guard lock(self->mutex);
+                self->unsafe_cleanup_queues();
+                auto result = self->unsafe_try_put(value);
+                auto completed = std::get<0>(result);
+                auto thunk = std::get<1>(result);
+
+                if (completed) {
+                    return Task<None,E>::eval([thunk] {
+                        thunk();
+                        return None();
+                    });
+                } else {
+                    auto promise = Promise<None,E>::create(self->sched);
+                    self->pending_puts.emplace_back(promise, value);
+                    return Task<None,E>::defer([promise, thunk] {
+                        thunk();
+                        return Task<None,E>::forPromise(promise);
+                    });
+                }
+            } else {
+                return Task<None,E>::cancel();
+            }
+        });
     }
 
      /**
@@ -65,24 +85,19 @@ public:
      */
     template <class Arg>
     bool tryPut(Arg&& value) {
-        using IntermediateResult = std::tuple<bool,std::function<void()>>;
+        bool success;
+        std::function<void()> thunk;
 
-        auto result_opt = stateRef->template modify<IntermediateResult>([value = std::forward<Arg>(value)](const auto& state) {
-            auto&& [nextState, completed, thunk] = state.tryPut(value);
-            return std::make_tuple(std::move(nextState), std::make_tuple(std::move(completed), std::move(thunk)));
-        })
-        .template map<bool>([](IntermediateResult&& result) {
-            auto&& [completed, thunk] = result;
-            thunk();
-            return completed;
-        })
-        .runSync();
-
-        if(result_opt && result_opt->is_left()) {
-            return result_opt->get_left();
-        } else {
-            return false;
+        {
+            std::lock_guard lock(mutex);
+            unsafe_cleanup_queues();
+            auto result = unsafe_try_put(std::forward<Arg>(value));
+            success = std::get<0>(result);
+            thunk = std::get<1>(result);
         }
+
+        thunk();
+        return success;
     }
 
     /**
@@ -93,12 +108,31 @@ public:
      * @return A task that completes when a value has been taken.
      */
     Task<T,E> take()  {
-        return stateRef->template modify<Task<T,E>>([](const auto& state) {
-                return state.take();
-            })
-            .template flatMap<T>([](auto&& task) {
-                return std::forward<Task<T,E>>(task);
-            });
+        return Task<T,E>::defer([self_weak = this->weak_from_this()]() {
+            if (auto self = self_weak.lock()) {
+                std::lock_guard lock(self->mutex);
+                self->unsafe_cleanup_queues();
+                auto result = self->unsafe_try_take();
+                auto value = std::get<0>(result);
+                auto thunk = std::get<1>(result);
+
+                if (value.has_value()) {
+                    return Task<T,E>::eval([thunk, value = *value] {
+                        thunk();
+                        return value;
+                    });
+                } else {
+                    auto promise = Promise<T,E>::create(self->sched);
+                    self->pending_takes.emplace_back(promise);
+                    return Task<T,E>::defer([promise, thunk] {
+                        thunk();
+                        return Task<T,E>::forPromise(promise);
+                    });
+                }
+            } else {
+                return Task<T,E>::cancel();
+            }
+        });
     }
 
     /**
@@ -108,24 +142,19 @@ public:
      * @return A value or nothing.
      */
     std::optional<T> tryTake()  {
-        using IntermediateResult = std::tuple<std::optional<T>,std::function<void()>>;
+        std::optional<T> value;
+        std::function<void()> thunk;
 
-        auto result_opt = stateRef->template modify<IntermediateResult>([](const auto& state) {
-            auto&& [nextState, valueOpt, thunk] = state.tryTake();
-            return std::make_tuple(std::move(nextState), std::make_tuple(std::move(valueOpt), std::move(thunk)));
-        })
-        .template map<std::optional<T>>([](IntermediateResult&& result) {
-            auto&& [valueOpt, thunk] = result;
-            thunk();
-            return valueOpt;
-        })
-        .runSync();
-
-        if(result_opt && result_opt->is_left()) {
-            return result_opt->get_left();
-        } else {
-            return std::optional<T>();
+        {
+            std::lock_guard lock(mutex);
+            unsafe_cleanup_queues();
+            auto result = unsafe_try_take();
+            value = std::get<0>(result);
+            thunk = std::get<1>(result);
         }
+
+        thunk();
+        return value;
     }
 
     /**
@@ -134,24 +163,109 @@ public:
      * puts or takes then they are canceled.
      */
     void reset()  {
-        using IntermediateResult = std::function<void()>;
+        std::vector<PendingPut> cancel_puts;
+        std::vector<PendingTake> cancel_takes;
 
-        stateRef->template modify<IntermediateResult>([](const auto& state) {
-            return state.reset();
-        })
-        .template map<None>([](auto&& thunk) {
-            thunk();
-            return None();
-        })
-        .runSync();
+        {
+            std::lock_guard lock(mutex);
+            std::swap(pending_puts, cancel_puts);
+            std::swap(pending_takes, cancel_takes);
+            values.clear();
+        }
+
+        for(auto&& put : cancel_puts) {
+            auto promise = std::get<0>(put);
+            promise->cancel();
+        }
+
+        for(auto&& take : cancel_takes) {
+            take->cancel();
+        }
     }
 
     Queue(const std::shared_ptr<Scheduler>& sched, uint32_t max_size)
-        : stateRef(Ref<queue::QueueState<T,E>,E>::create(sched, max_size))
-    {}
+        : max_size(max_size)
+        , sched(sched)
+        , mutex()
+        , values()
+        , pending_puts()
+        , pending_takes()
+    {
+        values.reserve(max_size);
+    }
 
 private:
-    std::shared_ptr<Ref<queue::QueueState<T,E>,E>> stateRef;
+    using PendingPut = std::tuple<PromiseRef<None,E>,T>;
+    using PendingTake = PromiseRef<T,E>;
+    using Thunk = std::function<void()>;
+
+    const std::size_t max_size;
+    std::shared_ptr<Scheduler> sched;
+
+    std::mutex mutex;
+    std::vector<T> values;
+    std::vector<PendingPut> pending_puts;
+    std::vector<PendingTake> pending_takes;
+
+    void unsafe_cleanup_queues() {
+        std::vector<PendingPut> new_puts;
+        std::vector<PendingTake> new_takes;
+
+        for(auto&& put : pending_puts) {
+            auto promise = std::get<0>(put);
+
+            if(promise->isCancelled()) {
+                continue;
+            }
+
+            new_puts.emplace_back(std::move(put));
+        }
+
+        for(auto&& take : pending_takes) {
+            if(take->isCancelled()) {
+                continue;
+            }
+
+            new_takes.emplace_back(std::move(take));
+        }
+
+        std::swap(pending_puts, new_puts);
+        std::swap(pending_takes, new_takes);
+    }
+
+    std::tuple<std::optional<T>,Thunk> unsafe_try_take() {
+        if (!values.empty()) {
+            auto value = values.front();
+            values.erase(values.begin());
+            return std::make_tuple(value, []{});
+        } else if (!pending_puts.empty()) {
+            auto put = pending_puts.front();
+            auto promise = std::get<0>(put);
+            auto value = std::get<1>(put);
+            pending_puts.erase(pending_puts.begin());
+            return std::make_tuple(value, [promise]{
+                promise->success(None());
+            });
+        } else {
+            return std::make_tuple(std::optional<T>(), []{});
+        }
+    }
+
+    template <class Arg>
+    std::tuple<bool,Thunk> unsafe_try_put(Arg&& value) {
+        if (!pending_takes.empty()) {
+            auto promise = pending_takes.front();
+            pending_takes.erase(pending_takes.begin());
+            return std::make_tuple(true, [promise, value = std::forward<Arg>(value)]{
+                promise->success(value);
+            });
+        } else if (values.size() < max_size) {
+            values.emplace_back(value);
+            return std::make_tuple(true, []{});
+        } else {
+            return std::make_tuple(false, []{});
+        }
+    }
 };
 
 } // namespace cask

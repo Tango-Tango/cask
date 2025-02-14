@@ -3,6 +3,12 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 19.0
+
+- Remove `List` and friends from the library. This is a breaking API change.
+- Rework `Queue` and `MVar` to not use a `List` at all. This change doesn't
+  effect the API or semantics of those types.
+
 ## 18.0
 
 - Add the `WorkStealingScheduler` as a more efficient and easier to maintain

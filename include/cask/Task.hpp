@@ -81,6 +81,10 @@ public:
         return Task<None,E>::pure(None());
     }
 
+    static Task<T,E> cancel() noexcept {
+        return Task<T,E>(fiber::FiberOp::cancel());
+    }
+
     /**
      * Create a task that wraps a function. Whenever the
      * task is evaluated it will simply execute the given
