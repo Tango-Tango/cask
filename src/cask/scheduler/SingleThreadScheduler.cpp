@@ -208,8 +208,9 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
                 // all of the schedulers looking for work "at the same time" when operating
                 // in a work-starved environment.
 
-                // Compute a random sleep time between 0 and 100ms
-                auto next_sleep_time = std::chrono::milliseconds(std::abs(std::rand()) % 100);
+                // Compute a random sleep time between 10ms and 100ms
+                constexpr std::chrono::milliseconds min_sleep_time(10);
+                auto next_sleep_time = std::chrono::milliseconds(std::abs(std::rand()) % 90) + min_sleep_time;
 
                 // Compute the next timer sleep time
                 auto next_timer = control_data->timers.begin();
@@ -220,9 +221,9 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
                     next_sleep_time = std::max(next_sleep_time, std::chrono::milliseconds(0));
                 }
 
-                // There is a possibility we've chosen to sleep for 0 milliseconds either randomly or because
-                // a timer needs to fire immediately. In that case we won't transition to idle and instead
-                // will immediately check for more work.
+                // There is a possibility we've chosen to sleep for 0 milliseconds because
+                // a timer needs to fire immediately. In that case we won't transition to
+                // idle and instead will immediately check for more work.
 
                 if (next_sleep_time > std::chrono::milliseconds::zero()) {
                     // If we are transitioning to idle call the on_idle callback
@@ -245,7 +246,6 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
     // Indicate the run thread has shut down.
     control_data->thread_running.store(false, std::memory_order_release);
 }
-
 
 std::vector<std::function<void()>> SingleThreadScheduler::steal_unsafe(const std::shared_ptr<SchedulerControlData>& control_data, std::size_t batch_size) {
     auto iterationStartTime = current_time_ms();
