@@ -96,7 +96,16 @@ std::thread::id SingleThreadScheduler::get_run_thread_id() const {
 
 std::vector<std::function<void()>> SingleThreadScheduler::steal(std::size_t batch_size) {
     std::lock_guard<std::mutex> lock(control_data->mutex);
-    return steal_unsafe(control_data, batch_size);
+
+    if (peek_available_work_unsafe(control_data) > batch_size / 2) {
+        // Plenty of work is available to make stealing worthwhile. Go
+        // and take a batch.
+        return steal_unsafe(control_data, batch_size);
+    } else {
+        // Not enough work is available to make stealing worthwhile.
+        return {};
+    }
+
 }
 
 void SingleThreadScheduler::submit(const std::function<void()>& task) {
@@ -245,6 +254,27 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
 
     // Indicate the run thread has shut down.
     control_data->thread_running.store(false, std::memory_order_release);
+}
+
+
+std::size_t SingleThreadScheduler::peek_available_work_unsafe(const std::shared_ptr<SchedulerControlData>& control_data) {
+    auto now = current_time_ms();
+    std::size_t peeked_batch_size = 0;
+
+    // Add the ready queue size
+    peeked_batch_size += control_data->ready_queue.size();
+
+    // Add the number of expired timers
+    for (auto& [timer_time, timers] : control_data->timers) {
+        if (timer_time <= now) {
+            peeked_batch_size += timers.size();
+        } else {
+            break;
+        }
+    }
+
+    // Returned the peeked size
+    return peeked_batch_size;
 }
 
 std::vector<std::function<void()>> SingleThreadScheduler::steal_unsafe(const std::shared_ptr<SchedulerControlData>& control_data, std::size_t batch_size) {
