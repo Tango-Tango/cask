@@ -3,6 +3,10 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 18.1
+
+- Allow timed tasks to participate in work stealing.
+
 ## 18.0
 
 - Add the `WorkStealingScheduler` as a more efficient and easier to maintain

@@ -96,20 +96,7 @@ std::thread::id SingleThreadScheduler::get_run_thread_id() const {
 
 std::vector<std::function<void()>> SingleThreadScheduler::steal(std::size_t batch_size) {
     std::lock_guard<std::mutex> lock(control_data->mutex);
-
-    std::function<void()> task;
-    std::vector<std::function<void()>> batch;
-
-    auto batchSize = std::min(control_data->ready_queue.size(), batch_size);
-    batch.reserve(batchSize);
-
-    while(batch.size() < batchSize) {
-        task = control_data->ready_queue.front();
-        control_data->ready_queue.pop();
-        batch.emplace_back(task);
-    }
-
-    return batch;
+    return steal_unsafe(control_data, batch_size);
 }
 
 void SingleThreadScheduler::submit(const std::function<void()>& task) {
@@ -173,7 +160,6 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
 
     while(true) {
         std::vector<std::function<void()>> batch;
-        std::vector<std::shared_ptr<CancelableTimer>> expiredTimers;
         auto iterationStartTime = current_time_ms();
 
         // Grab the lock and accumulate a batch of work including any
@@ -186,41 +172,8 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
             // running at all.
             if (!control_data->should_run) break;
 
-            std::vector<int64_t> expiredTimes;
-
-            // Accumulate any expired tasks
-            for (auto& [timer_time, timers] : control_data->timers) {
-                if (timer_time <= iterationStartTime) {
-                    for(auto& timer : timers) {
-                        expiredTimers.push_back(timer);
-                    }
-
-                    expiredTimes.push_back(timer_time);
-                } else {
-                    break;
-                }
-            }
-
-            // Erase those timers from timer storage
-            for (auto& timerTime : expiredTimes) {
-                control_data->timers.erase(timerTime);
-            }
-
-            // Fill the batch with ready tasks by draining the ready queue
-            auto batchSize = std::min(control_data->ready_queue.size(), batch_size);
-
-            // Adjust the batch size based on the number of expired timers
-            if (batchSize > expiredTimers.size()) {
-                batchSize -= expiredTimers.size();
-            } else {
-                batchSize = 0;
-            }
-
-            while(batch.size() < batchSize) {
-                task = control_data->ready_queue.front();
-                control_data->ready_queue.pop();
-                batch.emplace_back(task);
-            }
+            // "steal" from ourselves to populate a batch
+            batch = steal_unsafe(control_data, batch_size);
 
             // If we didn't find any work, request some from the parent scheduler
             if (batch.empty()) {
@@ -233,12 +186,6 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
                 control_data->on_resume();
             }
         }
-
-        // Fire all the timers
-        for (auto& timer : expiredTimers) {
-            timer->fire();
-        }
-        expiredTimers.clear();
 
         // Execute the batch of tasks. This is done outside of the lock to avoid
         // deadlocks and contention both with the running tasks which may be
@@ -297,6 +244,55 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
 
     // Indicate the run thread has shut down.
     control_data->thread_running.store(false, std::memory_order_release);
+}
+
+
+std::vector<std::function<void()>> SingleThreadScheduler::steal_unsafe(const std::shared_ptr<SchedulerControlData>& control_data, std::size_t batch_size) {
+    auto iterationStartTime = current_time_ms();
+    std::function<void()> task;
+    std::vector<std::function<void()>> batch;
+    std::vector<int64_t> expiredTimes;
+
+    // Accumulate any expired tasks
+    for (auto& [timer_time, timers] : control_data->timers) {
+        if (timer_time <= iterationStartTime) {
+            for(auto& timer : timers) {
+                batch.push_back([timer] {
+                    timer->fire();
+                });
+            }
+
+            expiredTimes.push_back(timer_time);
+        } else {
+            break;
+        }
+    }
+
+    // Erase those timers from timer storage
+    for (auto& timerTime : expiredTimes) {
+        control_data->timers.erase(timerTime);
+    }
+
+    // Adjust the batch size based on the number of expired timers
+    if (batch_size > expiredTimes.size()) {
+        batch_size -= expiredTimes.size();
+    } else {
+        batch_size = 0;
+    }
+
+    // Cap the batch size at the size of the ready queue
+    if (batch_size > control_data->ready_queue.size()) {
+        batch_size = control_data->ready_queue.size();
+    }
+
+    // Drain the ready queue to finish filling the batch
+    while(batch.size() < batch_size) {
+        task = control_data->ready_queue.front();
+        control_data->ready_queue.pop();
+        batch.emplace_back(task);
+    }
+
+    return batch;
 }
 
 int64_t SingleThreadScheduler::current_time_ms() {
