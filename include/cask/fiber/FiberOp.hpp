@@ -209,6 +209,9 @@ public:
     #ifdef __GNUC__
         __builtin_unreachable();
     #endif
+    #ifdef _MSC_VER
+        __assume(0);
+    #endif
 }
 
     union {
