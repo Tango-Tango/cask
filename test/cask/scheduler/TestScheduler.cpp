@@ -4,6 +4,7 @@
 //          https://www.boost.org/LICENSE_1_0.txt)
 
 #include <atomic>
+#include <chrono>
 #include "gtest/gtest.h"
 #include "cask/Deferred.hpp"
 #include "cask/Task.hpp"
