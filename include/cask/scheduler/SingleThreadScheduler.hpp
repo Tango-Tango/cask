@@ -128,6 +128,7 @@ private:
     std::shared_ptr<SchedulerControlData> control_data;
 
     static void run(const std::size_t batch_size, const std::shared_ptr<SchedulerControlData>& control_data);
+    static std::size_t peek_available_work_unsafe(const std::shared_ptr<SchedulerControlData>& control_data);
     static std::vector<std::function<void()>> steal_unsafe(const std::shared_ptr<SchedulerControlData>& control_data, std::size_t batch_size);
     static int64_t current_time_ms();
 };
