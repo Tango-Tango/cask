@@ -97,15 +97,20 @@ std::thread::id SingleThreadScheduler::get_run_thread_id() const {
 std::vector<std::function<void()>> SingleThreadScheduler::steal(std::size_t batch_size) {
     std::lock_guard<std::mutex> lock(control_data->mutex);
 
+    if (peek_timer_ready_unsafe(control_data)) {
+        // If a timer has expired but this scheduler hasn't
+        // processed it yet - allow it to be stolen immediately
+        return steal_unsafe(control_data, batch_size);
+    }
+
     if (peek_available_work_unsafe(control_data) > batch_size / 2) {
         // Plenty of work is available to make stealing worthwhile. Go
         // and take a batch.
         return steal_unsafe(control_data, batch_size);
-    } else {
-        // Not enough work is available to make stealing worthwhile.
-        return {};
     }
-
+    
+    // Not enough work is available to make stealing worthwhile.
+    return {};
 }
 
 void SingleThreadScheduler::submit(const std::function<void()>& task) {
@@ -256,6 +261,12 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
     control_data->thread_running.store(false, std::memory_order_release);
 }
 
+
+bool SingleThreadScheduler::peek_timer_ready_unsafe(const std::shared_ptr<SchedulerControlData>& control_data) {
+    auto now = current_time_ms();
+    auto next_timer = control_data->timers.begin();
+    return next_timer != control_data->timers.end() && next_timer->first <= now;
+}
 
 std::size_t SingleThreadScheduler::peek_available_work_unsafe(const std::shared_ptr<SchedulerControlData>& control_data) {
     auto now = current_time_ms();
