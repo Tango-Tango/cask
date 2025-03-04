@@ -21,7 +21,7 @@ TEST(ObservableFilter,FilterMatch) {
         ->await();
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 123);
+    EXPECT_EQ(*result, 123); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(ObservableFilter,FilterDoesntMatch) {
@@ -64,7 +64,7 @@ TEST(ObservableFilter,Cancelled) {
     try {
         deferred->await();
         FAIL() << "Expected method to throw";
-    } catch(std::runtime_error&) {}
+    } catch(std::runtime_error&) {} // NOLINT(bugprone-empty-catch)
 }
 
 TEST(ObservableFilter,StopsUpstream) {

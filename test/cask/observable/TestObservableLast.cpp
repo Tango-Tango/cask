@@ -17,6 +17,8 @@ using cask::scheduler::BenchScheduler;
 
 INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(ObservableLastTest);
 
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
+
 TEST_P(ObservableLastTest, Pure) {
     auto result = Observable<int>::pure(123)
         ->last()
@@ -118,3 +120,5 @@ TEST(ObservableLastTest, RunsCancelCallbacks) {
         EXPECT_EQ(run_count, 1);
     }
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access)

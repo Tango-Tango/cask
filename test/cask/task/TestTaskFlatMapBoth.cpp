@@ -9,6 +9,8 @@
 
 using cask::Task;
 
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
+
 TEST(TaskFlatMapBoth, ValueSameErrorTypes) {
     auto result = Task<int,std::string>::pure(123)
         .template flatMapBoth<float,std::string>(
@@ -128,4 +130,6 @@ TEST(TaskFlatMapBoth, ThrowsDownstreamErrorType) {
     ASSERT_TRUE(result->is_right());
     EXPECT_EQ(result->get_right().what(), std::string("thrown-error"));
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access)
 

@@ -14,8 +14,8 @@ TEST(TaskDefer,EvalutesSyncThingSync) {
     auto result = Task<int>::defer(deferred).runSync();
 
     ASSERT_TRUE(result.has_value());
-    ASSERT_TRUE(result->is_left());
-    EXPECT_EQ(result->get_left(), 123);
+    ASSERT_TRUE(result->is_left());  // NOLINT(bugprone-unchecked-optional-access)
+    EXPECT_EQ(result->get_left(), 123); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(TaskEval,EvalutesSyncThingAsync) {
@@ -32,8 +32,8 @@ TEST(TaskDefer,EvalutesErrorSync) {
     auto result = Task<int,float>::defer(deferred).runSync();
 
     ASSERT_TRUE(result.has_value());
-    ASSERT_TRUE(result->is_right());
-    EXPECT_EQ(result->get_right(), 1.23f);
+    ASSERT_TRUE(result->is_right()); // NOLINT(bugprone-unchecked-optional-access)
+    EXPECT_EQ(result->get_right(), 1.23f);  // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(TaskDefer,EvaluatesErrorAsync) {

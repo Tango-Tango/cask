@@ -41,7 +41,7 @@ TEST(ObservableQueue, Value) {
     auto result = fiber->await();
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 123);
+    EXPECT_EQ(*result, 123); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(ObservableQueue, ValueThenError) {
@@ -238,7 +238,7 @@ TEST(ObservableQueue, TailDropOverflowStrategy) {
     auto result = fiber->await();
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 2);
+    EXPECT_EQ(*result, 2); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(ObservableQueue, BackpressureOverflowStrategy) {
@@ -264,6 +264,6 @@ TEST(ObservableQueue, BackpressureOverflowStrategy) {
     auto result = fiber->await();
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 4);
+    EXPECT_EQ(*result, 4); // NOLINT(bugprone-unchecked-optional-access)
 }
 

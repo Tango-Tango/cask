@@ -16,7 +16,7 @@ namespace cask {
  * should continue by forwarding the next event or (b) processing
  * should stop altogether and the stream should shutdown.
  */
-enum Ack { Continue, Stop };
+enum Ack : std::uint8_t { Continue, Stop };
 
 template <class T, class E>
 class Observer;

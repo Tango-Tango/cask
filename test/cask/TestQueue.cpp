@@ -250,7 +250,7 @@ TEST(Queue, TryTakeHasValue) {
 
     auto value_opt = queue->tryTake();
     ASSERT_TRUE(value_opt.has_value());
-    EXPECT_EQ(*value_opt, 1);
+    EXPECT_EQ(*value_opt, 1); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(Queue, TryTakePendingPuts) {
@@ -265,13 +265,13 @@ TEST(Queue, TryTakePendingPuts) {
     {
         auto value_opt = queue->tryTake();
         ASSERT_TRUE(value_opt.has_value());
-        EXPECT_EQ(*value_opt, 1);
+        EXPECT_EQ(*value_opt, 1); // NOLINT(bugprone-unchecked-optional-access)
     }
 
     {
         auto value_opt = queue->tryTake();
         ASSERT_TRUE(value_opt.has_value());
-        EXPECT_EQ(*value_opt, 2);
+        EXPECT_EQ(*value_opt, 2); // NOLINT(bugprone-unchecked-optional-access)
     }
 
     sched->run_ready_tasks();

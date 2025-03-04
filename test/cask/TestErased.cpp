@@ -78,5 +78,5 @@ TEST(Erased, ThrowsEmptyGet) {
         Erased foo;
         foo.get<int>();
         FAIL() << "expected method to throw";
-    } catch(std::runtime_error&) {}
+    } catch(std::runtime_error&) {}  // NOLINT(bugprone-empty-catch)
 }

@@ -49,7 +49,7 @@ TEST_P(ObservableTest, Eval) {
         ->await();
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 123);
+    EXPECT_EQ(*result, 123); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST_P(ObservableTest, EvalThrows) {
@@ -73,7 +73,7 @@ TEST_P(ObservableTest, Defer) {
         ->await();
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 123);
+    EXPECT_EQ(*result, 123); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST_P(ObservableTest, DeferThrows) {
@@ -110,7 +110,7 @@ TEST_P(ObservableTest, DeferTask) {
         ->await();
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 123);
+    EXPECT_EQ(*result, 123);  // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST_P(ObservableTest, DeferTaskThrows) {

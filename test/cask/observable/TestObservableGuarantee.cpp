@@ -42,7 +42,7 @@ TEST_P(ObservableGuaranteeTest, RunsOnCompletion) {
         .run(sched)
         ->await();
 
-    EXPECT_EQ(*result, 123);
+    EXPECT_EQ(*result, 123);  // NOLINT(bugprone-unchecked-optional-access)
     EXPECT_EQ(run_count, 1);
 }
 
@@ -59,7 +59,7 @@ TEST_P(ObservableGuaranteeTest, RunsOnUpstreamComplete) {
         .run(sched)
         ->await();
 
-    EXPECT_EQ(*result, 123);
+    EXPECT_EQ(*result, 123);  // NOLINT(bugprone-unchecked-optional-access)
     EXPECT_EQ(run_count, 1);
 }
 

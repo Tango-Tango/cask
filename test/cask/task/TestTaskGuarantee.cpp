@@ -13,6 +13,8 @@ using cask::Scheduler;
 using cask::Task;
 using cask::scheduler::BenchScheduler;
 
+// NOLINTBEGIN(bugprone-empty-catch)
+
 TEST(TaskGuarantee, RunsOnComplete) {
     auto counter = 0;
     auto result = Task<int>::pure(123)
@@ -327,3 +329,5 @@ TEST(TaskGuarantee, RaceDoOnCancelInnerTask) {
     
     EXPECT_EQ(counter, 1);
 }
+
+// NOLINTEND(bugprone-empty-catch)

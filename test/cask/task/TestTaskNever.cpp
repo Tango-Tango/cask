@@ -22,6 +22,6 @@ TEST(TaskNever,EvalutesAsync) {
     try {
         deferred->await();
         FAIL() << "Excepted operation to throw.";
-    } catch(std::runtime_error& error) {}
+    } catch(std::runtime_error& error) {} // NOLINT(bugprone-empty-catch)
 }
 

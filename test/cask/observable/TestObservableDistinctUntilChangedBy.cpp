@@ -48,7 +48,7 @@ TEST_P(ObservableDistinctUntilChangedByTest, Cancel) {
     try {
         fiber->await();
         FAIL();
-    } catch(std::runtime_error&) {}
+    } catch(std::runtime_error&) {}  // NOLINT(bugprone-empty-catch)
 }
 
 TEST_P(ObservableDistinctUntilChangedByTest, SequentialNumbers) {

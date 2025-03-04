@@ -1,5 +1,4 @@
-Checks:          'clang-diagnostic-*,clang-analyzer-*,google-*,bugprone-*,performance-*,portability-*'
-WarningsAsErrors: 'clang-diagnostic-*,clang-analyzer-*,google-*,bugprone-*,performance-*,portability-*'
+Checks:          'clang-diagnostic-*,clang-analyzer-*,google-*,bugprone-*,performance-*,portability-*,-bugprone-reserved-identifier,-bugprone-suspicious-include'
+WarningsAsErrors: 'clang-diagnostic-*,clang-analyzer-*,google-*,bugprone-*,performance-*,portability-*,-bugprone-reserved-identifier,-bugprone-suspicious-include'
 HeaderFilterRegex: '.*/cask/.*'
-AnalyzeTemporaryDtors: false
 FormatStyle:     google

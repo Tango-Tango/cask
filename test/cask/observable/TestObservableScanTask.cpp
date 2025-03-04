@@ -25,7 +25,7 @@ TEST(ObservableScanTask, Pure) {
     auto result = fiber->await();
 
     EXPECT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 123);
+    EXPECT_EQ(*result, 123);  // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(ObservableScanTask, Vector) {

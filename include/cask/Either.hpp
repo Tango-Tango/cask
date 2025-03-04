@@ -141,12 +141,12 @@ constexpr bool Either<L,R>::is_right() const {
 
 template <class L, class R>
 constexpr L Either<L,R>::get_left() const {
-    return *leftValue;
+    return *leftValue; // NOLINT(bugprone-unchecked-optional-access)
 }
 
 template <class L, class R>
 constexpr R Either<L,R>::get_right() const {
-    return *rightValue;
+    return *rightValue; // NOLINT(bugprone-unchecked-optional-access)
 }
 
 } // namespace cask

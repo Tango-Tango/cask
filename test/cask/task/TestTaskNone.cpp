@@ -10,6 +10,8 @@ using cask::Task;
 using cask::Scheduler;
 using cask::None;
 
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
+
 TEST(TaskNone,EvalutesSync) {
     auto result = Task<>::none().runSync();
 
@@ -25,3 +27,5 @@ TEST(TaskNone,EvaluatesAsync) {
     
     EXPECT_EQ(result, None());
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access)

@@ -20,7 +20,7 @@ TEST(ObservableFlatten, FlattensValue) {
         ->await();
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 123);
+    EXPECT_EQ(*result, 123); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(ObservableFlatten, FlattensEmpty) {

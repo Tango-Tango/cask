@@ -9,6 +9,8 @@
 using cask::Erased;
 using cask::fiber::FiberValue;
 
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
+
 TEST(FiberValue, Empty) {
     FiberValue value;
 
@@ -79,3 +81,5 @@ TEST(FiberValue, ErasedMoveCancel) {
     EXPECT_FALSE(value.isError());
     EXPECT_TRUE(value.isCanceled());
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access)

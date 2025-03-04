@@ -9,6 +9,8 @@
 using cask::Task;
 using cask::Scheduler;
 
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
+
 TEST(TaskRaiseError,EvalutesSync) {
     auto result = Task<int,float>::raiseError(1.23).runSync();
 
@@ -28,3 +30,5 @@ TEST(TaskRaiseError,EvaluatesAsync) {
         EXPECT_EQ(error, 1.23f);
     }
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access)

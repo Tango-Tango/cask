@@ -10,6 +10,8 @@
 using cask::Task;
 using cask::scheduler::BenchScheduler;
 
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
+
 TEST(TaskFlatMapError, PureValue) {
     auto result_opt = Task<int,std::string>::pure(123)
         .template flatMapError<std::string>([](auto) {
@@ -75,3 +77,5 @@ TEST(TaskFlatMapError, CancelsInner) {
 
     ASSERT_TRUE(fiber->isCanceled());
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access)

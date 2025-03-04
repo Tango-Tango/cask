@@ -39,8 +39,8 @@ public:
             return !promise->isCancelled();
         });
 
-        if(!filteredTakes->is_empty()) {
-            auto takePromise = *(filteredTakes->head());
+        if(auto head = filteredTakes->head()) {
+            auto takePromise = *head;
             return std::make_tuple(
                 QueueState(sched, max_size, values, filteredPuts, filteredTakes->tail()),
                 true,
@@ -99,8 +99,8 @@ public:
                 values->head(),
                 []{}
             );
-        } else if(!filteredPuts->is_empty()) {
-            auto pending = *(filteredPuts->head());
+        } else if(auto head = filteredPuts->head()) {
+            auto pending = *head;
             auto putPromise = std::get<0>(pending);
             auto value = std::get<1>(pending);
             return std::make_tuple(

@@ -27,6 +27,8 @@ constexpr std::size_t DEFAULT_BATCH_SIZE = 128;
  */
 class SingleThreadScheduler final : public Scheduler, public std::enable_shared_from_this<SingleThreadScheduler> {
 public:
+    // NOLINTBEGIN(bugprone-easily-swappable-parameters)
+
     /**
      * Construct a single threaded scheduler.
      */
@@ -38,6 +40,8 @@ public:
         const std::function<void()>& on_resume = [](){},
         const std::function<std::vector<std::function<void()>>(std::size_t)>& on_request_work = [](auto){ return std::vector<std::function<void()>>(); }
     );
+
+    // NOLINTEND(bugprone-easily-swappable-parameters)
 
     /**
      * Destruct the scheduler. Destruction waits for all running and timer
@@ -67,10 +71,13 @@ private:
     class CancelableTimer;
 
     struct SchedulerControlData {
+
+        // NOLINTBEGIN(bugprone-easily-swappable-parameters)
         SchedulerControlData(
             const std::function<void()>& on_idle,
             const std::function<void()>& on_resume,
             const std::function<std::vector<std::function<void()>>(std::size_t)>& on_request_work);
+        // NOLINTEND(bugprone-easily-swappable-parameters)
 
         std::atomic_bool thread_running;
 
@@ -89,11 +96,16 @@ private:
 
     class CancelableTimer final : public Cancelable, std::enable_shared_from_this<CancelableTimer> {
     public:
+
+        // NOLINTBEGIN(bugprone-easily-swappable-parameters)
+
         CancelableTimer(
             const std::shared_ptr<SchedulerControlData>& control_data,
             TimerTimeMs time_slot,
             TimerId id
         );
+
+        // NOLINTEND(bugprone-easily-swappable-parameters)
 
         void fire();
         void cancel() override;
