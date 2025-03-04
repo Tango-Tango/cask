@@ -27,7 +27,7 @@ TEST(TaskDoOnCancel, IgnoredForCompletedValue) {
     sched->run_ready_tasks();
 
     ASSERT_TRUE(fiber->getValue().has_value());
-    EXPECT_EQ(*(fiber->getValue()), 123);
+    EXPECT_EQ(*(fiber->getValue()), 123);  // NOLINT(bugprone-unchecked-optional-access)
     EXPECT_EQ(cancel_counter, 0);
 }
 
@@ -47,7 +47,7 @@ TEST(TaskDoOnCancel, IgnoredForCompletedError) {
     sched->run_ready_tasks();
 
     ASSERT_TRUE(fiber->getError().has_value());
-    EXPECT_EQ(*(fiber->getError()), "broke");
+    EXPECT_EQ(*(fiber->getError()), "broke");  // NOLINT(bugprone-unchecked-optional-access)
     EXPECT_EQ(cancel_counter, 0);
 }
 

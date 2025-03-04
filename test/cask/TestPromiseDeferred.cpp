@@ -22,6 +22,8 @@ using cask::scheduler::BenchScheduler;
 
 INSTANTIATE_SCHEDULER_TEST_BENCH_SUITE(DeferredTest);
 
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
+
 TEST(DeferredTest, Pure) {
     auto deferred = Deferred<int,float>::pure(123);
     
@@ -270,7 +272,7 @@ TEST_P(DeferredTest, PromiseAwaitAsync) {
     // if the thread stops before we try to join it.
     try {
         backgroundAwait.join();
-    } catch(std::system_error& error) {}
+    } catch(std::system_error& error) {} // NOLINT(bugprone-empty-catch)
 
     // Finally assert that the value as set properly.
     EXPECT_EQ(deferred->await(), 123);
@@ -285,7 +287,7 @@ TEST_P(DeferredTest, PromiseCancel) {
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::runtime_error&) {}
+    } catch(std::runtime_error&) {} // NOLINT(bugprone-empty-catch)
 }
 
 TEST_P(DeferredTest, PromiseSuccessIgnoresCancel) {
@@ -323,7 +325,7 @@ TEST_P(DeferredTest, PromiseCancelIgnoresSuccess) {
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::runtime_error&) {}
+    } catch(std::runtime_error&) {} // NOLINT(bugprone-empty-catch)
 }
 
 TEST_P(DeferredTest, PromiseCancelIgnoresError) {
@@ -336,7 +338,7 @@ TEST_P(DeferredTest, PromiseCancelIgnoresError) {
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::runtime_error&) {}
+    } catch(std::runtime_error&) {} // NOLINT(bugprone-empty-catch)
 }
 
 TEST_P(DeferredTest, PromiseCancelIgnoresSubsequentCancel) {
@@ -349,7 +351,7 @@ TEST_P(DeferredTest, PromiseCancelIgnoresSubsequentCancel) {
     try {
         deferred->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::runtime_error&) {}
+    } catch(std::runtime_error&) {} // NOLINT(bugprone-empty-catch)
 }
 
 TEST_P(DeferredTest, PromiseCancelAffectsPeers) {
@@ -362,7 +364,7 @@ TEST_P(DeferredTest, PromiseCancelAffectsPeers) {
     try {
         sibling->await();
         FAIL() << "Expected operation to throw.";
-    } catch(std::runtime_error&) {}
+    } catch(std::runtime_error&) {} // NOLINT(bugprone-empty-catch)
 }
 
 TEST_P(DeferredTest, DoesntAllowMultipleSuccesses) {
@@ -590,3 +592,5 @@ TEST(DeferredTest, FiberAwait) {
     EXPECT_EQ(*(fiber->getValue()), 123);
     EXPECT_EQ(deferred->await(), 123);
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access)

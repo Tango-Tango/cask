@@ -24,7 +24,7 @@ TEST(ObservableFlatMapOptional, Value) {
     sched->run_ready_tasks();
     auto result = fiber->await();
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 1.5);
+    EXPECT_EQ(*result, 1.5); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(ObservableFlatMapOptional, UpstreamEmpty) {

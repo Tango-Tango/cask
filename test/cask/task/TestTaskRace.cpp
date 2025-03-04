@@ -65,7 +65,7 @@ TEST(TaskRace, Cancelled) {
     try {
         deferred->await();
         FAIL() << "Expected method to throw.";
-    } catch(std::runtime_error&) {}
+    } catch(std::runtime_error&) {} // NOLINT(bugprone-empty-catch)
 }
 
 TEST(TaskRace, TaskStressTest) {

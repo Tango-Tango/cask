@@ -13,8 +13,8 @@ TEST(TaskEval,EvalutesSync) {
     auto result = Task<int>::eval([]{ return 123; }).runSync();
     
     ASSERT_TRUE(result.has_value());
-    ASSERT_TRUE(result->is_left());
-    EXPECT_EQ(result->get_left(), 123);
+    ASSERT_TRUE(result->is_left());  // NOLINT(bugprone-unchecked-optional-access)
+    EXPECT_EQ(result->get_left(), 123);  // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(TaskEval,EvaluatesAsync) {

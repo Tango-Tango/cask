@@ -44,7 +44,7 @@ private:
     std::shared_ptr<Pool> pool;
 };
 
-enum FiberOpType { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE, CANCEL, CEDE };
+enum FiberOpType : std::uint8_t { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE, CANCEL, CEDE };
 
 /**
  * A `FiberOp` represents a trampolined and possibly asynchronous program

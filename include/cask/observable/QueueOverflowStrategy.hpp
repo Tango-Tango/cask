@@ -5,9 +5,11 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace cask::observable {
 
-enum QueueOverflowStrategy {
+enum QueueOverflowStrategy : std::uint8_t {
     TailDrop,
     Backpressure
 };

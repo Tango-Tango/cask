@@ -77,8 +77,8 @@ std::tuple<MVarState<T,E>,bool,std::function<void()>> MVarState<T,E>::tryPut(con
         return promise->isCancelled();
     });
 
-    if(!filteredTakes->is_empty()) {
-        auto takePromise = *(filteredTakes->head());
+    if(auto head = filteredTakes->head()) {
+        auto takePromise = *head;
         return std::make_tuple(
             MVarState(sched, valueOpt, pendingPuts, filteredTakes->tail()),
             true,
@@ -134,8 +134,8 @@ std::tuple<MVarState<T,E>,Task<T,E>> MVarState<T,E>::take() const {
             MVarState(sched, {}, filteredPuts, pendingTakes),
             Task<T,E>::pure(*valueOpt)
         );
-    } else if(!filteredPuts->is_empty()) {
-        auto pending = *(filteredPuts->head());
+    } else if(auto head = filteredPuts->head()) {
+        auto pending = *head;
         auto putPromise = std::get<0>(pending);
         auto value = std::get<1>(pending);
         return std::make_tuple(

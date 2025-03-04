@@ -21,7 +21,7 @@ TEST(ObservableBuffer,SingleValue) {
 
     ASSERT_TRUE(result.has_value());
 
-    BufferRef<int> buffer = *result;
+    BufferRef<int> buffer = *result;  // NOLINT(bugprone-unchecked-optional-access)
     ASSERT_EQ(buffer->size(), 1);
     EXPECT_EQ((*buffer)[0], 123);
 }
@@ -48,7 +48,7 @@ TEST(ObservableBuffer,Cancel) {
     try {
         deferred->await();
         FAIL() << "Expected method to throw";
-    } catch(std::runtime_error& error) {}
+    } catch(std::runtime_error& error) {}  // NOLINT(bugprone-empty-catch)
 }
 
 TEST(ObservableBuffer,Empty) {

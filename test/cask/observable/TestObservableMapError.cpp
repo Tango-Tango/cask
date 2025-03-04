@@ -11,6 +11,8 @@ using cask::Observable;
 using cask::Scheduler;
 using cask::Task;
 
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
+
 TEST(ObservableMapError, Empty) {
     auto sched = Scheduler::global();
     auto result = Observable<int, std::string>::empty()
@@ -114,3 +116,5 @@ TEST(ObservableMapError, ErrorDownstream) {
     EXPECT_EQ(result, "456");
     EXPECT_EQ(counter, 1);
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access)

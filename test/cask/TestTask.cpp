@@ -45,7 +45,7 @@ TEST_P(TaskTest, RaiseErrorAsync) {
 TEST_P(TaskTest, RaiseErrorWithoutErrorType) {
     auto task = Task<None, std::optional<int>>::raiseError(123);
     auto result = task.failed().run(sched);
-    EXPECT_EQ(*(result->await()), 123);
+    EXPECT_EQ(*(result->await()), 123); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST_P(TaskTest, EvalAsync) {

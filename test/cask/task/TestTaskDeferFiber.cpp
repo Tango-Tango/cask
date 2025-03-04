@@ -21,7 +21,7 @@ TEST(TaskDeferFiber, PureValue) {
     sched->run_ready_tasks();
 
     ASSERT_TRUE(fiber->getValue().has_value());
-    EXPECT_EQ(*(fiber->getValue()), 123);
+    EXPECT_EQ(*(fiber->getValue()), 123);  // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(TaskDeferFiber, Error) {
@@ -35,7 +35,7 @@ TEST(TaskDeferFiber, Error) {
     sched->run_ready_tasks();
 
     ASSERT_TRUE(fiber->getError().has_value());
-    EXPECT_EQ(*(fiber->getError()), "broke");
+    EXPECT_EQ(*(fiber->getError()), "broke");  // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(TaskDeferFiber, Cancels) {

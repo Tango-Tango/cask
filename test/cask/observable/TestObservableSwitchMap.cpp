@@ -53,8 +53,8 @@ TEST_P(ObservableSwitchMapTest, Pure) {
         .run(sched)
         ->await();
 
-    EXPECT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 184.5);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, 184.5);  // NOLINT(bugprone-unchecked-optional-access)
     awaitIdle();
 }
 
@@ -118,7 +118,7 @@ TEST_P(ObservableSwitchMapTest, CancelStopsInfiniteUpstream) {
     try {
         deferred->await();
         FAIL() << "Expected method to throw";
-    } catch(std::runtime_error&) {}
+    } catch(std::runtime_error&) {}  // NOLINT(bugprone-empty-catch)
 
     awaitIdle();
 }

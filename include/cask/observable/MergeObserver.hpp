@@ -250,11 +250,19 @@ Task<None,None> MergeObserver<T,E>::errorDownstream() {
     if (stopped.exchange(true)) {
         return Task<None,None>::none();
     } else {
-        return downstream->onError(std::forward<E>(*cached_error))
-            .template map<None>([p = completed_promise](auto){
-                p->success(None());
-                return None();
-            });
+        if (cached_error.has_value()) {
+            return downstream->onError(std::forward<E>(*cached_error))
+                .template map<None>([p = completed_promise](auto){
+                    p->success(None());
+                    return None();
+                });
+        } else {
+            return downstream->onComplete()
+                .template map<None>([p = completed_promise](auto){
+                    p->success(None());
+                    return None();
+                });
+        }
     }
 }
 

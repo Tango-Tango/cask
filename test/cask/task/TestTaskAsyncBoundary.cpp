@@ -20,7 +20,7 @@ TEST(TaskAsyncBoundary, DefersExecutionToScheduler) {
     sched->run_ready_tasks();
     EXPECT_TRUE(sched->isIdle());
     EXPECT_TRUE(fiber->getValue().has_value());
-    EXPECT_EQ(*(fiber->getValue()), 123);
+    EXPECT_EQ(*(fiber->getValue()), 123); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(TaskAsyncBoundary, AllowsCancelation) {

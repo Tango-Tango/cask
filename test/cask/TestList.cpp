@@ -8,6 +8,8 @@
 
 using cask::List;
 
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
+
 TEST(List, Empty) {
     auto list = List<int>::empty();
 
@@ -135,3 +137,5 @@ TEST(List, ForeachEmpty) {
     
     EXPECT_EQ(sum, 0);
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access)

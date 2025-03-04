@@ -107,10 +107,14 @@ T PromiseDeferred<T,E>::await() {
 
     if(canceled) {
         throw std::runtime_error("Awaiting a promise which was canceled");
-    } else if(result->is_left()) {
-        return result->get_left();
+    } else if (result.has_value()) {
+        if(result->is_left()) {
+            return result->get_left();
+        } else {
+            throw result->get_right();
+        }
     } else {
-        throw result->get_right();
+        throw std::runtime_error("Promise completed with no result");
     }
 }
 

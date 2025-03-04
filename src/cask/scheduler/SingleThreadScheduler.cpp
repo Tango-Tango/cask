@@ -19,6 +19,9 @@ using namespace std::chrono_literals;
 
 namespace cask::scheduler {
 
+
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+
 SingleThreadScheduler::SingleThreadScheduler(
     std::optional<int> priority,
     std::optional<int> pinned_core,
@@ -68,6 +71,9 @@ SingleThreadScheduler::SingleThreadScheduler(
     run_thread.detach();
     while(!control_data->thread_running.load(std::memory_order_acquire));
 }
+
+
+// NOLINTEND(bugprone-easily-swappable-parameters)
 
 SingleThreadScheduler::~SingleThreadScheduler() {
     // Incidate that the run thread should shut down
@@ -201,7 +207,7 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
             }
 
             // Fill the batch with ready tasks by draining the ready queue
-            auto batchSize = std::min(control_data->ready_queue.size(), std::size_t(batch_size));
+            auto batchSize = std::min(control_data->ready_queue.size(), batch_size);
 
             // Adjust the batch size based on the number of expired timers
             if (batchSize > expiredTimers.size()) {
@@ -297,6 +303,9 @@ int64_t SingleThreadScheduler::current_time_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
+
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+
 SingleThreadScheduler::SchedulerControlData::SchedulerControlData(
     const std::function<void()>& on_idle,
     const std::function<void()>& on_resume,
@@ -313,6 +322,7 @@ SingleThreadScheduler::SchedulerControlData::SchedulerControlData(
     , on_request_work(on_request_work)
 {}
 
+
 SingleThreadScheduler::CancelableTimer::CancelableTimer(
     const std::shared_ptr<SchedulerControlData>& control_data,
     int64_t time_slot,
@@ -327,6 +337,7 @@ SingleThreadScheduler::CancelableTimer::CancelableTimer(
     , shutdown(false)
 {}
 
+// NOLINTEND(bugprone-easily-swappable-parameters)
 
 void SingleThreadScheduler::CancelableTimer::fire() {
     std::vector<std::function<void()>> callbacks_to_run;

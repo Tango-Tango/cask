@@ -56,7 +56,7 @@ TEST_P(ObservableMergeTest,LeftValue) {
 
     auto result = fiber->await();
     EXPECT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 123);
+    EXPECT_EQ(*result, 123);  // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST_P(ObservableMergeTest,RightValue) {
@@ -67,7 +67,7 @@ TEST_P(ObservableMergeTest,RightValue) {
 
     auto result = fiber->await();
     EXPECT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 123);
+    EXPECT_EQ(*result, 123);  // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST_P(ObservableMergeTest,LeftError) {
@@ -103,7 +103,7 @@ TEST_P(ObservableMergeTest,Never) {
     try {
         fiber->await();
         FAIL() << "Expected fiber to cancel";
-    } catch(std::runtime_error&) {}
+    } catch(std::runtime_error&) {}  // NOLINT(bugprone-empty-catch)
 }
 
 TEST_P(ObservableMergeTest,DownstreamLeftStop) {

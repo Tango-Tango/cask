@@ -94,7 +94,8 @@ std::vector<std::function<void()>> WorkStealingScheduler::onThreadRequestWork(co
     if (auto self = self_weak.lock()) {
         // Select a random starting point for work stealing as a simple way to balance work
         // and avoid lock contention
-        auto random_start_index = std::size_t(std::abs(std::rand())) % self->thread_ids.size();
+        auto dice_roll = static_cast<std::size_t>(std::abs(std::rand()));
+        auto random_start_index = dice_roll % self->thread_ids.size();
         auto i = random_start_index;
 
         while (true) {

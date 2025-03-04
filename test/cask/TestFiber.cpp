@@ -18,6 +18,8 @@ using cask::fiber::FiberOp;
 using cask::scheduler::BenchScheduler;
 using cask::scheduler::SingleThreadScheduler;
 
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
+
 TEST(TestFiber, ConstructsSync) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::value(123);
@@ -440,4 +442,6 @@ TEST(TestFiber, RecoversCancel) {
     ASSERT_TRUE(fiber->getValue().has_value());
     EXPECT_EQ(fiber->getValue(), 456);
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access)
 

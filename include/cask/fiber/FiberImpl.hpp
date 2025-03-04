@@ -10,6 +10,7 @@
 #include <climits>
 #include <mutex>
 #include <map>
+#include <cstdint>
 #include "cask/Config.hpp"
 #include "cask/Deferred.hpp"
 #include "cask/Fiber.hpp"
@@ -17,7 +18,7 @@
 
 namespace cask::fiber {
 
-enum FiberState { READY, RUNNING, WAITING, DELAYED, RACING, COMPLETED, CANCELED };
+enum FiberState : std::uint8_t { READY, RUNNING, WAITING, DELAYED, RACING, COMPLETED, CANCELED };
 
 constexpr const char * print_state(const FiberState& state) {
     return state == READY ? "READY" :
@@ -91,7 +92,7 @@ private:
     std::vector<std::function<void(Fiber<T,E>*)>> callbacks;
     std::atomic_bool attempting_cancel;
     std::optional<FiberValue> race_result;
-    std::map<int, std::shared_ptr<Fiber<Erased,Erased>>> racing_fibers;
+    std::map<std::uint64_t, std::shared_ptr<Fiber<Erased,Erased>>> racing_fibers;
 };
 
 template <class T, class E>

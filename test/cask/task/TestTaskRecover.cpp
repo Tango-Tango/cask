@@ -10,6 +10,8 @@
 using cask::Task;
 using cask::scheduler::BenchScheduler;
 
+// NOLINTBEGIN(bugprone-unchecked-optional-access)
+
 TEST(TaskRecover, PureValue) {
     auto result_opt = Task<int,std::string>::pure(123)
         .recover([](auto) {
@@ -54,3 +56,5 @@ TEST(TaskRecover, Canceled) {
         SUCCEED();
     }
 }
+
+// NOLINTEND(bugprone-unchecked-optional-access)

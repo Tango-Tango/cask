@@ -36,7 +36,7 @@ TEST(ObservableFlatMap, Pure) {
         ->await();
 
     EXPECT_TRUE(result.has_value());
-    EXPECT_EQ(*result, 184.5);
+    EXPECT_EQ(*result, 184.5); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 TEST(ObservableFlatMap, UpstreamError) {

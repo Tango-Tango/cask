@@ -25,7 +25,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
+        os: [ubuntu-22.04, ubuntu-24.04]
         target: [debug, release, release_no_atomics, release_forced_cede_disabled, clang, mips, arm]
       fail-fast: false
 
@@ -131,7 +131,7 @@ jobs:
   
   analyze:
     name: Analyze
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.actor != 'engineering-at-tangotango'
 
     steps:
@@ -142,9 +142,9 @@ jobs:
     - name: Update Apt Cache
       run: sudo apt-get update
     - name: Install Apt Development Dependencies
-      run: sudo apt-get install -y ninja-build python3-pip gcovr cppcheck clang clang-tidy
+      run: sudo apt-get install -y ninja-build pipx gcovr cppcheck clang clang-tidy
     - name: Install Python Development Dependencies
-      run: sudo python3 -m pip install meson==1.0.0
+      run: sudo pipx install meson==1.0.0
     - name: Generate the Build Environment
       run: ./regenerate_env.sh clang
     - name: Run clang-tidy
@@ -152,7 +152,7 @@ jobs:
   
   release:
     name: Release
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: [build-linux, build-mac, build-windows, analyze]
     if: contains(github.ref, 'main') && github.actor != 'engineering-at-tangotango'
 
