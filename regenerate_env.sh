@@ -11,7 +11,6 @@ if [ "$BUILD_TARGET" = "debug" ] || [ "$BUILD_TARGET" = "all" ]; then
         -Dinitial_blocks_per_pool=64 \
         -Ddebug=true \
         -Doptimization=0 \
-        -Db_sanitize=address,undefined \
         -Db_coverage=true \
         -Dwarning_level=3 \
         -Dwerror=true
@@ -45,7 +44,7 @@ if [ "$BUILD_TARGET" = "release_always_async" ] || [ "$BUILD_TARGET" = "all" ]; 
         -Dbuildtype=release \
         -Dwarning_level=3 \
         -Dwerror=true \
-        -Dbatch_size=1
+        -Dcede_iterations=1
 fi
 
 if [ "$BUILD_TARGET" = "release_forced_cede_disabled" ] || [ "$BUILD_TARGET" = "all" ]; then
@@ -55,7 +54,7 @@ if [ "$BUILD_TARGET" = "release_forced_cede_disabled" ] || [ "$BUILD_TARGET" = "
         -Dbuildtype=release \
         -Dwarning_level=3 \
         -Dwerror=true \
-        -Dbatch_size=0
+        -Dcede_iterations=0
 fi
 
 

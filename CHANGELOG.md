@@ -3,6 +3,31 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 19.0
+
+- Performance improvements to the `WorkStealingScheduler` which necessitated
+  some API changes.
+  - Allow a `SingleThreadScheduler` to be constructed with a maximum queue size.
+  - Allow a `SingleThreadScheduler` to be constructed without automatically starting
+    the scheduler.
+  - Allow a `on_work_overflow` callback to be provided to the `SingleThreadScheduler`
+    to handle cases where the ready queue overflows internally (e.g. because a timer
+    fired and inserting into the queue overflows).
+  - Add the `start`, `stop` and `try_wake` methods to the `SingleThreadScheduler`.
+  - Add a `ReadyQueue` implementation and modify the `SingleThreadScheduler` to both
+    use it and accept an instance of it when stealing.
+  - Add the `ThreadStartBarrier` to simplify the task of starting a background thread
+    in a deterministic way.
+  - `Scheduler::submit` and `Scheduler::submitBulk` now return a boolean indicating
+    whether the task was submitted. This method will always return true unless the
+    scheduler is configured with a maximum queue size and the queue overflows
+- Rename the `batch_size` build time configuration to `cede_iterations` to better
+  clarify its function and intent.
+- Change `cede_iterations`, `initial_blocks_per_pool` and `cache_line_size`
+  to use `cstdint` types.
+- Add the `work_steal_thread_queue_size` build time configuration to allow
+  the maximum size of the run queue for each thread to be configured.
+
 ## 18.1
 
 - Allow timed tasks to participate in work stealing.

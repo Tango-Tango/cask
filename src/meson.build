@@ -5,7 +5,9 @@ cask_sources = [
     'cask/fiber/FiberValue.cpp',
     'cask/pool/InternalPool.cpp',
     'cask/scheduler/BenchScheduler.cpp',
+    'cask/scheduler/ReadyQueue.cpp',
     'cask/scheduler/SingleThreadScheduler.cpp',
+    'cask/scheduler/ThreadStartBarrier.cpp',
     'cask/scheduler/WorkStealingScheduler.cpp'
 ]
 

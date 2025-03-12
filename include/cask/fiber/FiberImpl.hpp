@@ -72,7 +72,7 @@ private:
     bool finishIteration();
 
     template <bool Async>
-    bool resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned int batch_size);
+    bool resumeUnsafe(const std::shared_ptr<Scheduler>& sched, std::size_t cede_iterations);
 
     void setDeferredCallbacks(
         const DeferredRef<Erased,Erased>& deferred,
@@ -127,15 +127,15 @@ bool FiberImpl<T,E>::resumeSync() {
 template <class T, class E>
 bool FiberImpl<T,E>::resume(const std::shared_ptr<Scheduler>& sched) {
     CurrentFiber::setId(id);
-    auto result = resumeUnsafe<true>(sched, batch_size);
+    auto result = resumeUnsafe<true>(sched, config::cede_iterations);
     CurrentFiber::clear();
     return result;
 }
 
 template <class T, class E>
 template <bool Async>
-bool FiberImpl<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsigned int batch_size) {
-    const auto forced_cede_disabled = batch_size == 0;
+bool FiberImpl<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, std::size_t cede_iterations) {
+    const auto forced_cede_disabled = cede_iterations == 0;
 
     FiberState current_state = state.load(std::memory_order_relaxed);
 
@@ -145,7 +145,7 @@ bool FiberImpl<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, unsig
 
     last_used_scheduler = std::weak_ptr<Scheduler>(sched);
 
-    while(forced_cede_disabled || batch_size-- > 0) {
+    while(forced_cede_disabled || cede_iterations-- > 0) {
         if(this->template evaluateOp<Async>(sched)) {
             return true;
         }

@@ -7,13 +7,15 @@
 #define _CASK_CONFIG_H_
 
 #include <cstddef>
+#include <cstdint>
 
-namespace cask {
+namespace cask::config {
 
 static constexpr bool ref_uses_atomics = @ref_uses_atomics@;
-static constexpr unsigned int batch_size = @batch_size@;
-static constexpr unsigned int initial_blocks_per_pool = @initial_blocks_per_pool@;
-static constexpr unsigned int cache_line_size = @cache_line_size@;
+static constexpr std::size_t cede_iterations = @cede_iterations@;
+static constexpr std::size_t initial_blocks_per_pool = @initial_blocks_per_pool@;
+static constexpr std::size_t cache_line_size = @cache_line_size@;
+static constexpr std::size_t work_steal_thread_queue_size = @work_steal_thread_queue_size@;
 
 }
 

@@ -38,7 +38,7 @@ public:
      * 
      * @param task The task to submit for execution.
      */
-    virtual void submit(const std::function<void()>& task) = 0;
+    virtual bool submit(const std::function<void()>& task) = 0;
 
     /**
      * Submit several tasks at once to the the thread pool. The order
@@ -48,7 +48,7 @@ public:
      * 
      * @param tasks The vector of tasks to submit in-bulk.
      */
-    virtual void submitBulk(const std::vector<std::function<void()>>& tasks) = 0;
+    virtual bool submitBulk(const std::vector<std::function<void()>>& tasks) = 0;
 
     /**
      * Submit a task to the pool after _at least_ the given amount

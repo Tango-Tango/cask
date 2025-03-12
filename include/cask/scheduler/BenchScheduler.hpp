@@ -87,8 +87,8 @@ public:
      */
     void advance_time(int64_t milliseconds);
 
-    void submit(const std::function<void()>& task) override;
-    void submitBulk(const std::vector<std::function<void()>>& tasks) override;
+    bool submit(const std::function<void()>& task) override;
+    bool submitBulk(const std::vector<std::function<void()>>& tasks) override;
     CancelableRef submitAfter(int64_t milliseconds, const std::function<void()>& task) override;
     bool isIdle() const override;
     std::string toString() const override;

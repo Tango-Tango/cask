@@ -65,16 +65,18 @@ void BenchScheduler::advance_time(int64_t milliseconds) {
     timers = new_timers;
 }
 
-void BenchScheduler::submit(const std::function<void()>& task) {
+bool BenchScheduler::submit(const std::function<void()>& task) {
     std::lock_guard<std::mutex> guard(scheduler_mutex);
     ready_queue.emplace(task);
+    return true;
 }
 
-void BenchScheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
+bool BenchScheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
     std::lock_guard<std::mutex> guard(scheduler_mutex);
     for(auto& task : tasks) {
         ready_queue.emplace(task);
     }
+    return true;
 }
 
 CancelableRef BenchScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
