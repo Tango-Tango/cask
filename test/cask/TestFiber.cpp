@@ -406,7 +406,7 @@ TEST(TestFiber, SkipsCancelSync) {
 
     auto fiber = Fiber<int,std::string>::run(op, sched);
 
-    if (cask::batch_size == 1) {
+    if (cask::config::cede_iterations == 1) {
         sched->run_ready_tasks();
     }
 

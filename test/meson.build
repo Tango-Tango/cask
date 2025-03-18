@@ -52,6 +52,7 @@ if get_option('build_tests')
         'cask/observable/TestObservableTakeWhile.cpp',
         'cask/observable/TestObservableTakeWhileInclusive.cpp',
         'cask/scheduler/TestBenchScheduler.cpp',
+        'cask/scheduler/TestReadyQueue.cpp',
         'cask/scheduler/TestScheduler.cpp',
         'cask/task/TestTaskAssignment.cpp',
         'cask/task/TestTaskAsyncBoundary.cpp',

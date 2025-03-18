@@ -74,7 +74,7 @@ public:
     Task<None,E> update(Predicate&& predicate)  {
         auto self = this->shared_from_this();
 
-        if constexpr (ref_uses_atomics) {
+        if constexpr (config::ref_uses_atomics) {
             return Task<None,E>::eval([self = std::move(self), predicate = std::forward<Predicate>(predicate)]() {
                 while(true) {
                     auto initial = std::atomic_load_explicit(&(self->data), std::memory_order_acquire);
@@ -112,7 +112,7 @@ public:
     Task<U,E> modify(Predicate&& predicate)  {
         auto self = this->shared_from_this();
 
-        if constexpr (ref_uses_atomics) {
+        if constexpr (config::ref_uses_atomics) {
             return Task<U,E>::eval([self = std::move(self), predicate = std::forward<Predicate>(predicate)]() {
                 while(true) {
                     auto initial = std::atomic_load_explicit(&(self->data), std::memory_order_acquire);

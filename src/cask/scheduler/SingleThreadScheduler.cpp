@@ -4,9 +4,11 @@
 //          https://www.boost.org/LICENSE_1_0.txt)
 
 #include "cask/scheduler/SingleThreadScheduler.hpp"
+#include "cask/Config.hpp"
 #include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <stack>
 
 #if __linux__
 #include <sys/resource.h>
@@ -25,16 +27,22 @@ namespace cask::scheduler {
 SingleThreadScheduler::SingleThreadScheduler(
     std::optional<int> priority,
     std::optional<int> pinned_core,
-    std::optional<std::size_t> batch_size,
+    std::optional<std::size_t> max_queue_size,
     const std::function<void()>& on_idle,
     const std::function<void()>& on_resume,
-    const std::function<std::vector<std::function<void()>>(std::size_t requested_amount)>& on_request_work)
-    : control_data(std::make_shared<SchedulerControlData>(on_idle, on_resume, on_request_work))
+    const std::function<void(ReadyQueue&)>& on_request_work,
+    const std::function<void(std::deque<std::function<void()>>&)>& on_work_overflow,
+    AutoStart auto_start)
+    : priority(priority)
+    , pinned_core(pinned_core)
+    , max_queue_size(max_queue_size.value_or(std::numeric_limits<std::size_t>::max()))
+    , started(false)
+    , next_id(0)
+    , run_thread_id()
+    , control_data(std::make_shared<SchedulerControlData>(on_idle, on_resume, on_request_work, on_work_overflow))
 {
-    auto actual_batch_size = batch_size.value_or(DEFAULT_BATCH_SIZE);
-
     // Spawn the run thread
-    std::thread run_thread(std::bind(&SingleThreadScheduler::run, actual_batch_size, control_data));
+    std::thread run_thread(std::bind(&SingleThreadScheduler::run, control_data));
 
     // Set the thread priority if requested
     if (priority.has_value()) {
@@ -69,19 +77,31 @@ SingleThreadScheduler::SingleThreadScheduler(
     // Detach the run thread and ensure it is running before returning
     run_thread_id = run_thread.get_id();
     run_thread.detach();
-    while(!control_data->thread_running.load(std::memory_order_acquire));
-}
 
+    if (auto_start == EnableAutoStart) {
+        start();
+    }
+}
 
 // NOLINTEND(bugprone-easily-swappable-parameters)
 
 SingleThreadScheduler::~SingleThreadScheduler() {
-    // Incidate that the run thread should shut down
-    {
-        std::lock_guard<std::mutex> lock(control_data->mutex);
-        control_data->should_run = false;
-        control_data->work_available.notify_all();
-    }
+    stop();
+}
+
+void SingleThreadScheduler::start() {
+    control_data->start_barrier.notify();
+    while(!control_data->thread_running.load(std::memory_order_acquire));
+}
+
+void SingleThreadScheduler::try_wake() {
+    control_data->ready_queue.wake();
+}
+
+void SingleThreadScheduler::stop() {
+    // Indicate that the run thread should shut down
+    control_data->should_run = false;
+    control_data->ready_queue.wake();
 
     // Wait for the run thread to finish - unless the destructor
     // is being called from the run thread itself.
@@ -94,43 +114,32 @@ std::thread::id SingleThreadScheduler::get_run_thread_id() const {
     return run_thread_id;
 }
 
-std::vector<std::function<void()>> SingleThreadScheduler::steal(std::size_t batch_size) {
-    std::lock_guard<std::mutex> lock(control_data->mutex);
+bool SingleThreadScheduler::steal(ReadyQueue& requestor_ready_queue) {
+    auto steal_happened = false;
+    auto steal_size = control_data->ready_queue.size() / 2;
 
-    if (peek_timer_ready_unsafe(control_data)) {
-        // If a timer has expired but this scheduler hasn't
-        // processed it yet - allow it to be stolen immediately
-        return steal_unsafe(control_data, batch_size);
+    while (steal_size > 0) {
+        if (requestor_ready_queue.steal_from(control_data->ready_queue)) {
+            steal_happened = true;
+            steal_size--;
+        } else {
+            break;
+        }
     }
 
-    if (peek_available_work_unsafe(control_data) > batch_size / 2) {
-        // Plenty of work is available to make stealing worthwhile. Go
-        // and take a batch.
-        return steal_unsafe(control_data, batch_size);
-    }
-    
-    // Not enough work is available to make stealing worthwhile.
-    return {};
+    return steal_happened;
 }
 
-void SingleThreadScheduler::submit(const std::function<void()>& task) {
-    std::lock_guard<std::mutex> lock(control_data->mutex);
-    control_data->ready_queue.emplace(task);
-    control_data->work_available.notify_all();
+bool SingleThreadScheduler::submit(const std::function<void()>& task) {
+    return control_data->ready_queue.push_back(task);
 }
 
-void SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
-    std::lock_guard<std::mutex> lock(control_data->mutex);
-    
-    for(auto& task: tasks) {
-        control_data->ready_queue.emplace(task);
-    }
-
-    control_data->work_available.notify_all();
+bool SingleThreadScheduler::submitBulk(const std::vector<std::function<void()>>& tasks) {
+    return control_data->ready_queue.push_batch_back(tasks);
 }
 
 CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std::function<void()>& task) {
-    std::lock_guard<std::mutex> lock(control_data->mutex);
+    std::lock_guard<std::mutex> lock(control_data->timers_mutex);
 
     TimerId id = next_id++;
     TimerTimeMs executionTick = current_time_ms() + milliseconds;
@@ -152,108 +161,100 @@ CancelableRef SingleThreadScheduler::submitAfter(int64_t milliseconds, const std
         timers->second.push_back(timer);
     }
 
-    control_data->work_available.notify_all();
-
     return timer;
 }
 
 bool SingleThreadScheduler::isIdle() const {
-    std::lock_guard<std::mutex> lock(control_data->mutex);
-    return control_data->idle;
-}
+    return control_data->idle.load(std::memory_order_relaxed);
+} 
 
 std::string SingleThreadScheduler::toString() const {
     return "SingleThreadScheduler";
 }
 
-void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_ptr<SchedulerControlData>& control_data) {
-    std::function<void()> task;
+void SingleThreadScheduler::run(const std::shared_ptr<SchedulerControlData>& control_data) {
+    std::optional<std::function<void()>> task = std::nullopt;
 
-    // Indicate the run thread is running
+    // Wait for the signal that the scheduler is ready to run
+    control_data->start_barrier.wait();
+
+    // We've been told to start running
     control_data->thread_running.store(true, std::memory_order_release);
 
     while(true) {
-        std::vector<std::function<void()>> batch;
-        auto iterationStartTime = current_time_ms();
+        // Check if we should be shutting down
+        if (!control_data->should_run) break;
 
-        // Grab the lock and accumulate a batch of work including any
-        // expired timers, tasks drained from the ready queue, and
-        // finally work stolen from other schedulers.
+        // Evaluate any expired timers
         {
-            std::lock_guard<std::mutex> lock(control_data->mutex);
+            std::lock_guard<std::mutex> timers_lock(control_data->timers_mutex);
+            auto overflow = evaluate_timers_unsafe(control_data);
 
-            // While hold the lock check if we should even be
-            // running at all.
-            if (!control_data->should_run) break;
-
-            // "steal" from ourselves to populate a batch
-            batch = steal_unsafe(control_data, batch_size);
-
-            // If we didn't find any work, request some from the parent scheduler
-            if (batch.empty()) {
-                batch = control_data->on_request_work(batch_size);
-            }
-
-            // If we are transitioning from idle to running, call the on_resume callback
-            if (control_data->idle && !batch.empty()) {
-                control_data->idle = false;
-                control_data->on_resume();
+            // Push any overflowed tasks to the parent scheduler
+            if (!overflow.empty()) {
+                control_data->on_work_overflow(overflow);
             }
         }
 
-        // Execute the batch of tasks. This is done outside of the lock to avoid
-        // deadlocks and contention both with the running tasks which may be
-        // submitting work and with other schedulers that may attempt to steal
-        // work while we are busy.
-        for(auto& task : batch) {
-            task();
+        // Take an item from the ready queue
+        task = control_data->ready_queue.pop_front();
+
+        // If we are transitioning from idle to running, call the on_resume callback
+        if (control_data->idle && task.has_value()) {
+            control_data->idle.store(false, std::memory_order_relaxed);
+            control_data->on_resume();
         }
 
-        {
-            std::unique_lock<std::mutex> lock(control_data->mutex);
+        // If we have work to do, then release the lock and do it
+        if (task.has_value()) {
+            (*task)();
+            task.reset();
+        }
 
-            // Once again check if we should even be running at all while
-            // holding the lock.
-            if (!control_data->should_run) break;
+        // After an execution attempt, check if we should be idle
+        if (control_data->ready_queue.empty()) {
+            // Our ready queue is empty. Attempt to fill it by stealing
+            // work from another scheduler.
+            control_data->on_request_work(control_data->ready_queue);
+
+            auto next_sleep_time = std::chrono::milliseconds(0);
 
             if (control_data->ready_queue.empty()) {
-                // If we have no work to do, sleep until either the next timer is ready or
-                // some random amount of time to wake up and look for work. This will avoid
-                // all of the schedulers looking for work "at the same time" when operating
-                // in a work-starved environment.
+                // Didn't find any work to steal. Look at timers and figure
+                // out a suitable time to sleep for.
+                std::lock_guard<std::mutex> timers_lock(control_data->timers_mutex);
 
-                // Compute a random sleep time between 10ms and 100ms
-                constexpr std::chrono::milliseconds min_sleep_time(10);
-                auto next_sleep_time = std::chrono::milliseconds(std::abs(std::rand()) % 90) + min_sleep_time;
+                // On-average, set a minimum sleep time of 10ms. We'll allow
+                // some deviation from this average (+- 2ms) so that threads
+                // spread out in time when they wake.
+                next_sleep_time = std::chrono::milliseconds(8);
+                next_sleep_time += std::chrono::milliseconds(std::rand() % 5);
 
-                // Compute the next timer sleep time
+                // Compute the next timer sleep time (if any)
                 auto next_timer = control_data->timers.begin();
                 if (next_timer != control_data->timers.end()) {
-                    auto next_timer_time = next_timer->first;
-                    auto next_timer_expires_in = std::chrono::milliseconds(next_timer_time - iterationStartTime);
-                    next_sleep_time = std::min(next_sleep_time, next_timer_expires_in);
-                    next_sleep_time = std::max(next_sleep_time, std::chrono::milliseconds(0));
-                }
+                    auto current_time = std::chrono::milliseconds(current_time_ms());
+                    auto next_timer_time = std::chrono::milliseconds(next_timer->first);
 
-                // There is a possibility we've chosen to sleep for 0 milliseconds because
-                // a timer needs to fire immediately. In that case we won't transition to
-                // idle and instead will immediately check for more work.
-
-                if (next_sleep_time > std::chrono::milliseconds::zero()) {
-                    // If we are transitioning to idle call the on_idle callback
-                    if (!control_data->idle) {
-                        control_data->idle = true;
-                        control_data->on_idle();
+                    if (current_time >= next_timer_time) {
+                        next_sleep_time = std::chrono::milliseconds::zero();
+                    } else {
+                        next_sleep_time = std::min(next_sleep_time, next_timer_time - current_time);
                     }
-
-                    // Nap time!
-                    control_data->work_available.wait_for(lock, next_sleep_time);
-
-                    // Once again we are now holding the lock. See if we were woken up
-                    // because we should be shutting down
-                    if (!control_data->should_run) break;
                 }
             }
+
+            // Look at the chosen sleep time and see if we need to go to sleep
+            if (next_sleep_time > std::chrono::milliseconds::zero()) {
+                // If we are transitioning to idle call the on_idle callback
+                if (!control_data->idle) {
+                    control_data->idle.store(true, std::memory_order_relaxed);
+                    control_data->on_idle();
+                }
+
+                // Nap time!
+                control_data->ready_queue.await_work(next_sleep_time);
+            }   
         }
     }
 
@@ -261,46 +262,20 @@ void SingleThreadScheduler::run(const std::size_t batch_size, const std::shared_
     control_data->thread_running.store(false, std::memory_order_release);
 }
 
-
-bool SingleThreadScheduler::peek_timer_ready_unsafe(const std::shared_ptr<SchedulerControlData>& control_data) {
-    auto now = current_time_ms();
-    auto next_timer = control_data->timers.begin();
-    return next_timer != control_data->timers.end() && next_timer->first <= now;
-}
-
-std::size_t SingleThreadScheduler::peek_available_work_unsafe(const std::shared_ptr<SchedulerControlData>& control_data) {
-    auto now = current_time_ms();
-    std::size_t peeked_batch_size = 0;
-
-    // Add the ready queue size
-    peeked_batch_size += control_data->ready_queue.size();
-
-    // Add the number of expired timers
-    for (auto& [timer_time, timers] : control_data->timers) {
-        if (timer_time <= now) {
-            peeked_batch_size += timers.size();
-        } else {
-            break;
-        }
-    }
-
-    // Returned the peeked size
-    return peeked_batch_size;
-}
-
-std::vector<std::function<void()>> SingleThreadScheduler::steal_unsafe(const std::shared_ptr<SchedulerControlData>& control_data, std::size_t batch_size) {
+std::deque<std::function<void()>> SingleThreadScheduler::evaluate_timers_unsafe(const std::shared_ptr<SchedulerControlData>& control_data) {
     auto iterationStartTime = current_time_ms();
-    std::function<void()> task;
-    std::vector<std::function<void()>> batch;
     std::vector<int64_t> expiredTimes;
+    std::deque<std::function<void()>> overflowed_tasks;
 
     // Accumulate any expired tasks
     for (auto& [timer_time, timers] : control_data->timers) {
         if (timer_time <= iterationStartTime) {
             for(auto& timer : timers) {
-                batch.push_back([timer] {
-                    timer->fire();
-                });
+                auto task = [timer] { timer->fire(); };
+
+                if (auto overflow = control_data->ready_queue.push_front(task)) {
+                    overflowed_tasks.push_front(*overflow);
+                }
             }
 
             expiredTimes.push_back(timer_time);
@@ -314,49 +289,49 @@ std::vector<std::function<void()>> SingleThreadScheduler::steal_unsafe(const std
         control_data->timers.erase(timerTime);
     }
 
-    // Adjust the batch size based on the number of expired timers
-    if (batch_size > expiredTimes.size()) {
-        batch_size -= expiredTimes.size();
-    } else {
-        batch_size = 0;
+    return overflowed_tasks;
+}
+
+bool SingleThreadScheduler::steal_unsafe(const std::shared_ptr<SchedulerControlData>& control_data, std::deque<std::function<void()>>& requestor_ready_queue, std::size_t requested_amount) {
+    std::function<void()> task;
+    bool work_stolen = false;
+
+    while(!control_data->ready_queue.empty() && requested_amount != 0) {
+        requested_amount--;
+
+        if (auto task = control_data->ready_queue.pop_front()) {
+            requestor_ready_queue.emplace_back(*task);
+            work_stolen = true;
+        } else {
+            break;
+        }
     }
 
-    // Cap the batch size at the size of the ready queue
-    if (batch_size > control_data->ready_queue.size()) {
-        batch_size = control_data->ready_queue.size();
-    }
-
-    // Drain the ready queue to finish filling the batch
-    while(batch.size() < batch_size) {
-        task = control_data->ready_queue.front();
-        control_data->ready_queue.pop();
-        batch.emplace_back(task);
-    }
-
-    return batch;
+    return work_stolen;
 }
 
 int64_t SingleThreadScheduler::current_time_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
-
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
 
 SingleThreadScheduler::SchedulerControlData::SchedulerControlData(
     const std::function<void()>& on_idle,
     const std::function<void()>& on_resume,
-    const std::function<std::vector<std::function<void()>>(std::size_t)>& on_request_work
+    const std::function<void(ReadyQueue&)>& on_request_work,
+    const std::function<void(std::deque<std::function<void()>>&)>& on_work_overflow
 )   : thread_running(false)
-    , mutex()
-    , work_available()
+    , start_barrier()
     , should_run(true)
     , idle(true)
-    , timers()
     , ready_queue()
+    , timers_mutex()
+    , timers()
     , on_idle(on_idle)
     , on_resume(on_resume)
     , on_request_work(on_request_work)
+    , on_work_overflow(on_work_overflow)
 {}
 
 
@@ -396,7 +371,7 @@ void SingleThreadScheduler::CancelableTimer::cancel() {
     std::vector<std::function<void()>> callbacks_to_run;
 
     {
-        std::lock_guard<std::mutex> control_guard(control_data->mutex);
+        std::lock_guard<std::mutex> parent_guard(control_data->timers_mutex);
         std::lock_guard<std::mutex> self_guard(timer_mutex);
 
         if (!shutdown && !canceled) {
