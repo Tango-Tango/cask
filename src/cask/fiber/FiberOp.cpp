@@ -20,15 +20,10 @@ FiberOp::FiberOp(AsyncData* async, const std::shared_ptr<Pool>& pool) noexcept
     data.asyncData = async;
 }
 
-FiberOp::FiberOp(ConstantData* constant, const std::shared_ptr<Pool>& pool) noexcept
+FiberOp::FiberOp(ConstantData* constant, const std::shared_ptr<Pool>& pool, FiberOpType type) noexcept
+    : opType(type)
+    , pool(pool)
 {
-    if(constant->is_left()) {
-        opType = VALUE;
-    } else {
-        opType = ERROR;
-    }
-    
-    this->pool = pool;
     data.constantData = constant;
 }
 

@@ -71,7 +71,9 @@ enum FiberOpType : std::uint8_t { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RA
  */
 class FiberOp final : public std::enable_shared_from_this<FiberOp> {
 public:
-    using ConstantData = Either<Erased,Erased>;
+    // ConstantData is now just Erased (48 bytes) instead of Either<Erased,Erased> (112 bytes).
+    // The opType field (VALUE vs ERROR) already tells us which case it is.
+    using ConstantData = Erased;
     using AsyncData = std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>;
     using ThunkData = std::function<Erased()>;
     using FlatMapInput = std::shared_ptr<const FiberOp>;
@@ -89,18 +91,16 @@ public:
     template <typename Arg>
     static std::shared_ptr<const FiberOp> value(Arg&& value) noexcept  {
         auto pool = cask::pool::global_pool();
-        auto erased = Erased(std::forward<Arg>(value));
-        auto constant = pool->allocate<ConstantData>(Either<Erased,Erased>::left(std::move(erased)));
-        auto op = pool->allocate<FiberOp>(constant, pool); 
+        auto constant = pool->allocate<ConstantData>(std::forward<Arg>(value));
+        auto op = pool->allocate<FiberOp>(constant, pool, VALUE);
         return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
     }
 
     template <typename Arg>
     static std::shared_ptr<const FiberOp> error(Arg&& error) noexcept {
         auto pool = cask::pool::global_pool();
-        auto erased = Erased(std::forward<Arg>(error));
-        auto constant = pool->allocate<ConstantData>(Either<Erased,Erased>::right(std::move(erased)));
-        auto op = pool->allocate<FiberOp>(constant, pool); 
+        auto constant = pool->allocate<ConstantData>(std::forward<Arg>(error));
+        auto op = pool->allocate<FiberOp>(constant, pool, ERROR);
         return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
     }
 
@@ -228,12 +228,12 @@ public:
      * users should use the static construction methods provided.
      */
     explicit FiberOp(AsyncData* async, const std::shared_ptr<Pool>& pool) noexcept;
-    explicit FiberOp(ConstantData* constant, const std::shared_ptr<Pool>& pool) noexcept;
+    explicit FiberOp(ConstantData* constant, const std::shared_ptr<Pool>& pool, FiberOpType type) noexcept;
     explicit FiberOp(ThunkData* thunk, const std::shared_ptr<Pool>& pool) noexcept;
     explicit FiberOp(FlatMapData* flatMap, const std::shared_ptr<Pool>& pool) noexcept;
     explicit FiberOp(DelayData* delay, const std::shared_ptr<Pool>& pool) noexcept;
     explicit FiberOp(RaceData* race, const std::shared_ptr<Pool>& pool) noexcept;
-    explicit FiberOp(FiberOpType valueless_op) noexcept;    
+    explicit FiberOp(FiberOpType valueless_op) noexcept;
 
     ~FiberOp();
     

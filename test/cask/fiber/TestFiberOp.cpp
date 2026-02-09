@@ -17,16 +17,14 @@ TEST(FiberOp, ValueCopy) {
     auto op = FiberOp::value(value);
 
     ASSERT_EQ(op->opType, cask::fiber::VALUE);
-    ASSERT_TRUE(op->data.constantData->is_left());
-    EXPECT_EQ(op->data.constantData->get_left().template get<int>(), 123);
+    EXPECT_EQ(op->data.constantData->template get<int>(), 123);
 }
 
 TEST(FiberOp, ValueMove) {
     auto op = FiberOp::value(Erased(123));
 
     ASSERT_EQ(op->opType, cask::fiber::VALUE);
-    ASSERT_TRUE(op->data.constantData->is_left());
-    EXPECT_EQ(op->data.constantData->get_left().template get<int>(), 123);
+    EXPECT_EQ(op->data.constantData->template get<int>(), 123);
 }
 
 TEST(FiberOp, Error) {
@@ -34,8 +32,7 @@ TEST(FiberOp, Error) {
     auto op = FiberOp::error(value);
 
     ASSERT_EQ(op->opType, cask::fiber::ERROR);
-    ASSERT_TRUE(op->data.constantData->is_right());
-    EXPECT_EQ(op->data.constantData->get_right().template get<int>(), 123);
+    EXPECT_EQ(op->data.constantData->template get<int>(), 123);
 }
 
 TEST(FiberOp, Async) {

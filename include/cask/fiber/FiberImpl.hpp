@@ -444,14 +444,14 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
     case VALUE:
     {
         const FiberOp::ConstantData* data = op->data.constantData;
-        value.setValue(data->get_left());
+        value.setValue(*data);
         op = nullptr;
     }
     break;
     case ERROR:
     {
         const FiberOp::ConstantData* data = op->data.constantData;
-        value.setError(data->get_right());
+        value.setError(*data);
         op = nullptr;
     }
     break;
