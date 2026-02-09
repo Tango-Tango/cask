@@ -177,42 +177,14 @@ public:
         >::value
     >>
     std::shared_ptr<const FiberOp> flatMap(Predicate&& predicate) const noexcept  {
-        switch(opType) {
-            case VALUE:
-            case ERROR:
-            case THUNK:
-            case ASYNC:
-            case DELAY:
-            case RACE:
-            case CANCEL:
-            case CEDE:
-            {
-                auto pool = cask::pool::global_pool();
-                auto data = pool->allocate<FlatMapData>(this->shared_from_this(), std::forward<Predicate>(predicate));
-                auto op = pool->allocate<FiberOp>(data, pool); 
-                return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
-            }
-            break;
-            case FLATMAP:
-            {
-                FiberOp::FlatMapData* data = this->data.flatMapData;
-                auto fixed = [input_predicate = data->second, output_predicate = std::forward<Predicate>(predicate)](FiberValue&& value) mutable {
-                    return input_predicate(std::forward<FiberValue>(value))->flatMap(std::forward<Predicate>(output_predicate));
-                };
-                auto pool = cask::pool::global_pool();
-                auto flatMapData = pool->allocate<FlatMapData>(data->first, fixed);
-                auto op = pool->allocate<FiberOp>(flatMapData, pool); 
-                return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
-            }
-            break;
-        }
-    #ifdef __GNUC__
-        __builtin_unreachable();
-    #endif
-    #ifdef _MSC_VER
-        __assume(0);
-    #endif
-}
+        // Always create a new FLATMAP node wrapping this operation.
+        // The continuation stack in FiberImpl handles chaining during evaluation,
+        // so we don't need to create nested closures here.
+        auto pool = cask::pool::global_pool();
+        auto data = pool->allocate<FlatMapData>(this->shared_from_this(), std::forward<Predicate>(predicate));
+        auto op = pool->allocate<FiberOp>(data, pool);
+        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+    }
 
     union {
         AsyncData* asyncData;
