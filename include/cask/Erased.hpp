@@ -38,22 +38,22 @@ public:
     Erased(Erased&& other) noexcept;
 
     template <typename T,
-              std::enable_if_t<!std::is_same<std::decay_t<T>,Erased>::value, bool> = true>
+              typename = std::enable_if_t<!std::is_same<std::decay_t<T>,Erased>::value>>
     Erased(const T& value) noexcept; // NOLINT(google-explicit-constructor)
 
     template <typename T,
-              std::enable_if_t<!std::is_same<std::decay_t<T>,Erased>::value, bool> = true>
+              typename = std::enable_if_t<!std::is_same<std::decay_t<T>,Erased>::value>>
     Erased(T&& value) noexcept; // NOLINT(google-explicit-constructor)
 
     Erased& operator=(const Erased& other) noexcept;
     Erased& operator=(Erased&& other) noexcept;
 
     template <typename T,
-              std::enable_if_t<!std::is_same<std::decay_t<T>,Erased>::value, bool> = true>
+              typename = std::enable_if_t<!std::is_same<std::decay_t<T>,Erased>::value>>
     Erased& operator=(const T& value) noexcept;
 
     template <typename T,
-              std::enable_if_t<!std::is_same<std::decay_t<T>,Erased>::value, bool> = true>
+              typename = std::enable_if_t<!std::is_same<std::decay_t<T>,Erased>::value>>
     Erased& operator=(T&& value) noexcept;
 
     /**
@@ -92,7 +92,7 @@ private:
     const std::type_info * info;
 };
 
-template <typename T, std::enable_if_t<!std::is_same<std::decay_t<T>,Erased>::value, bool>>
+template <typename T, typename>
 inline Erased::Erased(const T& value) noexcept
     : pool(cask::pool::global_pool())
     , data(pool->allocate<T>(value))
@@ -101,7 +101,7 @@ inline Erased::Erased(const T& value) noexcept
     , info(&typeid(T))
 {}
 
-template <typename T, std::enable_if_t<!std::is_same<std::decay_t<T>,Erased>::value, bool>>
+template <typename T, typename>
 inline Erased::Erased(T&& value) noexcept
     : pool(cask::pool::global_pool())
     , data(pool->allocate<std::decay_t<T>>(std::forward<T>(value)))
@@ -110,7 +110,7 @@ inline Erased::Erased(T&& value) noexcept
     , info(&typeid(std::decay_t<T>))
 {}
 
-template <typename T, std::enable_if_t<!std::is_same<std::decay_t<T>,Erased>::value, bool>>
+template <typename T, typename>
 inline Erased& Erased::operator=(const T& value) noexcept {
     if(data == nullptr) {
         pool = cask::pool::global_pool();
@@ -132,7 +132,7 @@ inline Erased& Erased::operator=(const T& value) noexcept {
     return *this;
 }
 
-template <typename T, std::enable_if_t<!std::is_same<std::decay_t<T>,Erased>::value, bool>>
+template <typename T, typename>
 inline Erased& Erased::operator=(T&& value) noexcept {
     using DecayedT = std::decay_t<T>;
     if(data == nullptr) {
