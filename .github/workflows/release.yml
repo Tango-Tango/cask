@@ -71,11 +71,10 @@ jobs:
     
     - name: Push changes and tag
       run: |
-        git push origin main
-        git push origin "${{ steps.version.outputs.tag_version }}"
+        git push --atomic origin HEAD:${{ github.ref }} "${{ steps.version.outputs.tag_version }}"
     
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
       with:
         draft: false
         prerelease: false
