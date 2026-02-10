@@ -55,6 +55,11 @@ jobs:
         echo "${{ steps.version.outputs.tag_version }}" > VERSION
         cat VERSION
 
+    - name: Configure git user
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
     - name: Commit VERSION file
       run: |
         git add VERSION
