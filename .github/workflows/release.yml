@@ -7,6 +7,11 @@ on:
         description: 'Version number (e.g., 19.1.0 or v19.1.0)'
         required: true
         type: string
+      branch:
+        description: 'Branch to release from (e.g., main, rel/19.x)'
+        required: false
+        type: string
+        default: 'main'
 
 jobs:
   release:
@@ -19,9 +24,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
+        ref: ${{ github.event.inputs.branch }}
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
-    
+
+    - name: Validate branch exists
+      run: |
+        BRANCH="${{ github.event.inputs.branch }}"
+        if ! git show-ref --verify --quiet "refs/heads/$BRANCH" && ! git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
+          echo "Error: Branch '$BRANCH' does not exist"
+          exit 1
+        fi
+
     - name: Validate and normalize version
       id: version
       run: |
@@ -71,7 +85,8 @@ jobs:
     
     - name: Push changes and tag
       run: |
-        git push --atomic origin HEAD:${{ github.ref }} "${{ steps.version.outputs.tag_version }}"
+        BRANCH="${{ github.event.inputs.branch }}"
+        git push --atomic origin "HEAD:refs/heads/$BRANCH" "${{ steps.version.outputs.tag_version }}"
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
