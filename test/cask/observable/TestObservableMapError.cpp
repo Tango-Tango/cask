@@ -6,6 +6,7 @@
 #include "gtest/gtest.h"
 #include "cask/Observable.hpp"
 #include "cask/None.hpp"
+#include <algorithm>
 
 using cask::Observable;
 using cask::Scheduler;
