@@ -1,0 +1,101 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 19.1.0 or v19.1.0)'
+        required: true
+        type: string
+      branch:
+        description: 'Branch to release from (e.g., main, rel/19.x)'
+        required: false
+        type: string
+        default: 'main'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.branch }}
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Validate branch exists
+      run: |
+        BRANCH="${{ github.event.inputs.branch }}"
+        if ! git show-ref --verify --quiet "refs/heads/$BRANCH" && ! git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
+          echo "Error: Branch '$BRANCH' does not exist"
+          exit 1
+        fi
+
+    - name: Validate and normalize version
+      id: version
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        # Remove 'v' prefix if present
+        VERSION="${VERSION#v}"
+        # Validate version format (major.minor.patch)
+        if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Error: Version must be in format X.Y.Z (e.g., 19.1.0)"
+          exit 1
+        fi
+        # Add 'v' prefix for tag
+        TAG_VERSION="v${VERSION}"
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "tag_version=${TAG_VERSION}" >> $GITHUB_OUTPUT
+        echo "Version: ${VERSION}"
+        echo "Tag: ${TAG_VERSION}"
+
+    - name: Fetch tags
+      run: git fetch --tags
+
+    - name: Check if tag already exists
+      run: |
+        if git rev-parse "${{ steps.version.outputs.tag_version }}" >/dev/null 2>&1; then
+          echo "Error: Tag ${{ steps.version.outputs.tag_version }} already exists"
+          exit 1
+        fi
+    
+    - name: Update VERSION file
+      run: |
+        echo "${{ steps.version.outputs.tag_version }}" > VERSION
+        cat VERSION
+
+    - name: Configure git user
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+    - name: Commit VERSION file
+      run: |
+        git add VERSION
+        git commit -m "ci: release of version ${{ steps.version.outputs.tag_version }} [skip ci]"
+    
+    - name: Create Git tag
+      run: |
+        git tag "${{ steps.version.outputs.tag_version }}"
+    
+    - name: Push changes and tag
+      run: |
+        BRANCH="${{ github.event.inputs.branch }}"
+        git push --atomic origin "HEAD:refs/heads/$BRANCH" "${{ steps.version.outputs.tag_version }}"
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
+      with:
+        draft: false
+        prerelease: false
+        name: "${{ steps.version.outputs.tag_version }}"
+        tag_name: "${{ steps.version.outputs.tag_version }}"
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

@@ -1,4 +1,4 @@
-name: Build, Test, and Release
+name: Build and Test
 
 on:
   workflow_dispatch:
@@ -149,34 +149,4 @@ jobs:
       run: ./regenerate_env.sh clang
     - name: Run clang-tidy
       run: ninja clang-tidy -C build_clang
-  
-  release:
-    name: Release
-    runs-on: ubuntu-24.04
-    needs: [build-linux, build-mac, build-windows, analyze]
-    if: contains(github.ref, 'main') && github.actor != 'engineering-at-tangotango'
-
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: 2
-        token: ${{ secrets.AUTOMATION_USER_TOKEN }}
-      env:
-        AUTOMATION_USER_TOKEN: secrets.AUTOMATION_USER_TOKEN
-    - name: Tag Release in Git
-      id: create-tag-release
-      run: |
-        git config user.name engineering-at-tangotango
-        git config user.email engineering@tangotango.net
-        ./automatic_release.py -u engineering-at-tangotango -o Tango-Tango -r cask -s post-build >> $GITHUB_OUTPUT
-    - name: Create Release in GitHub
-      uses: softprops/action-gh-release@v1
-      with:
-        draft: false
-        prerelease: false
-        name: "${{ steps.create-tag-release.outputs.version }}"
-        tag_name: "${{ steps.create-tag-release.outputs.version }}"
-      env:
-        GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-      
 
