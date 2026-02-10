@@ -71,7 +71,7 @@ sudo apt install ninja-build clang build-essential python3-pip gcovr
 Meson itself is best installed by pulling from pip directly.
 
 ```bash
-sudo python3 -m pip install meson==0.61.1
+sudo python3 -m pip install meson==1.10.1
 ```
 
 Finally you can generate the same build environments used by CI with the provided
