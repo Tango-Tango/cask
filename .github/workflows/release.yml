@@ -21,12 +21,19 @@ jobs:
       contents: write
 
     steps:
+    - name: Generate token
+      id: generate-token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ secrets.RELEASE_APP_ID }}
+        private-key: ${{ secrets.RELEASE_PRIVATE_KEY }}
+
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         ref: ${{ github.event.inputs.branch }}
         fetch-depth: 0
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ steps.generate-token.outputs.token }}
 
     - name: Validate branch exists
       run: |
@@ -97,5 +104,5 @@ jobs:
         tag_name: "${{ steps.version.outputs.tag_version }}"
         generate_release_notes: true
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
 
