@@ -85,6 +85,7 @@ TEST(Erased, MoveConstructor) {
     Erased first(123);
     Erased second(std::move(first));
 
+    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
     EXPECT_FALSE(first.has_value());
     EXPECT_TRUE(second.has_value());
     EXPECT_EQ(second.get<int>(), 123);
@@ -95,6 +96,7 @@ TEST(Erased, MoveAssignment) {
     Erased second;
     second = std::move(first);
 
+    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
     EXPECT_FALSE(first.has_value());
     EXPECT_TRUE(second.has_value());
     EXPECT_EQ(second.get<int>(), 123);
@@ -105,6 +107,7 @@ TEST(Erased, MoveAssignmentOverwrites) {
     Erased second(std::string("hello"));
     second = std::move(first);
 
+    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
     EXPECT_FALSE(first.has_value());
     EXPECT_TRUE(second.has_value());
     EXPECT_EQ(second.get<int>(), 123);
@@ -115,6 +118,7 @@ TEST(Erased, MoveConstructorWithString) {
     Erased first(original);
     Erased second(std::move(first));
 
+    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
     EXPECT_FALSE(first.has_value());
     EXPECT_TRUE(second.has_value());
     EXPECT_EQ(second.get<std::string>(), "hello world");
