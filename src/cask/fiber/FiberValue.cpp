@@ -62,7 +62,10 @@ void FiberValue::setError(Erased&& value) {
 }
 
 void FiberValue::setCanceled() {
-    this->value.reset();
+    // Note: We intentionally do NOT call value.reset() here.
+    // The value will be freed when FiberValue is destroyed.
+    // Calling reset() here would cause a race condition when
+    // another thread is copying the value concurrently.
     this->error = false;
     this->canceled = true;
 }
