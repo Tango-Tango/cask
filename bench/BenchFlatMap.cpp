@@ -4,6 +4,7 @@
 //          https://www.boost.org/LICENSE_1_0.txt)
 
 #include <benchmark/benchmark.h>
+#include <array>
 #include "cask/Task.hpp"
 #include "cask/Erased.hpp"
 #include "cask/fiber/FiberOp.hpp"
