@@ -98,6 +98,7 @@ subdir('include/cask')
 includes = include_directories('include')
 subdir('src')
 subdir('test')
+subdir('bench')
 
 # Provide a dependency hook for downstream projects
 cask_dep = declare_dependency(

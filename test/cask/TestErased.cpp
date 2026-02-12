@@ -80,3 +80,59 @@ TEST(Erased, ThrowsEmptyGet) {
         FAIL() << "expected method to throw";
     } catch(std::runtime_error&) {}  // NOLINT(bugprone-empty-catch)
 }
+
+TEST(Erased, MoveConstructor) {
+    Erased first(123);
+    Erased second(std::move(first));
+
+    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
+    EXPECT_FALSE(first.has_value());
+    EXPECT_TRUE(second.has_value());
+    EXPECT_EQ(second.get<int>(), 123);
+}
+
+TEST(Erased, MoveAssignment) {
+    Erased first(123);
+    Erased second;
+    second = std::move(first);
+
+    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
+    EXPECT_FALSE(first.has_value());
+    EXPECT_TRUE(second.has_value());
+    EXPECT_EQ(second.get<int>(), 123);
+}
+
+TEST(Erased, MoveAssignmentOverwrites) {
+    Erased first(123);
+    Erased second(std::string("hello"));
+    second = std::move(first);
+
+    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
+    EXPECT_FALSE(first.has_value());
+    EXPECT_TRUE(second.has_value());
+    EXPECT_EQ(second.get<int>(), 123);
+}
+
+TEST(Erased, MoveConstructorWithString) {
+    std::string original = "hello world";
+    Erased first(original);
+    Erased second(std::move(first));
+
+    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
+    EXPECT_FALSE(first.has_value());
+    EXPECT_TRUE(second.has_value());
+    EXPECT_EQ(second.get<std::string>(), "hello world");
+}
+
+TEST(Erased, RvalueConstruction) {
+    Erased foo(std::string("hello"));
+    EXPECT_TRUE(foo.has_value());
+    EXPECT_EQ(foo.get<std::string>(), "hello");
+}
+
+TEST(Erased, RvalueAssignment) {
+    Erased foo;
+    foo = std::string("hello");
+    EXPECT_TRUE(foo.has_value());
+    EXPECT_EQ(foo.get<std::string>(), "hello");
+}

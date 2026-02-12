@@ -86,3 +86,23 @@ TEST(TaskRace, TaskStressTest) {
         }
     }
 }
+
+TEST(TaskRace, ConcurrentRaceStressTest) {
+    auto iterations = 100000;
+    auto sched = std::make_shared<WorkStealingScheduler>();
+
+    while (iterations > 0) {
+        iterations--;
+        // Use a longer string to increase likelihood of memory corruption detection
+        auto task1 = Task<std::size_t,std::string>::pure(SIZE_MAX).delay(0);
+        auto task2 = Task<std::size_t,std::string>::raiseError("ErrorMessageThatIsLongerToIncreaseMemoryFootprint").asyncBoundary();
+        auto race = task1.raceWith(task2).materialize();
+        auto result = race.run(sched)->await();
+
+        if (result.is_left()) {
+            EXPECT_EQ(result.get_left(), SIZE_MAX);
+        } else {
+            EXPECT_EQ(result.get_right(), "ErrorMessageThatIsLongerToIncreaseMemoryFootprint");
+        }
+    }
+}

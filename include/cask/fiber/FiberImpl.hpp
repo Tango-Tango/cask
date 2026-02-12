@@ -10,6 +10,7 @@
 #include <climits>
 #include <mutex>
 #include <map>
+#include <stack>
 #include <cstdint>
 #include "cask/Config.hpp"
 #include "cask/Deferred.hpp"
@@ -83,7 +84,7 @@ private:
     std::shared_ptr<const FiberOp> op;
     std::weak_ptr<Scheduler> last_used_scheduler;
     FiberValue value;
-    FiberOp::FlatMapPredicate nextOp;
+    std::stack<FiberOp::FlatMapPredicate> continuationStack;
     std::atomic<FiberState> state;
     DeferredRef<Erased,Erased> waitingOn;
     CancelableRef delayedBy;
@@ -101,7 +102,7 @@ FiberImpl<T,E>::FiberImpl(const std::shared_ptr<const FiberOp>& op)
     , op(op)
     , last_used_scheduler()
     , value()
-    , nextOp()
+    , continuationStack()
     , state(READY)
     , waitingOn()
     , delayedBy()
@@ -150,7 +151,7 @@ bool FiberImpl<T,E>::resumeUnsafe(const std::shared_ptr<Scheduler>& sched, std::
             return true;
         }
 
-        if( (nextOp == nullptr || op == nullptr) && finishIteration()) {
+        if( (continuationStack.empty() || op == nullptr) && finishIteration()) {
             return true;
         }
     }
@@ -444,14 +445,14 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
     case VALUE:
     {
         const FiberOp::ConstantData* data = op->data.constantData;
-        value.setValue(data->get_left());
+        value.setValue(*data);
         op = nullptr;
     }
     break;
     case ERROR:
     {
         const FiberOp::ConstantData* data = op->data.constantData;
-        value.setError(data->get_right());
+        value.setError(*data);
         op = nullptr;
     }
     break;
@@ -521,7 +522,7 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
     case FLATMAP:
     {
         const FiberOp::FlatMapData* data = op->data.flatMapData;
-        nextOp = data->second;
+        continuationStack.push(data->second);
         op = data->first;
     }
     break;
@@ -609,9 +610,10 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
 
 template <class T, class E>
 bool FiberImpl<T,E>::finishIteration() {
-    if(nextOp) {
+    if(!continuationStack.empty()) {
+        auto nextOp = std::move(continuationStack.top());
+        continuationStack.pop();
         op = nextOp(std::move(value));
-        nextOp = nullptr;
         return false;
     } else {
         if(value.isCanceled()) {
@@ -619,7 +621,7 @@ bool FiberImpl<T,E>::finishIteration() {
         } else {
             state.store(COMPLETED, std::memory_order_release);
         }
-        
+
         std::vector<std::function<void(Fiber<T,E>*)>> local_callbacks;
 
         {
