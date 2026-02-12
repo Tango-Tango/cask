@@ -11,7 +11,6 @@
 #include <mutex>
 #include <map>
 #include <stack>
-#include <deque>
 #include <cstdint>
 #include "cask/Config.hpp"
 #include "cask/Deferred.hpp"
