@@ -25,7 +25,7 @@
 
 namespace cask::pool {
 
-template <std::size_t BlockSize, std::size_t ChunkSize, std::size_t Alignment>
+template <std::size_t BlockSize, std::size_t NumBlocksInChunk, std::size_t Alignment>
 class BlockPool {
 public:
     explicit BlockPool();
@@ -45,7 +45,7 @@ private:
 
     // A block which as at least one byte of padding.
     struct BlockWithPad {
-        BlockWithPad() : memory(), next(nullptr), padding() {}
+        BlockWithPad() : next(nullptr) {}
 
         uint8_t memory[BlockSize];
         BlockWithPad* next;
@@ -54,7 +54,7 @@ private:
 
     // A block with no padding.
     struct BlockWithoutPad {
-        BlockWithoutPad() : memory(), next(nullptr) {}
+        BlockWithoutPad() : next(nullptr) {}
 
         uint8_t memory[BlockSize];
         BlockWithoutPad* next;
@@ -69,7 +69,7 @@ private:
     static_assert(offsetof(Block, memory) == 0);
 
     struct Chunk {
-        Block blocks[ChunkSize];
+        Block blocks[NumBlocksInChunk];
         Chunk* next;
         Chunk();
     };
@@ -88,29 +88,29 @@ private:
     std::atomic_bool allocating_chunk;
 };
 
-template <std::size_t BlockSize, std::size_t ChunkSize, std::size_t Alignment>
+template <std::size_t BlockSize, std::size_t NumBlocksInChunk, std::size_t Alignment>
 template <class T>
-BlockPool<BlockSize,ChunkSize,Alignment>::Head<T>::Head()
+BlockPool<BlockSize,NumBlocksInChunk,Alignment>::Head<T>::Head()
     : ptr(nullptr)
     , counter(0)
 {}
 
-template <std::size_t BlockSize, std::size_t ChunkSize, std::size_t Alignment>
-BlockPool<BlockSize,ChunkSize,Alignment>::BlockPool()
+template <std::size_t BlockSize, std::size_t NumBlocksInChunk, std::size_t Alignment>
+BlockPool<BlockSize,NumBlocksInChunk,Alignment>::BlockPool()
     : free_blocks(Head<Block>())
     , allocated_chunks(Head<Chunk>())
     , allocating_chunk(false)
 {}
 
-template <std::size_t BlockSize, std::size_t ChunkSize, std::size_t Alignment>
-BlockPool<BlockSize,ChunkSize,Alignment>::~BlockPool() {
+template <std::size_t BlockSize, std::size_t NumBlocksInChunk, std::size_t Alignment>
+BlockPool<BlockSize,NumBlocksInChunk,Alignment>::~BlockPool() {
     auto current_head = allocated_chunks.load(std::memory_order_acquire);
     auto current = current_head.ptr;
 
     while(current) {
 
 #if CASK_ASAN_ENABLED
-        for(std::size_t i = 0; i < ChunkSize; i++) {
+        for(std::size_t i = 0; i < NumBlocksInChunk; i++) {
             auto block = &(current->blocks[i]);
             UNPOISON_BLOCK(block);
         }
@@ -122,9 +122,9 @@ BlockPool<BlockSize,ChunkSize,Alignment>::~BlockPool() {
     }
 }
 
-template <std::size_t BlockSize, std::size_t ChunkSize, std::size_t Alignment>
+template <std::size_t BlockSize, std::size_t NumBlocksInChunk, std::size_t Alignment>
 template <class T, class... Args>
-T* BlockPool<BlockSize,ChunkSize,Alignment>::allocate(Args&&... args) {
+T* BlockPool<BlockSize,NumBlocksInChunk,Alignment>::allocate(Args&&... args) {
     static_assert(sizeof(T) <= BlockSize);
 
     while(true) {
@@ -146,9 +146,9 @@ T* BlockPool<BlockSize,ChunkSize,Alignment>::allocate(Args&&... args) {
     }
 }
 
-template <std::size_t BlockSize, std::size_t ChunkSize, std::size_t Alignment>
+template <std::size_t BlockSize, std::size_t NumBlocksInChunk, std::size_t Alignment>
 template <class T>
-void BlockPool<BlockSize,ChunkSize,Alignment>::deallocate(T* ptr) {
+void BlockPool<BlockSize,NumBlocksInChunk,Alignment>::deallocate(T* ptr) {
     static_assert(sizeof(T) <= BlockSize);
 
     ptr->~T();
@@ -166,8 +166,8 @@ void BlockPool<BlockSize,ChunkSize,Alignment>::deallocate(T* ptr) {
     } while(!free_blocks.compare_exchange_weak(old_head,new_head, std::memory_order_release, std::memory_order_relaxed));
 }
 
-template <std::size_t BlockSize, std::size_t ChunkSize, std::size_t Alignment>
-void BlockPool<BlockSize,ChunkSize,Alignment>::allocate_chunk() {
+template <std::size_t BlockSize, std::size_t NumBlocksInChunk, std::size_t Alignment>
+void BlockPool<BlockSize,NumBlocksInChunk,Alignment>::allocate_chunk() {
     if (!allocating_chunk.exchange(true, std::memory_order_relaxed)) {
         // Allocate a chunk and add it to the allocated list
         Chunk* chunk = new Chunk();
@@ -183,27 +183,30 @@ void BlockPool<BlockSize,ChunkSize,Alignment>::allocate_chunk() {
             } while(!allocated_chunks.compare_exchange_weak(old_head,new_head,std::memory_order_release,std::memory_order_relaxed));
         }
 
-        // Load the blocks for this chunk into the free list
-        for(std::size_t i = 0; i < ChunkSize; i++) {
+	// String the chunk into a list of blocks that can be pushed onto
+	// the free list
+        for (std::size_t i = 0; i < NumBlocksInChunk; i++) {
             Block* block = &(chunk->blocks[i]);
+            block->next = (i < NumBlocksInChunk - 1) ? &(chunk->blocks[i + 1]) : nullptr;
             POISON_BLOCK(block);
-
-            Head<Block> old_head = free_blocks.load(std::memory_order_relaxed);
-            Head<Block> new_head;
-
-            do {
-                new_head.ptr = block;
-                new_head.ptr->next = old_head.ptr;
-                new_head.counter = old_head.counter + 1;
-            } while(!free_blocks.compare_exchange_weak(old_head,new_head,std::memory_order_release,std::memory_order_relaxed));
         }
+
+	// Push the entire chunk onto the free list with a single CAS
+        Head<Block> old_head = free_blocks.load(std::memory_order_relaxed);
+        Head<Block> new_head;
+        do {
+            chunk->blocks[NumBlocksInChunk - 1].next = old_head.ptr;
+            new_head.ptr = &(chunk->blocks[0]);
+            new_head.counter = old_head.counter + 1;
+        } while (!free_blocks.compare_exchange_weak(old_head, new_head,
+            std::memory_order_release, std::memory_order_relaxed));
 
         allocating_chunk.store(false, std::memory_order_relaxed);
     }
 }
 
-template <std::size_t BlockSize, std::size_t ChunkSize, std::size_t Alignment>
-BlockPool<BlockSize,ChunkSize,Alignment>::Chunk::Chunk()
+template <std::size_t BlockSize, std::size_t NumBlocksInChunk, std::size_t Alignment>
+BlockPool<BlockSize,NumBlocksInChunk,Alignment>::Chunk::Chunk()
     : blocks()
     , next(nullptr)
 {}

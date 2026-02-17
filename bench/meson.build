@@ -4,6 +4,7 @@ if get_option('build_benchmarks')
     bench_sources = [
         'BenchErased.cpp',
         'BenchFlatMap.cpp',
+        'BenchPool.cpp',
         'main.cpp'
     ]
 
