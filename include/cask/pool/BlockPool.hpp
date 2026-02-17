@@ -183,15 +183,15 @@ void BlockPool<BlockSize,NumBlocksInChunk,Alignment>::allocate_chunk() {
             } while(!allocated_chunks.compare_exchange_weak(old_head,new_head,std::memory_order_release,std::memory_order_relaxed));
         }
 
-	// String the chunk into a list of blocks that can be pushed onto
-	// the free list
+        // String the chunk into a list of blocks that can be pushed onto
+        // the free list
         for (std::size_t i = 0; i < NumBlocksInChunk; i++) {
             Block* block = &(chunk->blocks[i]);
             block->next = (i < NumBlocksInChunk - 1) ? &(chunk->blocks[i + 1]) : nullptr;
             POISON_BLOCK(block);
         }
 
-	// Push the entire chunk onto the free list with a single CAS
+        // Push the entire chunk onto the free list with a single CAS
         Head<Block> old_head = free_blocks.load(std::memory_order_relaxed);
         Head<Block> new_head;
         do {
