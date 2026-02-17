@@ -1,5 +1,4 @@
 #include <benchmark/benchmark.h>
-#include <thread>
 #include <vector>
 #include "cask/Pool.hpp"
 
@@ -71,7 +70,7 @@ BENCHMARK(BM_Pool_ColdStart);
 
 // Multi-threaded alloc/dealloc on a shared pool.
 static void BM_Pool_Contended(benchmark::State& state) {
-    static Pool pool;
+    Pool pool;
 
     // Pre-warm
     if (state.thread_index() == 0) {
