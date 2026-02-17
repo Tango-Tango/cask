@@ -65,6 +65,8 @@ private:
     // compile errors about 0-sized arrays.
     typedef typename std::conditional<PadSize == 0, BlockWithoutPad, BlockWithPad>::type Block;
 
+    static_assert(BlockSize > 0);
+    static_assert(NumBlocksInChunk > 0);
     static_assert(sizeof(Block) == TotalBlockSize + PadSize);
     static_assert(offsetof(Block, memory) == 0);
 
