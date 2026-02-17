@@ -70,25 +70,24 @@ static void BM_Pool_ColdStart(benchmark::State& state) {
 BENCHMARK(BM_Pool_ColdStart);
 
 // Multi-threaded alloc/dealloc on a shared pool.
-static void BM_Pool_Contended(benchmark::State& state) {
+class BM_Pool_Contended : public benchmark::Fixture {
+public:
+    Pool pool;
 
-    // This pool is static because it is intended to be used across all benchmark
-    // threads. This is an intentional part of the benchmark.
-    static Pool pool;
-
-    // Pre-warm
-    if (state.thread_index() == 0) {
+    void SetUp(const benchmark::State&) override {
         SmallObj* warm = pool.allocate<SmallObj>();
         pool.deallocate<SmallObj>(warm);
     }
+};
 
+BENCHMARK_DEFINE_F(BM_Pool_Contended, Run)(benchmark::State& state) {
     for (auto _ : state) {
         SmallObj* ptr = pool.allocate<SmallObj>();
         benchmark::DoNotOptimize(ptr);
         pool.deallocate<SmallObj>(ptr);
     }
 }
-BENCHMARK(BM_Pool_Contended)->Threads(1)->Threads(2)->Threads(4)->Threads(8);
+BENCHMARK_REGISTER_F(BM_Pool_Contended, Run)->Threads(1)->Threads(2)->Threads(4)->Threads(8);
 
 // new/delete baseline for comparison.
 static void BM_Pool_NewDelete_Baseline(benchmark::State& state) {
