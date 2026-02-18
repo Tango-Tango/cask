@@ -18,16 +18,15 @@ public:
     void deallocate(T* ptr);
 
 private:
-    static constexpr std::size_t smallest_block_num_entries = config::initial_blocks_per_pool;
-    static constexpr std::size_t smallest_block_size = config::cache_line_size * smallest_block_num_entries;
+    static constexpr std::size_t num_blocks = config::initial_blocks_per_pool;
 
-    pool::BlockPool<config::cache_line_size, smallest_block_size, alignof(std::max_align_t)> small_pool;
-    pool::BlockPool<config::cache_line_size*2UL, smallest_block_size / 2, alignof(std::max_align_t)> medium_pool;
-    pool::BlockPool<config::cache_line_size*4UL, smallest_block_size / 4, alignof(std::max_align_t)> large_pool;
-    pool::BlockPool<config::cache_line_size*8UL, smallest_block_size / 8, alignof(std::max_align_t)> xlarge_pool;
-    pool::BlockPool<config::cache_line_size*16UL, smallest_block_size / 16, alignof(std::max_align_t)> xxlarge_pool;
-    pool::BlockPool<config::cache_line_size*32UL, smallest_block_size / 32, alignof(std::max_align_t)> xxxlarge_pool;
-    pool::BlockPool<config::cache_line_size*64UL, smallest_block_size / 64, alignof(std::max_align_t)> xxxxlarge_pool;
+    pool::BlockPool<config::cache_line_size,      num_blocks,      alignof(std::max_align_t)> small_pool;
+    pool::BlockPool<config::cache_line_size*2UL,  num_blocks/2,    alignof(std::max_align_t)> medium_pool;
+    pool::BlockPool<config::cache_line_size*4UL,  num_blocks/4,    alignof(std::max_align_t)> large_pool;
+    pool::BlockPool<config::cache_line_size*8UL,  num_blocks/8,    alignof(std::max_align_t)> xlarge_pool;
+    pool::BlockPool<config::cache_line_size*16UL, num_blocks/16,   alignof(std::max_align_t)> xxlarge_pool;
+    pool::BlockPool<config::cache_line_size*32UL, num_blocks/32,   alignof(std::max_align_t)> xxxlarge_pool;
+    pool::BlockPool<config::cache_line_size*64UL, num_blocks/64,   alignof(std::max_align_t)> xxxxlarge_pool;
 };
 
 template <class T, class... Args>
