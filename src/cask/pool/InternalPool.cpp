@@ -24,13 +24,18 @@ std::shared_ptr<cask::Pool> cask::pool::global_pool() {
         ;
     }
 
+    // RAII guard ensures the spinlock is released on every exit path,
+    // including if Pool construction throws below.
+    struct SpinlockGuard {
+        std::atomic_flag& flag;
+        ~SpinlockGuard() { flag.clear(std::memory_order_release); }
+    } guard{initializing_pool};
+
     auto pool = pool_weak.lock();
     if (!pool) {
         pool = std::make_shared<cask::Pool>();
         pool_weak = pool;
     }
-
-    initializing_pool.clear(std::memory_order_release);
 
     local_pool_weak = pool;
     return pool;

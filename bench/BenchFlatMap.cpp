@@ -215,8 +215,7 @@ static void BM_GlobalPool(benchmark::State& state) {
         benchmark::DoNotOptimize(pool);
     }
 }
-BENCHMARK(BM_GlobalPool);
-BENCHMARK(BM_GlobalPool)->ThreadRange(2, 8);
+BENCHMARK(BM_GlobalPool)->ThreadRange(1, 8);
 
 // Benchmark pool allocation
 static void BM_PoolAllocate(benchmark::State& state) {
