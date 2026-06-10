@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <climits>
+#include <condition_variable>
 #include <mutex>
 #include <map>
 #include <stack>
@@ -750,14 +751,20 @@ T FiberImpl<T,E>::await() {
     auto current_state = state.load(std::memory_order_acquire);
 
     if(current_state != COMPLETED && current_state != CANCELED) {
-        std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>();
-        mutex->lock();
+        auto mutex = std::make_shared<std::mutex>();
+        auto cond = std::make_shared<std::condition_variable>();
+        auto finished = std::make_shared<bool>(false);
 
-        onFiberShutdown([mutex](auto){
-            mutex->unlock();
+        onFiberShutdown([mutex, cond, finished](auto){
+            {
+                std::lock_guard<std::mutex> guard(*mutex);
+                *finished = true;
+            }
+            cond->notify_all();
         });
 
-        mutex->lock();
+        std::unique_lock<std::mutex> lock(*mutex);
+        cond->wait(lock, [&finished]{ return *finished; });
     }
 
     if(auto value_opt = value.getValue()) {
