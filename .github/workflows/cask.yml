@@ -151,7 +151,7 @@ jobs:
     - name: Install Python Development Dependencies
       run: python3 -m pip install meson==1.10.1 ninja
     - name: Generate the Build Environment
-      run: meson setup builddir --cross-file=build_windows_arm_cross_file.txt
+      run: meson setup builddir
     - name: Compile
       working-directory: builddir
       run: meson compile
