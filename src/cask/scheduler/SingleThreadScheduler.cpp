@@ -283,22 +283,27 @@ void SingleThreadScheduler::run(const std::shared_ptr<SchedulerControlData>& con
 std::deque<std::function<void()>> SingleThreadScheduler::evaluate_timers_unsafe(const std::shared_ptr<SchedulerControlData>& control_data) {
     auto iterationStartTime = current_time_ms();
     std::vector<int64_t> expiredTimes;
+    std::vector<std::function<void()>> expired_tasks;
     std::deque<std::function<void()>> overflowed_tasks;
 
-    // Accumulate any expired tasks
+    // Accumulate any expired tasks, oldest first
     for (auto& [timer_time, timers] : control_data->timers) {
         if (timer_time <= iterationStartTime) {
             for(auto& timer : timers) {
-                auto task = [timer] { timer->fire(); };
-
-                if (auto overflow = control_data->ready_queue.push_front(task)) {
-                    overflowed_tasks.push_front(*overflow);
-                }
+                expired_tasks.emplace_back([timer] { timer->fire(); });
             }
 
             expiredTimes.push_back(timer_time);
         } else {
             break;
+        }
+    }
+
+    // Push expired tasks to the front of the ready queue in reverse so
+    // that the oldest timer lands at the front and fires first.
+    for (auto task_iter = expired_tasks.rbegin(); task_iter != expired_tasks.rend(); ++task_iter) {
+        if (auto overflow = control_data->ready_queue.push_front(*task_iter)) {
+            overflowed_tasks.push_front(*overflow);
         }
     }
 
