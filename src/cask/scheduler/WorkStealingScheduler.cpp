@@ -127,6 +127,20 @@ bool WorkStealingScheduler::submitBulk(const std::vector<std::function<void()>>&
         for(auto& task : tasks) {
             data->synchronized.global_ready_queue.emplace_back(task);
         }
+
+        // Try and wake up an idle scheduler - starting from
+        // a random start point
+        auto dice_roll = static_cast<std::size_t>(std::abs(std::rand()));
+        auto scheduler_index = dice_roll % (data->fixed.schedulers.size());
+        for(std::size_t i = 0; i < data->fixed.schedulers.size(); i++) {
+            auto selected_scheduler = data->fixed.schedulers[(scheduler_index + i) % data->fixed.schedulers.size()];
+
+            if (!selected_scheduler->isIdle()) continue;
+            if (selected_scheduler->get_run_thread_id() == thread_handle) continue;
+
+            selected_scheduler->try_wake();
+            break;
+        }
     }
 
     return true;
