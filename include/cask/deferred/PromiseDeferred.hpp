@@ -18,19 +18,6 @@
 
 namespace cask::deferred {
 
-template <class T, class E>
-class PromiseDeferred;
-
-template <class T, class E>
-struct PromiseAwaitState {
-    std::mutex mutex;
-    std::condition_variable cond;
-    bool finished = false;
-    bool canceled = false;
-    std::optional<Either<T,E>> result;
-};
-
-
 template <class T, class E = std::any>
 class PromiseDeferred final : public Deferred<T,E> {
 public:
@@ -46,6 +33,14 @@ public:
 
     std::shared_ptr<Promise<T,E>> promise;
 private:
+    struct AwaitState {
+        std::mutex mutex;
+        std::condition_variable cond;
+        bool finished = false;
+        bool canceled = false;
+        std::optional<Either<T,E>> result;
+    };
+
     std::shared_ptr<Scheduler> sched;
 };
 
@@ -99,8 +94,8 @@ T PromiseDeferred<T,E>::await() {
     std::optional<Either<T,E>> result = promise->get();
 
     if(!result.has_value()) {
-        auto await_state = std::make_shared<PromiseAwaitState<T,E>>();
-        std::weak_ptr<PromiseAwaitState<T,E>> weak_state = await_state;
+        auto await_state = std::make_shared<AwaitState>();
+        std::weak_ptr<AwaitState> weak_state = await_state;
 
         // Capture only a weak_ptr so the await state is released as soon as
         // await() returns, even though the stored callbacks outlive this call.

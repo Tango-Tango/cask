@@ -22,12 +22,6 @@ namespace cask::fiber {
 
 enum FiberState : std::uint8_t { READY, RUNNING, WAITING, DELAYED, RACING, COMPLETED, CANCELED };
 
-struct FiberAwaitState {
-    std::mutex mutex;
-    std::condition_variable cond;
-    bool finished = false;
-};
-
 constexpr const char * print_state(const FiberState& state) {
     return state == READY ? "READY" :
            state == RUNNING ? "RUNNING" :
@@ -57,6 +51,12 @@ public:
     T await() override;
 
 private:
+    struct AwaitState {
+        std::mutex mutex;
+        std::condition_variable cond;
+        bool finished = false;
+    };
+
     friend class Fiber<T,E>;
 
     template <class TT, class EE>
@@ -757,11 +757,11 @@ T FiberImpl<T,E>::await() {
     auto current_state = state.load(std::memory_order_acquire);
 
     if(current_state != COMPLETED && current_state != CANCELED) {
-        auto await_state = std::make_shared<FiberAwaitState>();
+        auto await_state = std::make_shared<AwaitState>();
 
         // Capture only a weak_ptr so the await state is released as soon as
         // await() returns, even though the stored callback outlives this call.
-        onFiberShutdown([weak_state = std::weak_ptr<FiberAwaitState>(await_state)](auto){
+        onFiberShutdown([weak_state = std::weak_ptr<AwaitState>(await_state)](auto){
             if(auto state = weak_state.lock()) {
                 {
                     std::lock_guard<std::mutex> guard(state->mutex);
