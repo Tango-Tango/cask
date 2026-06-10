@@ -7,6 +7,7 @@
 #define _CASK_PROMISE_DEFERRED_H_
 
 #include <any>
+#include <condition_variable>
 #include <functional>
 #include <optional>
 #include <memory>
@@ -16,10 +17,6 @@
 #include "../Scheduler.hpp"
 
 namespace cask::deferred {
-
-template <class T, class E>
-class PromiseDeferred;
-
 
 template <class T, class E = std::any>
 class PromiseDeferred final : public Deferred<T,E> {
@@ -36,6 +33,14 @@ public:
 
     std::shared_ptr<Promise<T,E>> promise;
 private:
+    struct AwaitState {
+        std::mutex mutex;
+        std::condition_variable cond;
+        bool finished = false;
+        bool canceled = false;
+        std::optional<Either<T,E>> result;
+    };
+
     std::shared_ptr<Scheduler> sched;
 };
 
@@ -89,20 +94,38 @@ T PromiseDeferred<T,E>::await() {
     std::optional<Either<T,E>> result = promise->get();
 
     if(!result.has_value()) {
-        std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>();
-        mutex->lock();
+        auto await_state = std::make_shared<AwaitState>();
+        std::weak_ptr<AwaitState> weak_state = await_state;
 
-        promise->onComplete([mutex, &result](Either<T,E> newResult){
-            result = newResult;
-            mutex->unlock();
+        // Capture only a weak_ptr so the await state is released as soon as
+        // await() returns, even though the stored callbacks outlive this call.
+        promise->onComplete([weak_state](Either<T,E> newResult){
+            if(auto state = weak_state.lock()) {
+                {
+                    std::lock_guard<std::mutex> guard(state->mutex);
+                    state->result = newResult;
+                    state->finished = true;
+                }
+                state->cond.notify_all();
+            }
         });
 
-        promise->onCancel([mutex, &canceled](){
-            canceled = true;
-            mutex->unlock();
+        promise->onCancel([weak_state](){
+            if(auto state = weak_state.lock()) {
+                {
+                    std::lock_guard<std::mutex> guard(state->mutex);
+                    state->canceled = true;
+                    state->finished = true;
+                }
+                state->cond.notify_all();
+            }
         });
 
-        mutex->lock();
+        std::unique_lock<std::mutex> lock(await_state->mutex);
+        await_state->cond.wait(lock, [&await_state]{ return await_state->finished; });
+
+        result = std::move(await_state->result);
+        canceled = await_state->canceled;
     }
 
     if(canceled) {

@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <climits>
+#include <condition_variable>
 #include <mutex>
 #include <map>
 #include <stack>
@@ -50,6 +51,12 @@ public:
     T await() override;
 
 private:
+    struct AwaitState {
+        std::mutex mutex;
+        std::condition_variable cond;
+        bool finished = false;
+    };
+
     friend class Fiber<T,E>;
 
     template <class TT, class EE>
@@ -750,14 +757,22 @@ T FiberImpl<T,E>::await() {
     auto current_state = state.load(std::memory_order_acquire);
 
     if(current_state != COMPLETED && current_state != CANCELED) {
-        std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>();
-        mutex->lock();
+        auto await_state = std::make_shared<AwaitState>();
 
-        onFiberShutdown([mutex](auto){
-            mutex->unlock();
+        // Capture only a weak_ptr so the await state is released as soon as
+        // await() returns, even though the stored callback outlives this call.
+        onFiberShutdown([weak_state = std::weak_ptr<AwaitState>(await_state)](auto){
+            if(auto await_state_locked = weak_state.lock()) {
+                {
+                    std::lock_guard<std::mutex> guard(await_state_locked->mutex);
+                    await_state_locked->finished = true;
+                }
+                await_state_locked->cond.notify_all();
+            }
         });
 
-        mutex->lock();
+        std::unique_lock<std::mutex> lock(await_state->mutex);
+        await_state->cond.wait(lock, [&await_state]{ return await_state->finished; });
     }
 
     if(auto value_opt = value.getValue()) {
