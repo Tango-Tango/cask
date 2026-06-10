@@ -91,7 +91,15 @@ SingleThreadScheduler::~SingleThreadScheduler() {
 
 void SingleThreadScheduler::start() {
     control_data->start_barrier.notify();
-    while(!control_data->thread_running.load(std::memory_order_acquire));
+
+    // Wait for the run thread to indicate it is running. If shutdown has
+    // been requested the run thread may exit without ever setting
+    // thread_running - so stop waiting in that case rather than spin forever.
+    while(!control_data->thread_running.load(std::memory_order_acquire)) {
+        if (!control_data->should_run.load(std::memory_order_relaxed)) {
+            break;
+        }
+    }
 }
 
 void SingleThreadScheduler::try_wake() {

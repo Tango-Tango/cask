@@ -80,6 +80,25 @@ TEST(SingleThreadSchedulerTest, ReleasesRunThreadWhenNeverStarted) {
     EXPECT_TRUE(released);
 }
 
+TEST(SingleThreadSchedulerTest, StartAfterStopDoesNotHang) {
+    // If stop() runs before start(), the run thread exits without ever
+    // setting thread_running. A subsequent start() must observe the
+    // shutdown and return rather than spin forever.
+    auto sched = std::make_unique<SingleThreadScheduler>(
+        std::nullopt,
+        std::nullopt,
+        std::nullopt,
+        [](){},
+        [](){},
+        [](auto&){},
+        [](auto&){},
+        cask::scheduler::DisableAutoStart);
+
+    sched->stop();
+    sched->start();
+    sched.reset();
+}
+
 TEST(SingleThreadSchedulerTest, StartsAndStops) {
     auto sched = std::make_unique<SingleThreadScheduler>(
         std::nullopt,
