@@ -91,7 +91,15 @@ SingleThreadScheduler::~SingleThreadScheduler() {
 
 void SingleThreadScheduler::start() {
     control_data->start_barrier.notify();
-    while(!control_data->thread_running.load(std::memory_order_acquire));
+
+    // Wait for the run thread to indicate it is running. If shutdown has
+    // been requested the run thread may exit without ever setting
+    // thread_running - so stop waiting in that case rather than spin forever.
+    while(!control_data->thread_running.load(std::memory_order_acquire)) {
+        if (!control_data->should_run.load(std::memory_order_relaxed)) {
+            break;
+        }
+    }
 }
 
 void SingleThreadScheduler::try_wake() {
@@ -101,6 +109,10 @@ void SingleThreadScheduler::try_wake() {
 void SingleThreadScheduler::stop() {
     // Indicate that the run thread should shut down
     control_data->should_run.store(false, std::memory_order_relaxed);
+
+    // Release the run thread if it is still waiting to be started so that
+    // it can observe the shutdown request and exit rather than leak.
+    control_data->start_barrier.notify();
     control_data->ready_queue.wake();
 
     // Wait for the run thread to finish - unless the destructor
@@ -177,6 +189,12 @@ void SingleThreadScheduler::run(const std::shared_ptr<SchedulerControlData>& con
 
     // Wait for the signal that the scheduler is ready to run
     control_data->start_barrier.wait();
+
+    // If shutdown was requested before the scheduler ever started, exit
+    // immediately without ever indicating that the thread is running.
+    if (!control_data->should_run.load(std::memory_order_relaxed)) {
+        return;
+    }
 
     // We've been told to start running
     control_data->thread_running.store(true, std::memory_order_release);
