@@ -121,7 +121,7 @@ private:
         std::atomic_bool thread_running;
         ThreadStartBarrier start_barrier; 
 
-        bool should_run;
+        std::atomic_bool should_run;
         std::atomic_bool idle;
         ReadyQueue ready_queue;
 
