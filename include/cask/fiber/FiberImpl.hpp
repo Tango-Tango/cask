@@ -762,12 +762,12 @@ T FiberImpl<T,E>::await() {
         // Capture only a weak_ptr so the await state is released as soon as
         // await() returns, even though the stored callback outlives this call.
         onFiberShutdown([weak_state = std::weak_ptr<AwaitState>(await_state)](auto){
-            if(auto state = weak_state.lock()) {
+            if(auto await_state_locked = weak_state.lock()) {
                 {
-                    std::lock_guard<std::mutex> guard(state->mutex);
-                    state->finished = true;
+                    std::lock_guard<std::mutex> guard(await_state_locked->mutex);
+                    await_state_locked->finished = true;
                 }
-                state->cond.notify_all();
+                await_state_locked->cond.notify_all();
             }
         });
 
