@@ -100,7 +100,7 @@ void SingleThreadScheduler::try_wake() {
 
 void SingleThreadScheduler::stop() {
     // Indicate that the run thread should shut down
-    control_data->should_run = false;
+    control_data->should_run.store(false, std::memory_order_release);
     control_data->ready_queue.wake();
 
     // Wait for the run thread to finish - unless the destructor
@@ -183,7 +183,7 @@ void SingleThreadScheduler::run(const std::shared_ptr<SchedulerControlData>& con
 
     while(true) {
         // Check if we should be shutting down
-        if (!control_data->should_run) break;
+        if (!control_data->should_run.load(std::memory_order_acquire)) break;
 
         // Evaluate any expired timers
         {
