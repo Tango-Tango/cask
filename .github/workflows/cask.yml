@@ -103,7 +103,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [windows-2022, windows-2025, windows-11-arm]
+        os: [windows-2022, windows-2025]
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
@@ -125,6 +125,33 @@ jobs:
       run: python3 -m pip install meson==1.10.1 ninja
     - name: Generate the Build Environment
       run: meson setup builddir
+    - name: Compile
+      working-directory: builddir
+      run: meson compile
+  
+  build-windows-arm:
+    name: Windows ARM
+    if: github.actor != 'engineering-at-tangotango'
+
+    runs-on: windows-11-arm
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 2
+        token: ${{ github.token }}
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    - name: Prepare MSVC
+      uses: bus1/cabuild/action/msdevshell@v1
+      with:
+        architecture: arm64
+    - name: Install Python Development Dependencies
+      run: python3 -m pip install meson==1.10.1 ninja
+    - name: Generate the Build Environment
+      run: meson setup builddir --cross-file=build_windows_arm_cross_file.txt
     - name: Compile
       working-directory: builddir
       run: meson compile
