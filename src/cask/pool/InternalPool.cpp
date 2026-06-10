@@ -45,13 +45,18 @@ std::shared_ptr<cask::Pool> cask::pool::global_pool() {
 
     // Slow path: the spinlock must be held for *all* access to pool_weak.
     // Calling weak_ptr::lock() concurrently with an assignment to the same
-    // weak_ptr is a data race - so an unguarded read of it is not safe.
-    SpinlockGuard guard(initializing_pool);
+    // weak_ptr is a data race - so an unguarded read of it is not safe. The
+    // guard lives in an explicit scope so the lock is acquired and released
+    // exactly here - keeping it off the fast path above.
+    std::shared_ptr<cask::Pool> pool;
+    {
+        SpinlockGuard guard(initializing_pool);
 
-    auto pool = pool_weak.lock();
-    if (!pool) {
-        pool = std::make_shared<cask::Pool>();
-        pool_weak = pool;
+        pool = pool_weak.lock();
+        if (!pool) {
+            pool = std::make_shared<cask::Pool>();
+            pool_weak = pool;
+        }
     }
 
     local_pool_weak = pool;
