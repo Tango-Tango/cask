@@ -86,12 +86,16 @@ private:
     std::condition_variable work_available;
     std::deque<std::function<void()>> ready_queue;
     std::atomic_size_t memoized_queue_size;
+    bool wake_requested;
 };
 
 template<class Rep, class Period>
 void ReadyQueue::await_work(const std::chrono::duration<Rep,Period>& timeout) {
     std::unique_lock<std::mutex> lock(mutex);
-    work_available.wait_for(lock, timeout);
+    work_available.wait_for(lock, timeout, [this] {
+        return !ready_queue.empty() || wake_requested;
+    });
+    wake_requested = false;
 }
 
 } // namespace cask::scheduler

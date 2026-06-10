@@ -13,6 +13,7 @@ ReadyQueue::ReadyQueue(std::optional<std::size_t> max_queue_size)
     , work_available()
     , ready_queue()
     , memoized_queue_size(0)
+    , wake_requested(false)
 {}
 
 std::size_t ReadyQueue::size() const {
@@ -112,6 +113,7 @@ bool ReadyQueue::steal_from(ReadyQueue& victim) {
 
 void ReadyQueue::wake() {
     std::lock_guard<std::mutex> lock(mutex);
+    wake_requested = true;
     work_available.notify_all();
 }
 
