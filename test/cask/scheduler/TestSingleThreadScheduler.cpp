@@ -106,16 +106,6 @@ TEST(SingleThreadSchedulerTest, FiresExpiredTimersInSubmissionOrder) {
     // When multiple timers expire before the run loop evaluates them
     // (e.g. while the scheduler was busy or not yet started), they must
     // fire oldest-first rather than in reverse order.
-    auto sched = std::make_unique<SingleThreadScheduler>(
-        std::nullopt,
-        std::nullopt,
-        std::nullopt,
-        [](){},
-        [](){},
-        [](auto&){},
-        [](auto&){},
-        cask::scheduler::DisableAutoStart);
-
     std::mutex mutex;
     std::condition_variable cv;
     std::vector<int> fired_order;
@@ -125,6 +115,16 @@ TEST(SingleThreadSchedulerTest, FiresExpiredTimersInSubmissionOrder) {
         fired_order.push_back(id);
         cv.notify_one();
     };
+
+    auto sched = std::make_unique<SingleThreadScheduler>(
+        std::nullopt,
+        std::nullopt,
+        std::nullopt,
+        [](){},
+        [](){},
+        [](auto&){},
+        [](auto&){},
+        cask::scheduler::DisableAutoStart);
 
     // Submit timers with strictly increasing expiration times so each
     // lands in its own timer bucket.
