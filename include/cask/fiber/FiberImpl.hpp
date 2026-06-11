@@ -35,7 +35,7 @@ constexpr const char * print_state(const FiberState& state) {
 template <class T, class E>
 class FiberImpl final : public Fiber<T,E> {
 public:
-    explicit FiberImpl(const std::shared_ptr<const FiberOp>& op);
+    explicit FiberImpl(const FiberOpRef& op);
     ~FiberImpl();
 
     FiberState getState();
@@ -88,7 +88,7 @@ private:
     );
 
     uint64_t id;
-    std::shared_ptr<const FiberOp> op;
+    FiberOpRef op;
     std::weak_ptr<Scheduler> last_used_scheduler;
     FiberValue value;
     std::stack<FiberOp::FlatMapPredicate> continuationStack;
@@ -104,7 +104,7 @@ private:
 };
 
 template <class T, class E>
-FiberImpl<T,E>::FiberImpl(const std::shared_ptr<const FiberOp>& op)
+FiberImpl<T,E>::FiberImpl(const FiberOpRef& op)
     : id(CurrentFiber::acquireId())
     , op(op)
     , last_used_scheduler()

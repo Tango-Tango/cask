@@ -15,6 +15,7 @@ namespace cask::fiber {
 
 FiberOp::FiberOp(AsyncData* async, const std::shared_ptr<Pool>& pool) noexcept
     : opType(ASYNC)
+    , refcount(1)
     , pool(pool)
 {
     data.asyncData = async;
@@ -22,6 +23,7 @@ FiberOp::FiberOp(AsyncData* async, const std::shared_ptr<Pool>& pool) noexcept
 
 FiberOp::FiberOp(ConstantData* constant, const std::shared_ptr<Pool>& pool, FiberOpType type) noexcept
     : opType(type)
+    , refcount(1)
     , pool(pool)
 {
     data.constantData = constant;
@@ -29,6 +31,7 @@ FiberOp::FiberOp(ConstantData* constant, const std::shared_ptr<Pool>& pool, Fibe
 
 FiberOp::FiberOp(ThunkData* thunk, const std::shared_ptr<Pool>& pool) noexcept
     : opType(THUNK)
+    , refcount(1)
     , pool(pool)
 {
     data.thunkData = thunk;
@@ -36,6 +39,7 @@ FiberOp::FiberOp(ThunkData* thunk, const std::shared_ptr<Pool>& pool) noexcept
 
 FiberOp::FiberOp(FlatMapData* flatMap, const std::shared_ptr<Pool>& pool) noexcept
     : opType(FLATMAP)
+    , refcount(1)
     , pool(pool)
 {
     data.flatMapData = flatMap;
@@ -43,6 +47,7 @@ FiberOp::FiberOp(FlatMapData* flatMap, const std::shared_ptr<Pool>& pool) noexce
 
 FiberOp::FiberOp(DelayData* delay, const std::shared_ptr<Pool>& pool) noexcept
     : opType(DELAY)
+    , refcount(1)
     , pool(pool)
 {
     data.delayData = delay;
@@ -50,41 +55,52 @@ FiberOp::FiberOp(DelayData* delay, const std::shared_ptr<Pool>& pool) noexcept
 
 FiberOp::FiberOp(RaceData* race, const std::shared_ptr<Pool>& pool) noexcept
     : opType(RACE)
+    , refcount(1)
     , pool(pool)
 {
     data.raceData = race;
 }
 
-FiberOp::FiberOp(FiberOpType valueless_op) noexcept
+FiberOp::FiberOp(FiberOpType valueless_op, const std::shared_ptr<Pool>& pool) noexcept
     : opType(valueless_op)
-    , pool()
+    , refcount(1)
+    , pool(pool)
 {}
 
-
-FiberOp::~FiberOp() {
+void FiberOp::deallocatePayload(Pool& pool) noexcept {
     switch(opType) {
         case VALUE:
         case ERROR:
-            pool->deallocate<ConstantData>(data.constantData);
+            pool.deallocate<ConstantData>(data.constantData);
         break;
         case THUNK:
-            pool->deallocate<ThunkData>(data.thunkData);
+            pool.deallocate<ThunkData>(data.thunkData);
         break;
         case ASYNC:
-            pool->deallocate<AsyncData>(data.asyncData);
+            pool.deallocate<AsyncData>(data.asyncData);
         break;
         case FLATMAP:
-            pool->deallocate<FlatMapData>(data.flatMapData);
+            pool.deallocate<FlatMapData>(data.flatMapData);
         break;
         case DELAY:
-            pool->deallocate<DelayData>(data.delayData);
+            pool.deallocate<DelayData>(data.delayData);
         break;
         case RACE:
-            pool->deallocate<RaceData>(data.raceData);
+            pool.deallocate<RaceData>(data.raceData);
         break;
         case CANCEL:
         case CEDE:
         break;
+    }
+}
+
+FiberOp::~FiberOp() {
+    // When destroyed via release() the pool member has already been moved
+    // out (and the payload freed) - so only clean up the payload here when
+    // the op is destroyed directly (e.g. by Pool::deallocate on an op which
+    // was never wrapped in a FiberOpRef).
+    if (pool) {
+        deallocatePayload(*pool);
     }
 }
 

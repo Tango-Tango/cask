@@ -7,6 +7,8 @@
 #define _CASK_FIBER_OP_H_
 
 #include <functional>
+#include <atomic>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <type_traits>
@@ -29,19 +31,58 @@ using DeferredRef = std::shared_ptr<Deferred<T,E>>;
 
 namespace cask::fiber {
 
-template <class T>
-class PoolDeleter {
-public:
-    explicit PoolDeleter(const std::shared_ptr<Pool>& pool)
-        : pool(pool)
-    {}
+class FiberOp;
 
-    void operator()(T* ptr) {
-        pool->deallocate<T>(ptr);
+/**
+ * An intrusive reference-counted pointer to a `FiberOp`. FiberOps are
+ * allocated from the memory pool and carry their own refcount, so no
+ * separate `shared_ptr` control block is ever heap-allocated for them.
+ * This keeps op creation on the pool fast-path - which matters because
+ * op construction is one of the hottest allocation paths in the library.
+ */
+class FiberOpRef {
+public:
+    constexpr FiberOpRef() noexcept : ptr(nullptr) {}
+    constexpr FiberOpRef(std::nullptr_t) noexcept : ptr(nullptr) {} // NOLINT(google-explicit-constructor)
+
+    explicit FiberOpRef(const FiberOp* op) noexcept;
+
+    FiberOpRef(const FiberOpRef& other) noexcept;
+    FiberOpRef(FiberOpRef&& other) noexcept : ptr(other.ptr) {
+        other.ptr = nullptr;
     }
 
+    FiberOpRef& operator=(const FiberOpRef& other) noexcept;
+    FiberOpRef& operator=(FiberOpRef&& other) noexcept;
+    FiberOpRef& operator=(std::nullptr_t) noexcept;
+
+    ~FiberOpRef();
+
+    /**
+     * Take ownership of an op whose refcount is already accounted for
+     * (e.g. freshly constructed with a refcount of 1) without bumping
+     * the count.
+     */
+    static FiberOpRef adopt(const FiberOp* op) noexcept {
+        return FiberOpRef(op, AdoptTag{});
+    }
+
+    const FiberOp* get() const noexcept { return ptr; }
+    const FiberOp& operator*() const noexcept { return *ptr; }
+    const FiberOp* operator->() const noexcept { return ptr; }
+    explicit operator bool() const noexcept { return ptr != nullptr; }
+
+    bool operator==(const FiberOpRef& other) const noexcept { return ptr == other.ptr; }
+    bool operator!=(const FiberOpRef& other) const noexcept { return ptr != other.ptr; }
+    bool operator==(std::nullptr_t) const noexcept { return ptr == nullptr; }
+    bool operator!=(std::nullptr_t) const noexcept { return ptr != nullptr; }
+
 private:
-    std::shared_ptr<Pool> pool;
+    struct AdoptTag {};
+
+    FiberOpRef(const FiberOp* op, AdoptTag) noexcept : ptr(op) {}
+
+    const FiberOp* ptr;
 };
 
 enum FiberOpType : std::uint8_t { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RACE, CANCEL, CEDE };
@@ -69,18 +110,18 @@ enum FiberOpType : std::uint8_t { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RA
  *      and all other operations are canceled.
  *   6. `Cancel` represents the cancelation of evaluation for the fiber.
  */
-class FiberOp final : public std::enable_shared_from_this<FiberOp> {
+class FiberOp final {
 public:
     // ConstantData is now just Erased (48 bytes) instead of Either<Erased,Erased> (112 bytes).
     // The opType field (VALUE vs ERROR) already tells us which case it is.
     using ConstantData = Erased;
     using AsyncData = std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>;
     using ThunkData = std::function<Erased()>;
-    using FlatMapInput = std::shared_ptr<const FiberOp>;
-    using FlatMapPredicate = std::function<std::shared_ptr<const FiberOp>(FiberValue&&)>;
+    using FlatMapInput = FiberOpRef;
+    using FlatMapPredicate = std::function<FiberOpRef(FiberValue&&)>;
     using FlatMapData = std::pair<FlatMapInput,FlatMapPredicate>;
     using DelayData = int64_t;
-    using RaceData = std::vector<std::shared_ptr<const FiberOp>>;
+    using RaceData = std::vector<FiberOpRef>;
 
     /**
      * The type of operation represented. Used for optimization of internal
@@ -89,19 +130,17 @@ public:
     FiberOpType opType;
 
     template <typename Arg>
-    static std::shared_ptr<const FiberOp> value(Arg&& value) noexcept  {
+    static FiberOpRef value(Arg&& value) noexcept  {
         auto pool = cask::pool::global_pool();
         auto constant = pool->allocate<ConstantData>(std::forward<Arg>(value));
-        auto op = pool->allocate<FiberOp>(constant, pool, VALUE);
-        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+        return FiberOpRef::adopt(pool->allocate<FiberOp>(constant, pool, VALUE));
     }
 
     template <typename Arg>
-    static std::shared_ptr<const FiberOp> error(Arg&& error) noexcept {
+    static FiberOpRef error(Arg&& error) noexcept {
         auto pool = cask::pool::global_pool();
         auto constant = pool->allocate<ConstantData>(std::forward<Arg>(error));
-        auto op = pool->allocate<FiberOp>(constant, pool, ERROR);
-        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+        return FiberOpRef::adopt(pool->allocate<FiberOp>(constant, pool, ERROR));
     }
 
     template <typename Predicate, typename = std::enable_if_t<
@@ -110,11 +149,10 @@ public:
             std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>
         >::value
     >>
-    static std::shared_ptr<const FiberOp> async(Predicate&& predicate) noexcept {
+    static FiberOpRef async(Predicate&& predicate) noexcept {
         auto pool = cask::pool::global_pool();
         auto async_data = pool->allocate<AsyncData>(std::forward<Predicate>(predicate));
-        auto op = pool->allocate<FiberOp>(async_data, pool); 
-        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+        return FiberOpRef::adopt(pool->allocate<FiberOp>(async_data, pool));
     }
 
     template <typename Predicate, typename = std::enable_if_t<
@@ -123,43 +161,38 @@ public:
             std::function<Erased()>
         >::value
     >>
-    static std::shared_ptr<const FiberOp> thunk(Predicate&& thunk) noexcept {
+    static FiberOpRef thunk(Predicate&& thunk) noexcept {
         auto pool = cask::pool::global_pool();
         auto thunk_data = pool->allocate<ThunkData>(std::forward<Predicate>(thunk));
-        auto op = pool->allocate<FiberOp>(thunk_data, pool); 
-        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+        return FiberOpRef::adopt(pool->allocate<FiberOp>(thunk_data, pool));
     }
 
-    static std::shared_ptr<const FiberOp> delay(int64_t delay_ms) noexcept {
+    static FiberOpRef delay(int64_t delay_ms) noexcept {
         auto pool = cask::pool::global_pool();
         auto delay_data = pool->allocate<DelayData>(delay_ms);
-        auto op = pool->allocate<FiberOp>(delay_data, pool); 
-        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+        return FiberOpRef::adopt(pool->allocate<FiberOp>(delay_data, pool));
     }
 
-    template <typename Arg = std::vector<std::shared_ptr<const FiberOp>>, typename = std::enable_if_t<
+    template <typename Arg = std::vector<FiberOpRef>, typename = std::enable_if_t<
         std::is_convertible<
             std::remove_reference_t<Arg>,
-            std::vector<std::shared_ptr<const FiberOp>>
+            std::vector<FiberOpRef>
         >::value
     >>
-    static std::shared_ptr<const FiberOp> race(Arg&& race) noexcept {
+    static FiberOpRef race(Arg&& race) noexcept {
         auto pool = cask::pool::global_pool();
         auto race_data = pool->allocate<RaceData>(std::forward<Arg>(race));
-        auto op = pool->allocate<FiberOp>(race_data, pool); 
-        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+        return FiberOpRef::adopt(pool->allocate<FiberOp>(race_data, pool));
     }
 
-    static std::shared_ptr<const FiberOp> cancel() noexcept {
+    static FiberOpRef cancel() noexcept {
         auto pool = cask::pool::global_pool();
-        auto op = pool->allocate<FiberOp>(CANCEL); 
-        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+        return FiberOpRef::adopt(pool->allocate<FiberOp>(CANCEL, pool));
     }
 
-    static std::shared_ptr<const FiberOp> cede() noexcept  {
+    static FiberOpRef cede() noexcept  {
         auto pool = cask::pool::global_pool();
-        auto op = pool->allocate<FiberOp>(CEDE); 
-        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+        return FiberOpRef::adopt(pool->allocate<FiberOp>(CEDE, pool));
     }
 
     /**
@@ -176,14 +209,40 @@ public:
             FlatMapPredicate
         >::value
     >>
-    std::shared_ptr<const FiberOp> flatMap(Predicate&& predicate) const noexcept  {
+    FiberOpRef flatMap(Predicate&& predicate) const noexcept  {
         // Always create a new FLATMAP node wrapping this operation.
         // The continuation stack in FiberImpl handles chaining during evaluation,
         // so we don't need to create nested closures here.
         auto pool = cask::pool::global_pool();
-        auto data = pool->allocate<FlatMapData>(this->shared_from_this(), std::forward<Predicate>(predicate));
-        auto op = pool->allocate<FiberOp>(data, pool);
-        return std::shared_ptr<FiberOp>(op, PoolDeleter<FiberOp>(pool));
+        auto data = pool->allocate<FlatMapData>(FiberOpRef(this), std::forward<Predicate>(predicate));
+        return FiberOpRef::adopt(pool->allocate<FiberOp>(data, pool));
+    }
+
+    /**
+     * Increment this op's intrusive reference count. Normally called only
+     * by `FiberOpRef`.
+     */
+    void retain() const noexcept {
+        refcount.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    /**
+     * Decrement this op's intrusive reference count - destroying the op and
+     * returning its memory to the pool when the count reaches zero. Normally
+     * called only by `FiberOpRef`.
+     */
+    void release() const noexcept {
+        if (refcount.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+            auto* self = const_cast<FiberOp*>(this); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+
+            // Move the pool reference out of the object so it (and the pool
+            // itself) reliably outlives the deallocation of this op. The
+            // destructor sees a null pool and skips payload cleanup, so the
+            // payload is released explicitly first.
+            std::shared_ptr<Pool> local_pool = std::move(self->pool);
+            self->deallocatePayload(*local_pool);
+            local_pool->deallocate<FiberOp>(self);
+        }
     }
 
     union {
@@ -205,13 +264,73 @@ public:
     explicit FiberOp(FlatMapData* flatMap, const std::shared_ptr<Pool>& pool) noexcept;
     explicit FiberOp(DelayData* delay, const std::shared_ptr<Pool>& pool) noexcept;
     explicit FiberOp(RaceData* race, const std::shared_ptr<Pool>& pool) noexcept;
-    explicit FiberOp(FiberOpType valueless_op) noexcept;
+    explicit FiberOp(FiberOpType valueless_op, const std::shared_ptr<Pool>& pool) noexcept;
 
     ~FiberOp();
     
 private:
+    void deallocatePayload(Pool& pool) noexcept;
+
+    mutable std::atomic<std::uint32_t> refcount;
     std::shared_ptr<Pool> pool;
 };
+
+inline FiberOpRef::FiberOpRef(const FiberOp* op) noexcept
+    : ptr(op)
+{
+    if (ptr) {
+        ptr->retain();
+    }
+}
+
+inline FiberOpRef::FiberOpRef(const FiberOpRef& other) noexcept
+    : ptr(other.ptr)
+{
+    if (ptr) {
+        ptr->retain();
+    }
+}
+
+inline FiberOpRef& FiberOpRef::operator=(const FiberOpRef& other) noexcept {
+    if (this != &other) {
+        const FiberOp* old = ptr;
+        ptr = other.ptr;
+        if (ptr) {
+            ptr->retain();
+        }
+        if (old) {
+            old->release();
+        }
+    }
+    return *this;
+}
+
+inline FiberOpRef& FiberOpRef::operator=(FiberOpRef&& other) noexcept {
+    if (this != &other) {
+        const FiberOp* old = ptr;
+        ptr = other.ptr;
+        other.ptr = nullptr;
+        if (old) {
+            old->release();
+        }
+    }
+    return *this;
+}
+
+inline FiberOpRef& FiberOpRef::operator=(std::nullptr_t) noexcept {
+    const FiberOp* old = ptr;
+    ptr = nullptr;
+    if (old) {
+        old->release();
+    }
+    return *this;
+}
+
+inline FiberOpRef::~FiberOpRef() {
+    if (ptr) {
+        ptr->release();
+    }
+}
 
 } // namespace cask::fiber
 
