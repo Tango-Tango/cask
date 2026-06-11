@@ -56,7 +56,7 @@ public:
      * @param sched The scheduler to run the Fiber on.
      * @return A Fiber representing the ongoing concurrent execution of the op.
      */
-    static FiberRef<T,E> run(const std::shared_ptr<const fiber::FiberOp>& op, const std::shared_ptr<Scheduler>& sched);
+    static FiberRef<T,E> run(const fiber::FiberOpRef& op, const std::shared_ptr<Scheduler>& sched);
 
     /**
      * Run the given FiberOp without a scheduler.
@@ -68,7 +68,7 @@ public:
      * @return The success or error result of the oeprations execution. If the op
      *         could not be executed without a scheduler then no result is provided.
      */
-    static std::optional<Either<T,E>> runSync(const std::shared_ptr<const fiber::FiberOp>& op);
+    static std::optional<Either<T,E>> runSync(const fiber::FiberOpRef& op);
 
     /**
      * Return the ID of the currently running fiber (if any).
@@ -162,14 +162,14 @@ public:
 namespace cask {
 
 template <class T, class E>
-FiberRef<T,E> Fiber<T,E>::run(const std::shared_ptr<const fiber::FiberOp>& op, const std::shared_ptr<Scheduler>& sched) {
+FiberRef<T,E> Fiber<T,E>::run(const fiber::FiberOpRef& op, const std::shared_ptr<Scheduler>& sched) {
     auto fiber = std::make_shared<fiber::FiberImpl<T,E>>(op);
     fiber->resume(sched);
     return fiber;
 }
 
 template <class T, class E>
-std::optional<Either<T,E>> Fiber<T,E>::runSync(const std::shared_ptr<const fiber::FiberOp>& op) {
+std::optional<Either<T,E>> Fiber<T,E>::runSync(const fiber::FiberOpRef& op) {
     auto fiber = std::make_shared<fiber::FiberImpl<T,E>>(op);
     fiber->resumeSync();
 

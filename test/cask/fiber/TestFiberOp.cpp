@@ -68,7 +68,7 @@ TEST(FiberOp, Delay) {
 }
 
 TEST(FiberOp, RaceCopy) {
-    std::vector<std::shared_ptr<const FiberOp>> ops = {FiberOp::value(123), FiberOp::value(456)};
+    std::vector<cask::fiber::FiberOpRef> ops = {FiberOp::value(123), FiberOp::value(456)};
     auto op = FiberOp::race(ops);
 
     ASSERT_EQ(op->opType, cask::fiber::RACE);

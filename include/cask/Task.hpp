@@ -805,11 +805,11 @@ public:
      * should not be called directly and, instead, users should use provided
      * operators to build these operations automatically.
      */
-    explicit Task(const std::shared_ptr<const fiber::FiberOp>& op) noexcept
+    explicit Task(const fiber::FiberOpRef& op) noexcept
         : op(op)
     {}
 
-    explicit Task(std::shared_ptr<const fiber::FiberOp>&& op) noexcept
+    explicit Task(fiber::FiberOpRef&& op) noexcept
         : op(std::move(op))
     {}
 
@@ -833,7 +833,7 @@ public:
         return *this;
     }
 
-    std::shared_ptr<const fiber::FiberOp> op;
+    fiber::FiberOpRef op;
 };
 
 } // namespace cask
