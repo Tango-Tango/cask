@@ -5,7 +5,6 @@
 
 #include <atomic>
 #include <chrono>
-#include <future>
 #include "gtest/gtest.h"
 #include "cask/Deferred.hpp"
 #include "cask/Task.hpp"
@@ -23,13 +22,13 @@ TEST_P(SchedulerTest, IdlesAtStart) {
 }
 
 TEST_P(SchedulerTest, SubmitSingle) {
-    std::promise<void> signal;
+    TestSignal signal;
 
     sched->submit([&signal] {
-        signal.set_value();
+        signal.notify();
     });
 
-    signal.get_future().wait();
+    signal.wait();
     
     awaitIdle();
 }
@@ -65,13 +64,13 @@ TEST_P(SchedulerTest, SubmitBulk) {
 }
 
 TEST_P(SchedulerTest, SubmitAfter) {
-    std::promise<void> signal;
+    TestSignal signal;
 
     auto before = std::chrono::high_resolution_clock::now();
     sched->submitAfter(25, [&signal] {
-        signal.set_value();
+        signal.notify();
     });
-    signal.get_future().wait();
+    signal.wait();
     auto after = std::chrono::high_resolution_clock::now();
 
     auto delta = after - before;
@@ -83,11 +82,11 @@ TEST_P(SchedulerTest, SubmitAfter) {
 }
 
 TEST_P(SchedulerTest, SubmitAfterCancel) {
-    std::promise<void> signal;
+    TestSignal signal;
 
     int cancel_counter = 0;
     auto firstHandle = sched->submitAfter(25, []{});
-    auto secondHandle = sched->submitAfter(25, [&signal] { signal.set_value(); });
+    auto secondHandle = sched->submitAfter(25, [&signal] { signal.notify(); });
 
     firstHandle->onCancel([&cancel_counter]{ cancel_counter++; });
     secondHandle->onCancel([&cancel_counter]{ cancel_counter++; });
@@ -96,24 +95,24 @@ TEST_P(SchedulerTest, SubmitAfterCancel) {
     firstHandle->cancel();
     firstHandle->cancel();
 
-    signal.get_future().wait();
+    signal.wait();
 
     EXPECT_EQ(cancel_counter, 1);
     awaitIdle();
 }
 
 TEST_P(SchedulerTest, RegistersCallbackAfterCancelled) {
-    std::promise<void> signal;
+    TestSignal signal;
 
     int cancel_counter = 0;
     auto firstHandle = sched->submitAfter(25, []{});
-    auto secondHandle = sched->submitAfter(25, [&signal] { signal.set_value(); });
+    auto secondHandle = sched->submitAfter(25, [&signal] { signal.notify(); });
 
     firstHandle->cancel();
     firstHandle->onCancel([&cancel_counter]{ cancel_counter++; });
     secondHandle->onCancel([&cancel_counter]{ cancel_counter++; });
 
-    signal.get_future().wait();
+    signal.wait();
 
     EXPECT_EQ(cancel_counter, 1);
     awaitIdle();
@@ -121,17 +120,17 @@ TEST_P(SchedulerTest, RegistersCallbackAfterCancelled) {
 
 TEST_P(SchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
     bool shutdown = false;
-    std::promise<void> shutdown_signal;
+    TestSignal shutdown_signal;
 
     auto before = std::chrono::high_resolution_clock::now();
     auto cancelable = sched->submitAfter(25, [] {});
 
     cancelable->onShutdown([&shutdown, &shutdown_signal] {
         shutdown = true;
-        shutdown_signal.set_value();
+        shutdown_signal.notify();
     });
 
-    shutdown_signal.get_future().wait();
+    shutdown_signal.wait();
     auto after = std::chrono::high_resolution_clock::now();
 
     auto delta = after - before;
@@ -145,14 +144,14 @@ TEST_P(SchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
 
 TEST_P(SchedulerTest, RunsShutdownImmediatelyCallbackIfTimerAlreadyFired) {
     bool shutdown = false;
-    std::promise<void> signal;
+    TestSignal signal;
 
     auto before = std::chrono::high_resolution_clock::now();
     auto cancelable = sched->submitAfter(25, [&signal] {
-        signal.set_value();
+        signal.notify();
     });
 
-    signal.get_future().wait();
+    signal.wait();
     auto after = std::chrono::high_resolution_clock::now();
 
     auto delta = after - before;
