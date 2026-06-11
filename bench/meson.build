@@ -6,6 +6,7 @@ if get_option('build_benchmarks')
         'BenchFiberOp.cpp',
         'BenchFlatMap.cpp',
         'BenchPool.cpp',
+        'BenchSchedulerFlatMap.cpp',
         'main.cpp'
     ]
 
