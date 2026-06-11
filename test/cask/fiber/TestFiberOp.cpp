@@ -155,7 +155,7 @@ TEST(FiberOpRef, MoveTransfersOwnership) {
     const auto* raw = op.get();
 
     auto moved = std::move(op);
-    EXPECT_EQ(op.get(), nullptr); // NOLINT(bugprone-use-after-move): intentionally checking moved-from state
+    EXPECT_EQ(op.get(), nullptr); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move): intentionally checking moved-from state
     EXPECT_EQ(moved.get(), raw);
     EXPECT_GT(token.use_count(), 1);
 
@@ -192,7 +192,7 @@ TEST(FiberOpRef, MoveAssignReleasesPreviousTarget) {
 
     EXPECT_EQ(first_token.use_count(), 1);
     EXPECT_GT(second_token.use_count(), 1);
-    EXPECT_EQ(second.get(), nullptr); // NOLINT(bugprone-use-after-move): intentionally checking moved-from state
+    EXPECT_EQ(second.get(), nullptr); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move): intentionally checking moved-from state
 
     first = nullptr;
     EXPECT_EQ(second_token.use_count(), 1);
@@ -218,7 +218,7 @@ TEST(FiberOpRef, FlatMapRetainsInputOp) {
     auto token = std::make_shared<int>(42);
 
     auto input = opHoldingToken(token);
-    auto composed = input->flatMap([](auto&& value) {
+    auto composed = input->flatMap([](cask::fiber::FiberValue&& value) {
         return FiberOp::value(std::move(value).getValue().value_or(Erased(0)));
     });
 
