@@ -4,9 +4,10 @@
 //          https://www.boost.org/LICENSE_1_0.txt)
 
 // Benchmarks targeting the cost of creating ref-counted FiberOp handles.
-// Each FiberOp factory pool-allocates the op; the handle wrapping it must
-// not defeat the pool with extra heap allocations (e.g. a shared_ptr
-// control block) since this is one of the hottest allocation paths.
+// Each FiberOp factory pool-allocates the op and returns a FiberOpRef -
+// an intrusive refcounted pointer. The handle must not defeat the pool
+// with extra heap allocations since this is one of the hottest
+// allocation paths in the library.
 
 #include <benchmark/benchmark.h>
 #include <vector>
@@ -21,7 +22,7 @@ using cask::fiber::FiberValue;
 
 // Single value op create + destroy - the most common operation
 // (every Task::pure / map / flatMap result goes through this).
-static void BM_FiberOp_SharedValue(benchmark::State& state) {
+static void BM_FiberOp_CreateValue(benchmark::State& state) {
     auto pool = cask::pool::global_pool();
     for (auto _ : state) {
         auto op = FiberOp::value(Erased(42));
@@ -29,10 +30,10 @@ static void BM_FiberOp_SharedValue(benchmark::State& state) {
     }
     benchmark::DoNotOptimize(pool);
 }
-BENCHMARK(BM_FiberOp_SharedValue)->ThreadRange(1, 8);
+BENCHMARK(BM_FiberOp_CreateValue)->ThreadRange(1, 8);
 
 // Error op create + destroy.
-static void BM_FiberOp_SharedError(benchmark::State& state) {
+static void BM_FiberOp_CreateError(benchmark::State& state) {
     auto pool = cask::pool::global_pool();
     for (auto _ : state) {
         auto op = FiberOp::error(Erased(42));
@@ -40,10 +41,10 @@ static void BM_FiberOp_SharedError(benchmark::State& state) {
     }
     benchmark::DoNotOptimize(pool);
 }
-BENCHMARK(BM_FiberOp_SharedError);
+BENCHMARK(BM_FiberOp_CreateError);
 
 // Thunk op create + destroy.
-static void BM_FiberOp_SharedThunk(benchmark::State& state) {
+static void BM_FiberOp_CreateThunk(benchmark::State& state) {
     auto pool = cask::pool::global_pool();
     for (auto _ : state) {
         auto op = FiberOp::thunk([]() { return Erased(42); });
@@ -51,11 +52,11 @@ static void BM_FiberOp_SharedThunk(benchmark::State& state) {
     }
     benchmark::DoNotOptimize(pool);
 }
-BENCHMARK(BM_FiberOp_SharedThunk);
+BENCHMARK(BM_FiberOp_CreateThunk);
 
-// Valueless op (cede) create + destroy - isolates the shared_ptr wrapping
-// cost since there is no payload allocation at all.
-static void BM_FiberOp_SharedCede(benchmark::State& state) {
+// Valueless op (cede) create + destroy - isolates the handle and op
+// allocation cost since there is no payload allocation at all.
+static void BM_FiberOp_CreateCede(benchmark::State& state) {
     auto pool = cask::pool::global_pool();
     for (auto _ : state) {
         auto op = FiberOp::cede();
@@ -63,7 +64,7 @@ static void BM_FiberOp_SharedCede(benchmark::State& state) {
     }
     benchmark::DoNotOptimize(pool);
 }
-BENCHMARK(BM_FiberOp_SharedCede);
+BENCHMARK(BM_FiberOp_CreateCede);
 
 // Build a flatMap chain - each link creates a VALUE op plus a FLATMAP op,
 // mirroring what Task composition does internally.
@@ -84,9 +85,10 @@ static void BM_FiberOp_FlatMapChainBuild(benchmark::State& state) {
 }
 BENCHMARK(BM_FiberOp_FlatMapChainBuild)->Range(1, 256);
 
-// Copying the shared_ptr (refcount churn) - measures control block traffic
-// in the trampoline, which hands these pointers around constantly.
-static void BM_FiberOp_SharedPtrCopy(benchmark::State& state) {
+// Copying a FiberOpRef (intrusive refcount churn) - measures the atomic
+// increment/decrement cost in the trampoline, which hands these handles
+// around constantly.
+static void BM_FiberOp_RefCopy(benchmark::State& state) {
     auto pool = cask::pool::global_pool();
     auto op = FiberOp::value(Erased(42));
     for (auto _ : state) {
@@ -95,7 +97,7 @@ static void BM_FiberOp_SharedPtrCopy(benchmark::State& state) {
     }
     benchmark::DoNotOptimize(pool);
 }
-BENCHMARK(BM_FiberOp_SharedPtrCopy);
+BENCHMARK(BM_FiberOp_RefCopy);
 
 // Batch create-then-destroy: stresses both alloc and dealloc paths with
 // many ops alive at once, closer to a real fiber's working set.

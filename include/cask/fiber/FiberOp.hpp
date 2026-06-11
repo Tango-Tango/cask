@@ -292,13 +292,15 @@ inline FiberOpRef::FiberOpRef(const FiberOpRef& other) noexcept
 }
 
 inline FiberOpRef& FiberOpRef::operator=(const FiberOpRef& other) noexcept {
-    const FiberOp* old = ptr;
-    ptr = other.ptr;
-    if (ptr) {
-        ptr->retain();
-    }
-    if (old) {
-        old->release();
+    if (this != &other) {
+        const FiberOp* old = ptr;
+        ptr = other.ptr;
+        if (ptr) {
+            ptr->retain();
+        }
+        if (old) {
+            old->release();
+        }
     }
     return *this;
 }

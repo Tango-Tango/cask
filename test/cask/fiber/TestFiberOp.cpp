@@ -108,3 +108,143 @@ TEST(FiberOp, FlatMap) {
     ASSERT_EQ(input->opType, cask::fiber::VALUE);
     ASSERT_TRUE(predicate);
 }
+
+// --- FiberOpRef intrusive reference counting lifetime tests ---
+
+namespace {
+
+cask::fiber::FiberOpRef opHoldingToken(const std::shared_ptr<int>& token) {
+    return FiberOp::thunk([token] {
+        return Erased(*token);
+    });
+}
+
+} // namespace
+
+TEST(FiberOpRef, DestroysPayloadWhenLastRefDropped) {
+    auto token = std::make_shared<int>(42);
+
+    {
+        auto op = opHoldingToken(token);
+        EXPECT_GT(token.use_count(), 1);
+    }
+
+    EXPECT_EQ(token.use_count(), 1);
+}
+
+TEST(FiberOpRef, CopyExtendsLifetime) {
+    auto token = std::make_shared<int>(42);
+
+    auto op = opHoldingToken(token);
+    auto copy = op;
+
+    EXPECT_EQ(op.get(), copy.get());
+
+    op = nullptr;
+    EXPECT_EQ(op.get(), nullptr);
+    EXPECT_GT(token.use_count(), 1);
+
+    copy = nullptr;
+    EXPECT_EQ(token.use_count(), 1);
+}
+
+TEST(FiberOpRef, MoveTransfersOwnership) {
+    auto token = std::make_shared<int>(42);
+
+    auto op = opHoldingToken(token);
+    const auto* raw = op.get();
+
+    auto moved = std::move(op);
+    EXPECT_EQ(op.get(), nullptr); // NOLINT(bugprone-use-after-move): intentionally checking moved-from state
+    EXPECT_EQ(moved.get(), raw);
+    EXPECT_GT(token.use_count(), 1);
+
+    moved = nullptr;
+    EXPECT_EQ(token.use_count(), 1);
+}
+
+TEST(FiberOpRef, CopyAssignReleasesPreviousTarget) {
+    auto first_token = std::make_shared<int>(1);
+    auto second_token = std::make_shared<int>(2);
+
+    auto first = opHoldingToken(first_token);
+    auto second = opHoldingToken(second_token);
+
+    first = second;
+
+    EXPECT_EQ(first_token.use_count(), 1);
+    EXPECT_GT(second_token.use_count(), 1);
+    EXPECT_EQ(first.get(), second.get());
+
+    first = nullptr;
+    second = nullptr;
+    EXPECT_EQ(second_token.use_count(), 1);
+}
+
+TEST(FiberOpRef, MoveAssignReleasesPreviousTarget) {
+    auto first_token = std::make_shared<int>(1);
+    auto second_token = std::make_shared<int>(2);
+
+    auto first = opHoldingToken(first_token);
+    auto second = opHoldingToken(second_token);
+
+    first = std::move(second);
+
+    EXPECT_EQ(first_token.use_count(), 1);
+    EXPECT_GT(second_token.use_count(), 1);
+    EXPECT_EQ(second.get(), nullptr); // NOLINT(bugprone-use-after-move): intentionally checking moved-from state
+
+    first = nullptr;
+    EXPECT_EQ(second_token.use_count(), 1);
+}
+
+TEST(FiberOpRef, SelfCopyAssignIsSafe) {
+    auto token = std::make_shared<int>(42);
+
+    auto op = opHoldingToken(token);
+    const auto* raw = op.get();
+
+    auto& alias = op;
+    op = alias;
+
+    EXPECT_EQ(op.get(), raw);
+    EXPECT_GT(token.use_count(), 1);
+
+    op = nullptr;
+    EXPECT_EQ(token.use_count(), 1);
+}
+
+TEST(FiberOpRef, FlatMapRetainsInputOp) {
+    auto token = std::make_shared<int>(42);
+
+    auto input = opHoldingToken(token);
+    auto composed = input->flatMap([](auto&& value) {
+        return FiberOp::value(std::move(value).getValue().value_or(Erased(0)));
+    });
+
+    // Dropping the original handle must not destroy the input op - the
+    // FLATMAP node holds its own reference to it.
+    input = nullptr;
+    EXPECT_GT(token.use_count(), 1);
+    EXPECT_EQ(composed->data.flatMapData->first->opType, cask::fiber::THUNK);
+
+    composed = nullptr;
+    EXPECT_EQ(token.use_count(), 1);
+}
+
+TEST(FiberOpRef, RaceRetainsRacers) {
+    auto first_token = std::make_shared<int>(1);
+    auto second_token = std::make_shared<int>(2);
+
+    auto race = FiberOp::race({
+        opHoldingToken(first_token),
+        opHoldingToken(second_token)
+    });
+
+    EXPECT_GT(first_token.use_count(), 1);
+    EXPECT_GT(second_token.use_count(), 1);
+
+    race = nullptr;
+    EXPECT_EQ(first_token.use_count(), 1);
+    EXPECT_EQ(second_token.use_count(), 1);
+}
