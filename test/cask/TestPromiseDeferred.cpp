@@ -149,77 +149,73 @@ TEST_P(DeferredTest, Promise) {
 }
 
 TEST_P(DeferredTest, PromiseOnCompleteSuccess) {
-    std::mutex mutex;
-    mutex.lock();
+    TestSignal signal;
 
     auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     Either<int,std::string> result = Either<int,std::string>::left(0);
-    deferred->onComplete([&result, &mutex](auto value) {
+    deferred->onComplete([&result, &signal](auto value) {
         result = value;
-        mutex.unlock();
+        signal.notify();
     });
 
     promise->success(123);
-    mutex.lock();
+    signal.wait();
 
     EXPECT_EQ(result.get_left(), 123);
 }
 
 TEST_P(DeferredTest, PromiseOnCompleteError) {
-    std::mutex mutex;
-    mutex.lock();
+    TestSignal signal;
 
     auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     Either<int,std::string> result = Either<int,std::string>::left(0);
-    deferred->onComplete([&result, &mutex](auto value) {
+    deferred->onComplete([&result, &signal](auto value) {
         result = value;
-        mutex.unlock();
+        signal.notify();
     });
 
     promise->error("broke");
-    mutex.lock();
+    signal.wait();
 
     EXPECT_EQ(result.get_right(), "broke");
 }
 
 TEST_P(DeferredTest, PromiseOnSuccess) {
-    std::mutex mutex;
-    mutex.lock();
+    TestSignal signal;
 
     auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     int result = 0;
-    deferred->onSuccess([&result, &mutex](auto value) {
+    deferred->onSuccess([&result, &signal](auto value) {
         result = value;
-        mutex.unlock();
+        signal.notify();
     });
 
     promise->success(123);
-    mutex.lock();
+    signal.wait();
 
     EXPECT_EQ(result, 123);
 }
 
 TEST_P(DeferredTest, PromiseOnError) {
-    std::mutex mutex;
-    mutex.lock();
+    TestSignal signal;
 
     auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
 
     std::string result = "not called";
-    deferred->onError([&result, &mutex](auto value) {
+    deferred->onError([&result, &signal](auto value) {
         result = value;
-        mutex.unlock();
+        signal.notify();
     });
 
     promise->error("broke");
-    mutex.lock();
+    signal.wait();
 
     EXPECT_EQ(result, "broke");
 }
@@ -248,20 +244,19 @@ TEST_P(DeferredTest, PromiseAwaitSyncError) {
 }
 
 TEST_P(DeferredTest, PromiseAwaitAsync) {
-    std::mutex mutex;
-    mutex.lock();
+    TestSignal started;
 
     auto promise = Promise<int,std::string>::create(sched);
     auto deferred = Deferred<int,std::string>::forPromise(promise);
     int value;
 
-    std::thread backgroundAwait([&value, &mutex, &deferred]() {
-        mutex.unlock();
+    std::thread backgroundAwait([&value, &started, &deferred]() {
+        started.notify();
         value = deferred->await();
     });
 
     // Wait for background thread to get started
-    mutex.lock();
+    started.wait();
 
     // Complete the promise after a small sleep (to be triple sure that
     // the await is running).

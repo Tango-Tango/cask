@@ -1,11 +1,36 @@
 #pragma once
 
+#include <condition_variable>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include "cask/Scheduler.hpp"
 #include "cask/scheduler/SingleThreadScheduler.hpp"
 #include "cask/scheduler/WorkStealingScheduler.hpp"
+
+// A simple one-shot cross-thread signal built on a mutex and condition
+// variable. Safe to notify and wait concurrently from different threads.
+class TestSignal {
+public:
+    void notify() {
+        // Notify while holding the lock so the broadcast cannot race with a
+        // waiter waking up and destroying this signal.
+        std::lock_guard<std::mutex> lock(mutex);
+        fired = true;
+        cond.notify_all();
+    }
+
+    void wait() {
+        std::unique_lock<std::mutex> lock(mutex);
+        cond.wait(lock, [this] { return fired; });
+    }
+
+private:
+    std::mutex mutex;
+    std::condition_variable cond;
+    bool fired = false;
+};
 
 struct SchedulerTestBenchEntry {
     std::function<std::shared_ptr<cask::Scheduler>()> factory;
