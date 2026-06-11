@@ -323,7 +323,7 @@ bool SingleThreadScheduler::steal_unsafe(const std::shared_ptr<SchedulerControlD
         requested_amount--;
 
         if (auto task = control_data->ready_queue.pop_front()) {
-            requestor_ready_queue.emplace_back(*task);
+            requestor_ready_queue.emplace_back(std::move(*task));
             work_stolen = true;
         } else {
             break;

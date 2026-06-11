@@ -30,7 +30,7 @@ std::optional<std::function<void()>> ReadyQueue::push_front(const std::function<
     if (ready_queue.size() + 1 > max_queue_size) {
         // Pop an item from the back of the queue and return it
         // as overflow, then push this item to the front.
-        auto overflow = ready_queue.back();
+        auto overflow = std::move(ready_queue.back());
         ready_queue.pop_back();
         ready_queue.emplace_front(task);
         return overflow;
@@ -75,7 +75,7 @@ std::optional<std::function<void()>> ReadyQueue::pop_front() {
     if(ready_queue.empty()) {
         return std::nullopt;
     } else {
-        auto task = ready_queue.front();
+        auto task = std::move(ready_queue.front());
         ready_queue.pop_front();
         memoized_queue_size.fetch_sub(1, std::memory_order_relaxed);
         return task;
@@ -87,7 +87,7 @@ std::optional<std::function<void()>> ReadyQueue::pop_back() {
     if(ready_queue.empty()) {
         return std::nullopt;
     } else {
-        auto task = ready_queue.back();
+        auto task = std::move(ready_queue.back());
         ready_queue.pop_back();
         memoized_queue_size.fetch_sub(1, std::memory_order_relaxed);
         return task;
@@ -101,9 +101,9 @@ bool ReadyQueue::steal_from(ReadyQueue& victim) {
     if (ready_queue.size() >= max_queue_size || victim.ready_queue.empty()) {
         return false;
     } else {
-        auto task = victim.ready_queue.back();
+        auto task = std::move(victim.ready_queue.back());
         victim.ready_queue.pop_back();
-        ready_queue.emplace_front(task);
+        ready_queue.emplace_front(std::move(task));
         memoized_queue_size.fetch_add(1, std::memory_order_relaxed);
         victim.memoized_queue_size.fetch_sub(1, std::memory_order_relaxed);
         work_available.notify_one();
