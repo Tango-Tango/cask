@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <future>
 #include "gtest/gtest.h"
 #include "cask/Deferred.hpp"
 #include "cask/Task.hpp"
@@ -22,14 +23,13 @@ TEST_P(SchedulerTest, IdlesAtStart) {
 }
 
 TEST_P(SchedulerTest, SubmitSingle) {
-    std::mutex mutex;
-    mutex.lock();
+    std::promise<void> signal;
 
-    sched->submit([&mutex] {
-        mutex.unlock();
+    sched->submit([&signal] {
+        signal.set_value();
     });
 
-    mutex.lock();
+    signal.get_future().wait();
     
     awaitIdle();
 }
@@ -65,14 +65,13 @@ TEST_P(SchedulerTest, SubmitBulk) {
 }
 
 TEST_P(SchedulerTest, SubmitAfter) {
-    std::mutex mutex;
-    mutex.lock();
+    std::promise<void> signal;
 
     auto before = std::chrono::high_resolution_clock::now();
-    sched->submitAfter(25, [&mutex] {
-        mutex.unlock();
+    sched->submitAfter(25, [&signal] {
+        signal.set_value();
     });
-    mutex.lock();
+    signal.get_future().wait();
     auto after = std::chrono::high_resolution_clock::now();
 
     auto delta = after - before;
@@ -84,12 +83,11 @@ TEST_P(SchedulerTest, SubmitAfter) {
 }
 
 TEST_P(SchedulerTest, SubmitAfterCancel) {
-    std::mutex mutex;
-    mutex.lock();
+    std::promise<void> signal;
 
     int cancel_counter = 0;
     auto firstHandle = sched->submitAfter(25, []{});
-    auto secondHandle = sched->submitAfter(25, [&mutex] { mutex.unlock(); });
+    auto secondHandle = sched->submitAfter(25, [&signal] { signal.set_value(); });
 
     firstHandle->onCancel([&cancel_counter]{ cancel_counter++; });
     secondHandle->onCancel([&cancel_counter]{ cancel_counter++; });
@@ -98,25 +96,24 @@ TEST_P(SchedulerTest, SubmitAfterCancel) {
     firstHandle->cancel();
     firstHandle->cancel();
 
-    mutex.lock();
+    signal.get_future().wait();
 
     EXPECT_EQ(cancel_counter, 1);
     awaitIdle();
 }
 
 TEST_P(SchedulerTest, RegistersCallbackAfterCancelled) {
-    std::mutex mutex;
-    mutex.lock();
+    std::promise<void> signal;
 
     int cancel_counter = 0;
     auto firstHandle = sched->submitAfter(25, []{});
-    auto secondHandle = sched->submitAfter(25, [&mutex] { mutex.unlock(); });
+    auto secondHandle = sched->submitAfter(25, [&signal] { signal.set_value(); });
 
     firstHandle->cancel();
     firstHandle->onCancel([&cancel_counter]{ cancel_counter++; });
     secondHandle->onCancel([&cancel_counter]{ cancel_counter++; });
 
-    mutex.lock();
+    signal.get_future().wait();
 
     EXPECT_EQ(cancel_counter, 1);
     awaitIdle();
@@ -124,19 +121,17 @@ TEST_P(SchedulerTest, RegistersCallbackAfterCancelled) {
 
 TEST_P(SchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
     bool shutdown = false;
-    std::mutex shutdown_mutex;
-
-    shutdown_mutex.lock();
+    std::promise<void> shutdown_signal;
 
     auto before = std::chrono::high_resolution_clock::now();
     auto cancelable = sched->submitAfter(25, [] {});
 
-    cancelable->onShutdown([&shutdown, &shutdown_mutex] {
+    cancelable->onShutdown([&shutdown, &shutdown_signal] {
         shutdown = true;
-        shutdown_mutex.unlock();
+        shutdown_signal.set_value();
     });
 
-    shutdown_mutex.lock();
+    shutdown_signal.get_future().wait();
     auto after = std::chrono::high_resolution_clock::now();
 
     auto delta = after - before;
@@ -150,15 +145,14 @@ TEST_P(SchedulerTest, RunsShutdownCallbackAfterTimerTaskCompletion) {
 
 TEST_P(SchedulerTest, RunsShutdownImmediatelyCallbackIfTimerAlreadyFired) {
     bool shutdown = false;
-    std::mutex mutex;
-    mutex.lock();
+    std::promise<void> signal;
 
     auto before = std::chrono::high_resolution_clock::now();
-    auto cancelable = sched->submitAfter(25, [&mutex] {
-        mutex.unlock();
+    auto cancelable = sched->submitAfter(25, [&signal] {
+        signal.set_value();
     });
 
-    mutex.lock();
+    signal.get_future().wait();
     auto after = std::chrono::high_resolution_clock::now();
 
     auto delta = after - before;

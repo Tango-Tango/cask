@@ -38,7 +38,7 @@ public:
     void deallocate(T* ptr);
 
 private:
-    static constexpr std::size_t TotalBlockSize = BlockSize + sizeof(void*);
+    static constexpr std::size_t TotalBlockSize = BlockSize + sizeof(std::atomic<void*>);
     static constexpr std::size_t PadSize = (Alignment - (TotalBlockSize % Alignment)) % Alignment;
 
     struct Chunk;
@@ -48,7 +48,7 @@ private:
         BlockWithPad() : next(nullptr) {}
 
         uint8_t memory[BlockSize];
-        BlockWithPad* next;
+        std::atomic<BlockWithPad*> next;
         std::uint8_t padding[PadSize == 0 ? 1 : PadSize];
     };
 
@@ -57,7 +57,7 @@ private:
         BlockWithoutPad() : next(nullptr) {}
 
         uint8_t memory[BlockSize];
-        BlockWithoutPad* next;
+        std::atomic<BlockWithoutPad*> next;
     };
 
     // Choose the block type. Most of the time at least some padding is required, but
@@ -130,15 +130,17 @@ T* BlockPool<BlockSize,NumBlocksInChunk,Alignment>::allocate(Args&&... args) {
     static_assert(sizeof(T) <= BlockSize);
 
     while(true) {
-        Head<Block> old_head = free_blocks.load(std::memory_order_relaxed);
+        // Acquire so that dereferencing old_head.ptr->next below synchronizes with
+        // the release-CAS that published the block (or its freshly constructed chunk).
+        Head<Block> old_head = free_blocks.load(std::memory_order_acquire);
 
         if(old_head.ptr) {
             Head<Block> new_head;
-            new_head.ptr = old_head.ptr->next;
+            new_head.ptr = old_head.ptr->next.load(std::memory_order_relaxed);
             new_head.counter = old_head.counter + 1;
-            if(free_blocks.compare_exchange_weak(old_head, new_head, std::memory_order_acquire, std::memory_order_relaxed)) {
+            if(free_blocks.compare_exchange_weak(old_head, new_head, std::memory_order_acquire, std::memory_order_acquire)) {
                 UNPOISON_BLOCK(old_head.ptr);
-                old_head.ptr->next = nullptr;
+                old_head.ptr->next.store(nullptr, std::memory_order_relaxed);
                 return new (old_head.ptr->memory) T(std::forward<Args>(args)...);
             }
 
@@ -163,7 +165,7 @@ void BlockPool<BlockSize,NumBlocksInChunk,Alignment>::deallocate(T* ptr) {
 
     do {
         new_head.ptr = block;
-        new_head.ptr->next = old_head.ptr;
+        new_head.ptr->next.store(old_head.ptr, std::memory_order_relaxed);
         new_head.counter = old_head.counter + 1;
     } while(!free_blocks.compare_exchange_weak(old_head,new_head, std::memory_order_release, std::memory_order_relaxed));
 }
@@ -189,7 +191,7 @@ void BlockPool<BlockSize,NumBlocksInChunk,Alignment>::allocate_chunk() {
         // the free list
         for (std::size_t i = 0; i < NumBlocksInChunk; i++) {
             Block* block = &(chunk->blocks[i]);
-            block->next = (i < NumBlocksInChunk - 1) ? &(chunk->blocks[i + 1]) : nullptr;
+            block->next.store((i < NumBlocksInChunk - 1) ? &(chunk->blocks[i + 1]) : nullptr, std::memory_order_relaxed);
             POISON_BLOCK(block);
         }
 
@@ -197,7 +199,7 @@ void BlockPool<BlockSize,NumBlocksInChunk,Alignment>::allocate_chunk() {
         Head<Block> old_head = free_blocks.load(std::memory_order_relaxed);
         Head<Block> new_head;
         do {
-            chunk->blocks[NumBlocksInChunk - 1].next = old_head.ptr;
+            chunk->blocks[NumBlocksInChunk - 1].next.store(old_head.ptr, std::memory_order_relaxed);
             new_head.ptr = &(chunk->blocks[0]);
             new_head.counter = old_head.counter + 1;
         } while (!free_blocks.compare_exchange_weak(old_head, new_head,
