@@ -7,6 +7,7 @@
 #define _CASK_EITHER_H_
 
 #include <optional>
+#include <utility>
 
 namespace cask {
 
@@ -78,7 +79,16 @@ public:
      *
      * @return The left value or throws an exception.
      */
-    constexpr L get_left() const;
+    constexpr L get_left() const&;
+
+    /**
+     * Attempt to get the left result, moving it out of this either.
+     * Only callable on rvalues - the either is left holding a
+     * moved-from value.
+     *
+     * @return The left value or throws an exception.
+     */
+    constexpr L get_left() &&;
 
     /**
      * Attempt to get the right result. Can throw if this either
@@ -88,7 +98,16 @@ public:
      *
      * @return The right value or throws an exception.
      */
-    constexpr R get_right() const;
+    constexpr R get_right() const&;
+
+    /**
+     * Attempt to get the right result, moving it out of this either.
+     * Only callable on rvalues - the either is left holding a
+     * moved-from value.
+     *
+     * @return The right value or throws an exception.
+     */
+    constexpr R get_right() &&;
 
     constexpr Either<L,R>(const Either<L,R>&) = default;
     constexpr Either<L,R>(Either<L,R>&&) noexcept = default;
@@ -140,13 +159,23 @@ constexpr bool Either<L,R>::is_right() const {
 }
 
 template <class L, class R>
-constexpr L Either<L,R>::get_left() const {
+constexpr L Either<L,R>::get_left() const& {
     return *leftValue; // NOLINT(bugprone-unchecked-optional-access)
 }
 
 template <class L, class R>
-constexpr R Either<L,R>::get_right() const {
+constexpr L Either<L,R>::get_left() && {
+    return std::move(*leftValue); // NOLINT(bugprone-unchecked-optional-access)
+}
+
+template <class L, class R>
+constexpr R Either<L,R>::get_right() const& {
     return *rightValue; // NOLINT(bugprone-unchecked-optional-access)
+}
+
+template <class L, class R>
+constexpr R Either<L,R>::get_right() && {
+    return std::move(*rightValue); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 } // namespace cask

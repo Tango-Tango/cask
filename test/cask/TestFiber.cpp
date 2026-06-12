@@ -82,6 +82,53 @@ TEST(TestFiber, EvaluatesPureValueSync) {
     ASSERT_EQ(result->get_left(), 123);
 }
 
+TEST(TestFiber, SharedOpEvaluatedRepeatedlyKeepsConstant) {
+    // A VALUE op that is still referenced externally (here, by this test -
+    // exactly like an op graph held by a re-runnable Task) must have its
+    // constant copied out during evaluation, not moved out: every
+    // evaluation must observe the original value. A non-trivial type is
+    // used so a wrongly-moved-out value is observable.
+    auto op = FiberOp::value(std::string("hello"));
+
+    for(int i = 0; i < 3; i++) {
+        auto result = Fiber<std::string,std::string>::runSync(op);
+
+        ASSERT_TRUE(result.has_value());
+        ASSERT_TRUE(result->is_left());
+        ASSERT_EQ(result->get_left(), "hello");
+    }
+}
+
+TEST(TestFiber, SharedErrorOpEvaluatedRepeatedlyKeepsConstant) {
+    auto op = FiberOp::error(std::string("broke"));
+
+    for(int i = 0; i < 3; i++) {
+        auto result = Fiber<std::string,std::string>::runSync(op);
+
+        ASSERT_TRUE(result.has_value());
+        ASSERT_TRUE(result->is_right());
+        ASSERT_EQ(result->get_right(), "broke");
+    }
+}
+
+TEST(TestFiber, SharedFlatMapChainEvaluatedRepeatedlyKeepsConstants) {
+    // The flatMap continuation returns a freshly-built (uniquely
+    // referenced) op each evaluation - its constant may be moved out - but
+    // the shared input op's constant must survive every run.
+    auto op = FiberOp::value(std::string("hello"))->flatMap([](auto value) {
+        auto str = value.underlying().template get<std::string>();
+        return FiberOp::value(str + " world");
+    });
+
+    for(int i = 0; i < 3; i++) {
+        auto result = Fiber<std::string,std::string>::runSync(op);
+
+        ASSERT_TRUE(result.has_value());
+        ASSERT_TRUE(result->is_left());
+        ASSERT_EQ(result->get_left(), "hello world");
+    }
+}
+
 TEST(TestFiber, EvaluatesPureError) {
     auto sched = std::make_shared<BenchScheduler>();
     auto op = FiberOp::error(std::string("broke"));

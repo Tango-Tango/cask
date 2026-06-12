@@ -31,7 +31,12 @@ private:
 
 template <class T, class... Args>
 T* Pool::allocate(Args&&... args) {
-    if constexpr (sizeof(T) <= config::cache_line_size) {
+    // The block pools only guarantee alignof(std::max_align_t); types with
+    // stricter alignment go to (aligned) operator new, which honors any
+    // alignment in C++17.
+    if constexpr (alignof(T) > alignof(std::max_align_t)) {
+        return new T(std::forward<Args>(args)...);
+    } else if constexpr (sizeof(T) <= config::cache_line_size) {
         return small_pool.template allocate<T,Args...>(std::forward<Args>(args)...);
     } else if constexpr (sizeof(T) <= config::cache_line_size * 2UL) {
         return medium_pool.template allocate<T,Args...>(std::forward<Args>(args)...);
@@ -52,7 +57,9 @@ T* Pool::allocate(Args&&... args) {
 
 template <class T>
 void Pool::deallocate(T* ptr) {
-    if constexpr (sizeof(T) <= config::cache_line_size) {
+    if constexpr (alignof(T) > alignof(std::max_align_t)) {
+        delete ptr;
+    } else if constexpr (sizeof(T) <= config::cache_line_size) {
         return small_pool.template deallocate<T>(ptr);
     } else if constexpr (sizeof(T) <= config::cache_line_size * 2UL) {
         return medium_pool.template deallocate<T>(ptr);
