@@ -379,7 +379,7 @@ inline Erased& Erased::operator=(T&& value) noexcept {
     using DecayedT = std::decay_t<T>;
     if(state == state_for<DecayedT>()) {
         if constexpr (erased::trivial_sbo<DecayedT>) {
-            std::memcpy(inline_ptr(), &value, sizeof(DecayedT));
+            ::new (inline_ptr()) DecayedT(std::forward<T>(value));
         } else if constexpr (erased::fits_sbo<DecayedT>) {
             *static_cast<DecayedT*>(inline_ptr()) = std::forward<T>(value);
         } else {
