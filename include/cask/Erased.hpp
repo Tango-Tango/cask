@@ -121,7 +121,7 @@ inline constexpr TypeOps ops_for = [] {
     static_assert(!trivial_sbo<T>, "trivial inline types need no operations table");
     if constexpr (fits_sbo<T>) {
         return TypeOps(InlineOps{
-            [](void* ptr) noexcept { static_cast<T*>(ptr)->~T(); },
+            [](void* ptr) noexcept { std::destroy_at(static_cast<T*>(ptr)); },
             [](void* dest, const void* src) { ::new (dest) T(*static_cast<const T*>(src)); },
             [](void* dest, void* src) { ::new (dest) T(std::move(*static_cast<T*>(src))); }
         });
