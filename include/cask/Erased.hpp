@@ -122,7 +122,9 @@ inline constexpr TypeOps ops_for = [] {
     if constexpr (fits_sbo<T>) {
         return TypeOps(InlineOps{
             [](void* ptr) noexcept { std::destroy_at(static_cast<T*>(ptr)); },
+            // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): type-erased relocation primitive; the (dest, src) order mirrors the standard placement-new/memcpy convention
             [](void* dest, const void* src) { ::new (dest) T(*static_cast<const T*>(src)); },
+            // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): type-erased relocation primitive; the (dest, src) order mirrors the standard placement-new/memcpy convention
             [](void* dest, void* src) { ::new (dest) T(std::move(*static_cast<T*>(src))); }
         });
     } else {
