@@ -358,10 +358,10 @@ template <typename T, typename>
 inline Erased& Erased::operator=(const T& value) noexcept {
     if(state == state_for<T>()) {
         if constexpr (erased::trivial_sbo<T>) {
-            // Same-size trivial types share a state, so the buffer may hold
-            // a different (but equally trivial) type. Copy bytes rather
-            // than invoking T's assignment on possibly-mismatched storage.
-            std::memcpy(inline_ptr(), &value, sizeof(T));
+            // Same-size trivial types share a state, so the buffer may hold a
+            // different (but equally trivial) type. Reconstruct to ensure the
+            // correct object's lifetime is active in C++17.
+            ::new (inline_ptr()) T(value);
         } else if constexpr (erased::fits_sbo<T>) {
             *static_cast<T*>(inline_ptr()) = value;
         } else {
