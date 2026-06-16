@@ -219,6 +219,19 @@ public:
     }
 
     /**
+     * Check whether this op is uniquely referenced (refcount of exactly 1).
+     * When the caller holds that single reference no other owner can
+     * observe the op, so it may safely move payload data out of the op
+     * rather than copying - the classic uniqueness optimization for
+     * otherwise-immutable structures. Freshly built per-iteration ops
+     * (e.g. the result of a flatMap continuation) are unique; ops still
+     * referenced by a `Task` are not and must be copied from.
+     */
+    bool unique() const noexcept {
+        return refcount.load(std::memory_order_acquire) == 1;
+    }
+
+    /**
      * Increment this op's intrusive reference count. Normally called only
      * by `FiberOpRef`.
      */

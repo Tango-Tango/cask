@@ -7,6 +7,7 @@
 #define _CASK_EITHER_H_
 
 #include <optional>
+#include <utility>
 
 namespace cask {
 
@@ -71,24 +72,50 @@ public:
     constexpr bool is_right() const;
 
     /**
-     * Attempt to get the left result. Can throw if this either
-     * is holding a right result instead - and thus should be
-     * be guarded by a call to `is_left` or `!is_right` to determine
-     * the state of this either.
+     * Get the left value held by this either.
      *
-     * @return The left value or throws an exception.
+     * @pre This either must be holding a left value. Guard the call with
+     *      `is_left()` (or `!is_right()`); calling this when the either
+     *      holds a right value is undefined behavior - it does NOT throw.
+     *
+     * @return A copy of the left value.
      */
-    constexpr L get_left() const;
+    constexpr L get_left() const&;
 
     /**
-     * Attempt to get the right result. Can throw if this either
-     * is holding a right result instead - and thus should be
-     * be guarded by a call to `is_right` or `!is_left` to determine
-     * the state of this either.
+     * Get the left value, moving it out of this either. Only callable on
+     * rvalues; the either is left holding a moved-from value.
      *
-     * @return The right value or throws an exception.
+     * @pre This either must be holding a left value. Guard the call with
+     *      `is_left()` (or `!is_right()`); calling this when the either
+     *      holds a right value is undefined behavior - it does NOT throw.
+     *
+     * @return The left value, moved out of this either.
      */
-    constexpr R get_right() const;
+    constexpr L get_left() &&;
+
+    /**
+     * Get the right value held by this either.
+     *
+     * @pre This either must be holding a right value. Guard the call with
+     *      `is_right()` (or `!is_left()`); calling this when the either
+     *      holds a left value is undefined behavior - it does NOT throw.
+     *
+     * @return A copy of the right value.
+     */
+    constexpr R get_right() const&;
+
+    /**
+     * Get the right value, moving it out of this either. Only callable on
+     * rvalues; the either is left holding a moved-from value.
+     *
+     * @pre This either must be holding a right value. Guard the call with
+     *      `is_right()` (or `!is_left()`); calling this when the either
+     *      holds a left value is undefined behavior - it does NOT throw.
+     *
+     * @return The right value, moved out of this either.
+     */
+    constexpr R get_right() &&;
 
     constexpr Either<L,R>(const Either<L,R>&) = default;
     constexpr Either<L,R>(Either<L,R>&&) noexcept = default;
@@ -140,13 +167,23 @@ constexpr bool Either<L,R>::is_right() const {
 }
 
 template <class L, class R>
-constexpr L Either<L,R>::get_left() const {
+constexpr L Either<L,R>::get_left() const& {
     return *leftValue; // NOLINT(bugprone-unchecked-optional-access)
 }
 
 template <class L, class R>
-constexpr R Either<L,R>::get_right() const {
+constexpr L Either<L,R>::get_left() && {
+    return std::move(*leftValue); // NOLINT(bugprone-unchecked-optional-access)
+}
+
+template <class L, class R>
+constexpr R Either<L,R>::get_right() const& {
     return *rightValue; // NOLINT(bugprone-unchecked-optional-access)
+}
+
+template <class L, class R>
+constexpr R Either<L,R>::get_right() && {
+    return std::move(*rightValue); // NOLINT(bugprone-unchecked-optional-access)
 }
 
 } // namespace cask

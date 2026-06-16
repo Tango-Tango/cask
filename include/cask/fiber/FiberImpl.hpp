@@ -477,15 +477,26 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
     switch(op->opType) {
     case VALUE:
     {
-        const FiberOp::ConstantData* data = op->data.constantData;
-        value.setValue(*data);
+        FiberOp::ConstantData* data = op->data.constantData;
+        if(op->unique()) {
+            // This fiber holds the only reference to the op and is about
+            // to drop it - move the value out instead of copying. Ops
+            // still shared (e.g. held by a re-runnable Task) are copied.
+            value.setValue(std::move(*data));
+        } else {
+            value.setValue(*data);
+        }
         op = nullptr;
     }
     break;
     case ERROR:
     {
-        const FiberOp::ConstantData* data = op->data.constantData;
-        value.setError(*data);
+        FiberOp::ConstantData* data = op->data.constantData;
+        if(op->unique()) {
+            value.setError(std::move(*data));
+        } else {
+            value.setError(*data);
+        }
         op = nullptr;
     }
     break;
@@ -532,11 +543,14 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
             auto deferred = (*data)(sched);
 
             if (auto result_opt = deferred->get()) {
+                // The optional (and the Either inside it) is a local copy
+                // owned by this frame - move the result out rather than
+                // copying it a second time.
                 if(result_opt->is_left()) {
-                    value.setValue(result_opt->get_left());
+                    value.setValue(std::move(*result_opt).get_left());
                     op = nullptr;
                 } else {
-                    value.setError(result_opt->get_right());
+                    value.setError(std::move(*result_opt).get_right());
                     op = nullptr;
                 }
             } else {
