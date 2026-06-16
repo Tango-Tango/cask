@@ -85,7 +85,7 @@ TEST(Erased, MoveConstructor) {
     Erased first(123);
     Erased second(std::move(first));
 
-    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
+    // NOLINTNEXTLINE(bugprone-use-after-move,clang-analyzer-cplusplus.Move): Testing that moved-from state is empty
     EXPECT_FALSE(first.has_value());
     EXPECT_TRUE(second.has_value());
     EXPECT_EQ(second.get<int>(), 123);
@@ -96,7 +96,7 @@ TEST(Erased, MoveAssignment) {
     Erased second;
     second = std::move(first);
 
-    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
+    // NOLINTNEXTLINE(bugprone-use-after-move,clang-analyzer-cplusplus.Move): Testing that moved-from state is empty
     EXPECT_FALSE(first.has_value());
     EXPECT_TRUE(second.has_value());
     EXPECT_EQ(second.get<int>(), 123);
@@ -107,7 +107,7 @@ TEST(Erased, MoveAssignmentOverwrites) {
     Erased second(std::string("hello"));
     second = std::move(first);
 
-    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
+    // NOLINTNEXTLINE(bugprone-use-after-move,clang-analyzer-cplusplus.Move): Testing that moved-from state is empty
     EXPECT_FALSE(first.has_value());
     EXPECT_TRUE(second.has_value());
     EXPECT_EQ(second.get<int>(), 123);
@@ -118,7 +118,7 @@ TEST(Erased, MoveConstructorWithString) {
     Erased first(original);
     Erased second(std::move(first));
 
-    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
+    // NOLINTNEXTLINE(bugprone-use-after-move,clang-analyzer-cplusplus.Move): Testing that moved-from state is empty
     EXPECT_FALSE(first.has_value());
     EXPECT_TRUE(second.has_value());
     EXPECT_EQ(second.get<std::string>(), "hello world");
@@ -162,9 +162,11 @@ struct Tracked {
     Tracked(const Tracked& other) : counters(other.counters), payload(other.payload) { counters->copy_ctor++; }
     Tracked(Tracked&& other) noexcept : counters(other.counters), payload(other.payload) { counters->move_ctor++; }
     Tracked& operator=(const Tracked& other) {
-        counters = other.counters;
-        payload = other.payload;
-        counters->copy_assign++;
+        if(this != &other) {
+            counters = other.counters;
+            payload = other.payload;
+            counters->copy_assign++;
+        }
         return *this;
     }
     Tracked& operator=(Tracked&& other) noexcept {
@@ -241,7 +243,7 @@ TEST(Erased, InlineNonTrivialMoveEmptiesSourceAndBalancesLifetimes) {
         Erased first((Tracked(&counters, 7)));
         Erased second(std::move(first));
 
-        // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
+        // NOLINTNEXTLINE(bugprone-use-after-move,clang-analyzer-cplusplus.Move): Testing that moved-from state is empty
         EXPECT_FALSE(first.has_value());
         EXPECT_TRUE(second.has_value());
         EXPECT_EQ(second.get<Tracked>().payload, 7);
@@ -356,7 +358,7 @@ TEST(Erased, PooledMoveStealsPointerWithoutTouchingValue) {
     EXPECT_EQ(counters.move_ctor, move_ctors_before);
     EXPECT_EQ(counters.dtor, dtors_before);
 
-    // NOLINTNEXTLINE(bugprone-use-after-move): Testing that moved-from state is empty
+    // NOLINTNEXTLINE(bugprone-use-after-move,clang-analyzer-cplusplus.Move): Testing that moved-from state is empty
     EXPECT_FALSE(first.has_value());
     EXPECT_EQ(second.get<BigTracked>().payload, 7);
 
