@@ -84,7 +84,11 @@ jobs:
     - name: Commit VERSION file
       run: |
         git add VERSION
-        git commit -m "ci: release of version ${{ steps.version.outputs.tag_version }} [skip ci]"
+        if git diff --cached --quiet; then
+          echo "VERSION file already up to date; nothing to commit"
+        else
+          git commit -m "ci: release of version ${{ steps.version.outputs.tag_version }} [skip ci]"
+        fi
     
     - name: Create Git tag
       run: |
