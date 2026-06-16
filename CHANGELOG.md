@@ -3,6 +3,36 @@
 All feature additions, significant bug fixes, and API changes will be documented
 in this file. This project follows [semantic versioning](https://semver.org/).
 
+## 20.0
+
+- Use an intrusive refcount for `FiberOp`, yielding a 20% to 45% performance
+  uplift. **API change:** `FiberOp` is now passed as a `fiber::FiberOpRef` rather
+  than a `std::shared_ptr<const fiber::FiberOp>`, changing the signatures of
+  `Task`'s constructors and `Fiber::run` / `Fiber::runSync`. These are used
+  internally; consumers never interact with `FiberOp` directly, so users are not
+  expected to be affected.
+- **API change:** `Either::get_left` and `Either::get_right` are now
+  ref-qualified, each providing `const&` and `&&` overloads in place of the
+  previous single `const` accessor, so values can be moved out of an rvalue
+  `Either`.
+- Optimize type-erased value storage and movement, improving `flatMap` chain
+  throughput by 20% to 40%. `Erased` now stores small values inline and
+  `FiberValue` moves values when its refcount proves it safe.
+- Force move semantics in `ReadyQueue` for a small performance improvement.
+- Resolve several thread-sanitizer-identified races in `BlockPool` and
+  `FiberImpl`.
+- Avoid undefined behavior when initializing a global pool concurrently.
+- Use a lock and condition variable for `await` blocking to remove reliance on
+  undefined behavior, and a predicate in `ReadyQueue::await_work` to avoid missed
+  wakeups.
+- Wake an idle scheduler when `submitBulk` falls back to the global ready queue,
+  matching `submit` and avoiding added latency.
+- Fire expired timers in oldest-first order.
+- Don't leak the run thread when a `SingleThreadScheduler` constructed with
+  `DisableAutoStart` is stopped before being started.
+- Use an atomic bool for the `SingleThreadScheduler` `should_run` flag.
+- Update CI to the latest GitHub-hosted runners.
+
 ## 19.0
 
 - Performance improvements to the `WorkStealingScheduler` which necessitated
