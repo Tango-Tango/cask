@@ -97,7 +97,12 @@ Task<None,None> SwitchMapObserver<TI,TO,E>::onComplete() {
             subscription->onFiberShutdown([promise](auto) {
                 promise->success(None());
             });
-            return Task<None,None>::forPromise(promise);
+            // Capture the subscription so the fiber stays alive until it
+            // completes - scheduler timer callbacks only hold weak references.
+            return Task<None,None>::forPromise(promise)
+                .template map<None>([subscription](None&&) {
+                    return None();
+                });
         } else {
             return Task<None,None>::none();
         }
