@@ -90,5 +90,9 @@ const Erased& FiberValue::underlying() const {
     return value;
 }
 
+Erased& FiberValue::underlying() {
+    return value;
+}
+
 
 } // namespace cask::fiber

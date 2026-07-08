@@ -258,12 +258,12 @@ public:
             op->flatMap([predicate = std::forward<Predicate>(predicate)](auto&& fiber_value) {
                 try {
                     if(fiber_value.isValue()) {
-                        auto input = fiber_value.underlying().template get<T>();
+                        auto input = std::move(fiber_value.underlying().template get<T>());
                         auto result = predicate(std::forward<T>(input));
                         auto erased = Erased(std::forward<T2>(result));
                         return fiber::FiberOp::value(std::move(erased));
                     } else if(fiber_value.isError()) {
-                        return fiber::FiberOp::error(fiber_value.underlying());
+                        return fiber::FiberOp::error(std::move(fiber_value.underlying()));
                     } else {
                         return fiber::FiberOp::cancel();
                     }
@@ -291,9 +291,9 @@ public:
             op->flatMap([predicate = std::forward<Predicate>(predicate)](auto&& fiber_value) {
                 try {
                     if(fiber_value.isValue()) {
-                        return fiber::FiberOp::value(fiber_value.underlying());
+                        return fiber::FiberOp::value(std::move(fiber_value.underlying()));
                     } else if(fiber_value.isError()) {
-                        auto input = fiber_value.underlying().template get<E>();
+                        auto input = std::move(fiber_value.underlying().template get<E>());
                         auto result = predicate(std::forward<E>(input));
                         auto erased = Erased(std::forward<E2>(result));
                         return fiber::FiberOp::error(std::move(erased));
@@ -330,11 +330,11 @@ public:
             op->flatMap([predicate = std::forward<Predicate>(predicate)](auto&& fiber_input) {
                 try {
                     if(fiber_input.isValue()) {
-                        auto input = fiber_input.underlying().template get<T>();
+                        auto input = std::move(fiber_input.underlying().template get<T>());
                         auto resultTask = predicate(std::forward<T>(input));
                         return resultTask.op;
                     } else if(fiber_input.isError()) {
-                        return fiber::FiberOp::error(fiber_input.underlying());
+                        return fiber::FiberOp::error(std::move(fiber_input.underlying()));
                     } else {
                         return fiber::FiberOp::cancel();
                     }
@@ -366,9 +366,9 @@ public:
         return Task<T,E2>(
             op->flatMap([predicate = std::forward<Predicate>(predicate)](auto&& fiber_input) {
                 if(fiber_input.isValue()) {
-                    return fiber::FiberOp::value(fiber_input.underlying());
+                    return fiber::FiberOp::value(std::move(fiber_input.underlying()));
                 } else if(fiber_input.isError()) {
-                    auto input = fiber_input.underlying().template get<E>();
+                    auto input = std::move(fiber_input.underlying().template get<E>());
                     auto resultTask = predicate(std::forward<E>(input));
                     return resultTask.op;
                 } else {
@@ -408,11 +408,11 @@ public:
                 op->flatMap([successPredicate, errorPredicate](auto&& fiber_input) {
                     try {
                         if(fiber_input.isValue()) {
-                            auto input = fiber_input.underlying().template get<T>();
+                            auto input = std::move(fiber_input.underlying().template get<T>());
                             auto resultTask = successPredicate(std::forward<T>(input));
                             return resultTask.op;
                         } else if(fiber_input.isError()) {
-                            auto input = fiber_input.underlying().template get<E>();
+                            auto input = std::move(fiber_input.underlying().template get<E>());
                             auto resultTask = errorPredicate(std::forward<E>(input));
                             return resultTask.op;
                         } else {
@@ -429,11 +429,11 @@ public:
                 op->flatMap([successPredicate, errorPredicate](auto&& fiber_input) {
                     try {
                         if(fiber_input.isValue()) {
-                            auto input = fiber_input.underlying().template get<T>();
+                            auto input = std::move(fiber_input.underlying().template get<T>());
                             auto resultTask = successPredicate(std::forward<T>(input));
                             return resultTask.op;
                         } else if(fiber_input.isError()) {
-                            auto input = fiber_input.underlying().template get<E>();
+                            auto input = std::move(fiber_input.underlying().template get<E>());
                             auto resultTask = errorPredicate(std::forward<E>(input));
                             return resultTask.op;
                         } else {
@@ -461,11 +461,11 @@ public:
         return Task<E,T>(
             op->flatMap([](auto&& input) {
                 if(input.isError()) {
-                    auto error = input.underlying().template get<E>();
+                    auto error = std::move(input.underlying().template get<E>());
                     auto erased = Erased(std::forward<E>(error));
                     return fiber::FiberOp::value(std::move(erased));
                 } else if(input.isValue()) {
-                    auto value = input.underlying().template get<T>();
+                    auto value = std::move(input.underlying().template get<T>());
                     auto erased = Erased(std::forward<T>(value));
                     return fiber::FiberOp::error(std::move(erased));
                 } else {
@@ -491,11 +491,11 @@ public:
             op->flatMap([handler = std::forward<Predicate>(handler)](auto&& fiber_input) {
                 try {
                     if(fiber_input.isValue()) {
-                        return fiber::FiberOp::value(fiber_input.underlying());
+                        return fiber::FiberOp::value(std::move(fiber_input.underlying()));
                     } else if(fiber_input.isError()) {
-                        auto error = fiber_input.underlying().template get<E>();
+                        const E& error = fiber_input.underlying().template get<E>();
                         handler(error);
-                        return fiber::FiberOp::error(fiber_input.underlying());
+                        return fiber::FiberOp::error(std::move(fiber_input.underlying()));
                     } else {
                         return fiber::FiberOp::cancel();
                     }
@@ -521,9 +521,9 @@ public:
         return Task<T,E>(
             op->flatMap([handler = std::forward<Task<None,None>>(handler)](auto&& fiber_input) {
                 if(fiber_input.isValue()) {
-                    return fiber::FiberOp::value(fiber_input.underlying());
+                    return fiber::FiberOp::value(std::move(fiber_input.underlying()));
                 } else if(fiber_input.isError()) {
-                    return fiber::FiberOp::error(fiber_input.underlying());
+                    return fiber::FiberOp::error(std::move(fiber_input.underlying()));
                 } else {
                     return handler.op->flatMap([](auto) {
                         return fiber::FiberOp::cancel();
@@ -548,9 +548,9 @@ public:
         return Task<T,E>(
             op->flatMap([error = std::forward<E>(error)](auto&& fiber_input) {
                 if(fiber_input.isValue()) {
-                    return fiber::FiberOp::value(fiber_input.underlying());
+                    return fiber::FiberOp::value(std::move(fiber_input.underlying()));
                 } else if(fiber_input.isError()) {
-                    return fiber::FiberOp::error(fiber_input.underlying());
+                    return fiber::FiberOp::error(std::move(fiber_input.underlying()));
                 } else {
                     return fiber::FiberOp::error(error);
                 }
@@ -569,12 +569,12 @@ public:
         return Task<Either<T,E>,E>(
             op->flatMap([](auto&& fiber_value) {
                 if(fiber_value.isValue()) {
-                    auto value = fiber_value.underlying().template get<T>();
+                    auto value = std::move(fiber_value.underlying().template get<T>());
                     auto either = Either<T,E>::left(std::forward<T>(value));
                     auto erased = Erased(std::move(either));
                     return fiber::FiberOp::value(std::move(erased));
                 } else if(fiber_value.isError()) {
-                    auto error = fiber_value.underlying().template get<E>();
+                    auto error = std::move(fiber_value.underlying().template get<E>());
                     auto either = Either<T,E>::right(std::forward<E>(error));
                     auto erased = Erased(std::move(either));
                     return fiber::FiberOp::value(std::move(erased));
@@ -609,18 +609,18 @@ public:
         return Task<T2,E>(
             op->flatMap([](auto&& fiber_input) {
                 if(fiber_input.isValue()) {
-                    auto either = fiber_input.underlying().template get<Either<T2,E>>();
+                    auto either = std::move(fiber_input.underlying().template get<Either<T2,E>>());
                     if(either.is_left()) {
-                        auto value = either.get_left();
+                        auto value = std::move(either).get_left();
                         auto erased = Erased(std::forward<T2>(value));
-                        return fiber::FiberOp::value(erased);
+                        return fiber::FiberOp::value(std::move(erased));
                     } else {
-                        auto error = either.get_right();
+                        auto error = std::move(either).get_right();
                         auto erased = Erased(std::forward<E>(error));
-                        return fiber::FiberOp::error(erased);
+                        return fiber::FiberOp::error(std::move(erased));
                     }
                 } else if(fiber_input.isError()) {
-                    return fiber::FiberOp::error(fiber_input.underlying());
+                    return fiber::FiberOp::error(std::move(fiber_input.underlying()));
                 } else {
                     return fiber::FiberOp::cancel();
                 }
@@ -665,9 +665,9 @@ public:
         return Task<T,E>(
             op->flatMap([predicate = std::forward<Predicate>(predicate)](auto&& fiber_input) {
                 if(fiber_input.isValue()) {
-                    return fiber::FiberOp::value(fiber_input.underlying());
+                    return fiber::FiberOp::value(std::move(fiber_input.underlying()));
                 } else if(fiber_input.isError()) {
-                    auto error = fiber_input.underlying().template get<E>();
+                    auto error = std::move(fiber_input.underlying().template get<E>());
                     auto result = predicate(std::forward<E>(error));
                     auto erased = Erased(std::move(result));
                     return fiber::FiberOp::value(std::move(erased));
@@ -762,15 +762,15 @@ public:
         return Task<T,E>(
             op->flatMap(
                 [task = std::forward<Arg>(task)](auto&& fiber_value) {
-                    return task.op->flatMap([fiber_value = std::forward<fiber::FiberValue>(fiber_value)](auto&& guaranteed_value) {
+                    return task.op->flatMap([fiber_value = std::forward<fiber::FiberValue>(fiber_value)](auto&& guaranteed_value) mutable {
                         if(guaranteed_value.isError()) {
-                            return fiber::FiberOp::error(guaranteed_value.underlying());
+                            return fiber::FiberOp::error(std::move(guaranteed_value.underlying()));
                         } else if(guaranteed_value.isCanceled() || fiber_value.isCanceled()) {
                             return fiber::FiberOp::cancel();
                         } else if(fiber_value.isValue()) {
-                            return fiber::FiberOp::value(fiber_value.underlying());
+                            return fiber::FiberOp::value(std::move(fiber_value.underlying()));
                         } else {
-                            return fiber::FiberOp::error(fiber_value.underlying());
+                            return fiber::FiberOp::error(std::move(fiber_value.underlying()));
                         }
                     });
                 }
