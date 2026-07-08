@@ -546,7 +546,7 @@ public:
     >>
     Task<T,E> onCancelRaiseError(Arg&& error) const noexcept  {
         return Task<T,E>(
-            op->flatMap([error = std::forward<E>(error)](auto&& fiber_input) {
+            op->flatMap([error = E(std::forward<Arg>(error))](auto&& fiber_input) {
                 if(fiber_input.isValue()) {
                     return fiber::FiberOp::value(std::move(fiber_input.underlying()));
                 } else if(fiber_input.isError()) {
