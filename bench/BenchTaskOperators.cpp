@@ -7,10 +7,12 @@
 #include <string>
 #include <vector>
 #include "cask/Task.hpp"
+#include "cask/scheduler/BenchScheduler.hpp"
 
 using cask::Either;
 using cask::None;
 using cask::Task;
+using cask::scheduler::BenchScheduler;
 
 // Benchmarks for per-operator payload traffic. Each stage of a task
 // composition hands its value/error payload to the next stage through
@@ -29,6 +31,53 @@ std::vector<int> make_payload() {
 using VectorTask = Task<std::vector<int>, std::vector<int>>;
 
 } // namespace
+
+// A single eval thunk on the non-throwing fast path - isolates the overhead
+// of entering the THUNK branch in the fiber loop.
+static void BM_Eval_RunSync(benchmark::State& state) {
+    Task<int, std::string> task = Task<int, std::string>::eval([]() {
+        return 42;
+    });
+
+    for (auto _ : state) {
+        auto result = task.runSync();
+        benchmark::DoNotOptimize(result);
+    }
+}
+BENCHMARK(BM_Eval_RunSync);
+
+// Fast path for deferAction: the callback does not throw and returns an
+// already-completed Deferred. This exercises the new typed catch boundary.
+static void BM_DeferAction_Async(benchmark::State& state) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto task = Task<int, std::string>::deferAction([](const auto&) {
+        return cask::Deferred<int, std::string>::pure(42);
+    });
+
+    for (auto _ : state) {
+        auto fiber = task.run(sched);
+        sched->run_ready_tasks();
+        auto result = fiber->await();
+        benchmark::DoNotOptimize(result);
+    }
+}
+BENCHMARK(BM_DeferAction_Async);
+
+// Fast path for deferFiber: the callback does not throw and returns a fiber.
+static void BM_DeferFiber_Async(benchmark::State& state) {
+    auto sched = std::make_shared<BenchScheduler>();
+    auto task = Task<int, std::string>::deferFiber([](const auto& sched) {
+        return Task<int, std::string>::pure(42).run(sched);
+    });
+
+    for (auto _ : state) {
+        auto fiber = task.run(sched);
+        sched->run_ready_tasks();
+        auto result = fiber->await();
+        benchmark::DoNotOptimize(result);
+    }
+}
+BENCHMARK(BM_DeferFiber_Async);
 
 // A chain of map stages moving a vector payload through each stage.
 static void BM_Map_VectorChain(benchmark::State& state) {

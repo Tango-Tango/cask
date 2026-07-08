@@ -53,3 +53,33 @@ TEST(TaskDeferFiber, Cancels) {
     ASSERT_TRUE(fiber->isCanceled());
 }
 
+TEST(TaskDeferFiber, ThrownError) {
+    auto sched = std::make_shared<BenchScheduler>();
+
+    auto fiber = Task<int,std::string>::deferFiber([](const auto&) -> cask::FiberRef<int,std::string> {
+            throw std::string("broke");
+        })
+        .run(sched);
+
+    sched->run_ready_tasks();
+
+    ASSERT_TRUE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getError()), "broke");  // NOLINT(bugprone-unchecked-optional-access)
+}
+
+TEST(TaskDeferFiber, ThrownErrorSurvivesMapErrorRetype) {
+    auto sched = std::make_shared<BenchScheduler>();
+
+    auto fiber = Task<int,std::string>::deferFiber([](const auto&) -> cask::FiberRef<int,std::string> {
+            throw std::string("broke");
+        })
+        .template mapError<int>([](std::string&& error) {
+            return static_cast<int>(error.size());
+        })
+        .run(sched);
+
+    sched->run_ready_tasks();
+
+    ASSERT_TRUE(fiber->getError().has_value());
+    EXPECT_EQ(*(fiber->getError()), 5);  // NOLINT(bugprone-unchecked-optional-access)
+}

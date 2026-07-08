@@ -55,7 +55,10 @@ TEST(FiberOp, Thunk) {
     ASSERT_EQ(op->opType, cask::fiber::THUNK);
 
     auto function = *(op->data.thunkData);
-    EXPECT_EQ(function().template get<int>(), 123);
+    cask::fiber::FiberValue value;
+    function(value);
+    ASSERT_TRUE(value.isValue());
+    EXPECT_EQ(value.underlying().template get<int>(), 123);
 }
 
 TEST(FiberOp, Delay) {

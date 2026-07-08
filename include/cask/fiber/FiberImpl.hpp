@@ -503,7 +503,7 @@ bool FiberImpl<T,E>::evaluateOp(const std::shared_ptr<Scheduler>& sched) {
     case THUNK:
     {
         const FiberOp::ThunkData* thunk = op->data.thunkData;
-        value.setValue((*thunk)());
+        (*thunk)(value);
         op = nullptr;
     }
     break;
