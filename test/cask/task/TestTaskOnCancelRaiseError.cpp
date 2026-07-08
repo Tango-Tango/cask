@@ -10,6 +10,34 @@
 using cask::Task;
 using cask::scheduler::BenchScheduler;
 
+namespace {
+struct MoveTrackingError {
+    std::string message;
+    bool moved_from = false;
+
+    explicit MoveTrackingError(std::string message)
+        : message(std::move(message)) {}
+
+    MoveTrackingError(const MoveTrackingError&) = default;
+    MoveTrackingError& operator=(const MoveTrackingError&) = default;
+
+    MoveTrackingError(MoveTrackingError&& other) noexcept
+        : message(std::move(other.message)) {
+        other.moved_from = true;
+    }
+
+    MoveTrackingError& operator=(MoveTrackingError&& other) noexcept {
+        if(this != &other) {
+            message = std::move(other.message);
+            moved_from = other.moved_from;
+            other.moved_from = true;
+        }
+
+        return *this;
+    }
+};
+}  // namespace
+
 TEST(TaskOnCancelRaiseError,ConvertsToError) {
     auto sched = std::make_shared<BenchScheduler>();
     auto fiber = Task<int, std::string>::never()
@@ -49,4 +77,25 @@ TEST(TaskOnCancelRaiseError,IgnoresError) {
     sched->run_ready_tasks();
 
     EXPECT_EQ(fiber->await(), "broke");
+}
+
+TEST(TaskOnCancelRaiseError,DoesNotMoveFromLvalueError) {
+    auto sched = std::make_shared<BenchScheduler>();
+    MoveTrackingError error("cancel happened");
+
+    auto fiber = Task<int, MoveTrackingError>::never()
+        .onCancelRaiseError(error)
+        .run(sched);
+
+    EXPECT_FALSE(error.moved_from);
+
+    sched->run_ready_tasks();
+    fiber->cancel();
+    sched->run_ready_tasks();
+
+    auto fiber_error = fiber->getError();
+    ASSERT_TRUE(fiber_error.has_value());
+    const auto raised_error = fiber_error.value_or(MoveTrackingError(""));
+    EXPECT_EQ(raised_error.message, "cancel happened");
+    EXPECT_FALSE(error.moved_from);
 }

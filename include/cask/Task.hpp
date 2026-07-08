@@ -533,7 +533,7 @@ public:
     >>
     Task<T,E> doOnCancel(Arg&& handler) const noexcept  {
         return Task<T,E>(
-            op->flatMap([handler = std::forward<Task<None,None>>(handler)](auto&& fiber_input) {
+            op->flatMap([handler = std::forward<Arg>(handler)](auto&& fiber_input) {
                 if(fiber_input.isValue()) {
                     return fiber::FiberOp::value(std::move(fiber_input.underlying()));
                 } else if(fiber_input.isError()) {
@@ -560,7 +560,7 @@ public:
     >>
     Task<T,E> onCancelRaiseError(Arg&& error) const noexcept  {
         return Task<T,E>(
-            op->flatMap([error = std::forward<E>(error)](auto&& fiber_input) {
+            op->flatMap([error = E(std::forward<Arg>(error))](auto&& fiber_input) {
                 if(fiber_input.isValue()) {
                     return fiber::FiberOp::value(std::move(fiber_input.underlying()));
                 } else if(fiber_input.isError()) {

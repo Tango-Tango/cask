@@ -90,3 +90,26 @@ TEST(TaskDoOnCancel, RunsForCanceledTask) {
     EXPECT_EQ(cancel_counter, 1);
 }
 
+TEST(TaskDoOnCancel, PreservesLvalueHandler) {
+    int cancel_counter = 0;
+    auto sched = std::make_shared<BenchScheduler>();
+    auto handler = Task<None,None>::eval([&cancel_counter] {
+        cancel_counter++;
+        return None();
+    });
+
+    auto task = Task<int,std::string>::never().doOnCancel(handler);
+
+    ASSERT_NE(handler.op, nullptr);
+
+    auto fiber = task.run(sched);
+    auto handler_fiber = handler.run(sched);
+
+    sched->run_ready_tasks();
+    fiber->cancel();
+    sched->run_ready_tasks();
+
+    ASSERT_TRUE(fiber->isCanceled());
+    ASSERT_TRUE(handler_fiber->getValue().has_value());
+    EXPECT_EQ(cancel_counter, 2);
+}
