@@ -92,7 +92,13 @@ public:
     template <typename Predicate = std::function<T()>>
     static Task<T,E> eval(Predicate&& thunk) noexcept {
         return Task<T,E>(
-            fiber::FiberOp::thunk(std::forward<Predicate>(thunk))
+            fiber::FiberOp::thunk([thunk = std::forward<Predicate>(thunk)](fiber::FiberValue& fiber_value) mutable {
+                try {
+                    fiber_value.setValue(Erased(thunk()));
+                } catch(E& error) {
+                    fiber_value.setError(Erased(error));
+                }
+            })
         );
     }
 
@@ -128,10 +134,14 @@ public:
     static Task<T,E> deferAction(Predicate&& predicate) noexcept  {
         return Task<T,E>(
             fiber::FiberOp::async([predicate = std::forward<Predicate>(predicate)](const auto& sched) {
-                return predicate(sched)->template mapBoth<Erased,Erased>(
-                    [](auto&& value) { return value; },
-                    [](auto&& error) { return error; }
-                );
+                try {
+                    return predicate(sched)->template mapBoth<Erased,Erased>(
+                        [](auto&& value) { return value; },
+                        [](auto&& error) { return error; }
+                    );
+                } catch(E& error) {
+                    return Deferred<Erased,Erased>::raiseError(Erased(error));
+                }
             })
         );
     }
@@ -154,12 +164,16 @@ public:
     static Task<T,E> deferFiber(Predicate&& predicate) noexcept  {
         return Task<T,E>(
             fiber::FiberOp::async([predicate = std::forward<Predicate>(predicate)](const auto& sched) {
-                auto fiber = predicate(sched)->template mapBoth<Erased,Erased>(
-                    [](auto&& value) { return value; },
-                    [](auto&& error) { return error; }
-                );
+                try {
+                    auto fiber = predicate(sched)->template mapBoth<Erased,Erased>(
+                        [](auto&& value) { return value; },
+                        [](auto&& error) { return error; }
+                    );
 
-                return Deferred<Erased,Erased>::forFiber(fiber);
+                    return Deferred<Erased,Erased>::forFiber(fiber);
+                } catch(E& error) {
+                    return Deferred<Erased,Erased>::raiseError(Erased(error));
+                }
             })
         );
     }

@@ -98,7 +98,7 @@ enum FiberOpType : std::uint8_t { ASYNC, VALUE, ERROR, FLATMAP, THUNK, DELAY, RA
  * 
  *   1. `Value` represents a pure value which does not need to be computed.
  *   2. `Error` represents an errors which should halt execution.
- *   3. `Thunk` represents a lazily-evaluated method which returns a `Value`.
+ *   3. `Thunk` represents a lazily-evaluated method which writes a fiber result.
  *   4. `Async` represents an asynchronous operation.
  *   5. `FlatMap` represents a composite program which takes the results
  *      from one program (the input) and provides it to another program (
@@ -116,7 +116,7 @@ public:
     // The opType field (VALUE vs ERROR) already tells us which case it is.
     using ConstantData = Erased;
     using AsyncData = std::function<DeferredRef<Erased,Erased>(const std::shared_ptr<Scheduler>&)>;
-    using ThunkData = std::function<Erased()>;
+    using ThunkData = std::function<void(FiberValue&)>;
     using FlatMapInput = FiberOpRef;
     using FlatMapPredicate = std::function<FiberOpRef(FiberValue&&)>;
     using FlatMapData = std::pair<FlatMapInput,FlatMapPredicate>;
@@ -156,14 +156,28 @@ public:
     }
 
     template <typename Predicate, typename = std::enable_if_t<
-        std::is_convertible<
-            std::remove_reference_t<Predicate>,
-            std::function<Erased()>
-        >::value
+        std::is_invocable<std::remove_reference_t<Predicate>&>::value ||
+        std::is_invocable<std::remove_reference_t<Predicate>&,FiberValue&>::value
     >>
     static FiberOpRef thunk(Predicate&& thunk) noexcept {
         auto pool = cask::pool::global_pool();
-        auto thunk_data = pool->allocate<ThunkData>(std::forward<Predicate>(thunk));
+        auto thunk_data = pool->allocate<ThunkData>(
+            [thunk = std::forward<Predicate>(thunk)](FiberValue& fiber_value) mutable {
+                if constexpr (std::is_invocable<std::remove_reference_t<Predicate>&,FiberValue&>::value) {
+                    thunk(fiber_value);
+                } else {
+                    using Result = std::remove_cv_t<std::remove_reference_t<std::invoke_result_t<Predicate&>>>;
+
+                    if constexpr (std::is_same<Result,FiberValue>::value) {
+                        fiber_value = thunk();
+                    } else if constexpr (std::is_same<Result,Erased>::value) {
+                        fiber_value.setValue(thunk());
+                    } else {
+                        fiber_value.setValue(Erased(thunk()));
+                    }
+                }
+            }
+        );
         return FiberOpRef::adopt(pool->allocate<FiberOp>(thunk_data, pool));
     }
 

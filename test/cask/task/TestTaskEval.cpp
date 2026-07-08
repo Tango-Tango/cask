@@ -24,3 +24,41 @@ TEST(TaskEval,EvaluatesAsync) {
     
     EXPECT_EQ(result, 123);
 }
+
+TEST(TaskEval,ThrownErrorBecomesSyncFailure) {
+    auto result = Task<int, std::string>::eval([]() -> int {
+        throw std::string("broke");
+    }).runSync();
+
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->is_right());  // NOLINT(bugprone-unchecked-optional-access)
+    EXPECT_EQ(result->get_right(), "broke");  // NOLINT(bugprone-unchecked-optional-access)
+}
+
+TEST(TaskEval,ThrownErrorBecomesAsyncFailure) {
+    try {
+        Task<int, std::string>::eval([]() -> int {
+            throw std::string("broke");
+        })
+            .run(Scheduler::global())
+            ->await();
+
+        FAIL() << "Expected task error to be thrown.";
+    } catch(const std::string& error) {
+        EXPECT_EQ(error, "broke");
+    }
+}
+
+TEST(TaskEval,ThrownErrorSurvivesMapErrorRetype) {
+    auto result = Task<int, std::string>::eval([]() -> int {
+        throw std::string("broke");
+    })
+        .template mapError<int>([](std::string&& error) {
+            return static_cast<int>(error.size());
+        })
+        .runSync();
+
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->is_right());  // NOLINT(bugprone-unchecked-optional-access)
+    EXPECT_EQ(result->get_right(), 5);  // NOLINT(bugprone-unchecked-optional-access)
+}
