@@ -95,6 +95,10 @@ TEST(TaskOnCancelRaiseError,DoesNotMoveFromLvalueError) {
 
     auto fiber_error = fiber->getError();
     ASSERT_TRUE(fiber_error.has_value());
+    if(!fiber_error.has_value()) {
+        return;
+    }
+
     EXPECT_EQ(fiber_error->message, "cancel happened");
     EXPECT_FALSE(error.moved_from);
 }
